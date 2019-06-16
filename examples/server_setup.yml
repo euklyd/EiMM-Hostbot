@@ -1,0 +1,21 @@
+name: Server Name
+channels:
+  announcements: Announcements Channel Name
+  flips: Flips Channel Name
+  gamechat: Gamechat Channel Name
+  graveyard: Graveyard Channel Name
+  music: Music Channel Name
+roles:
+  host:
+    name: Host Role Name
+    color: 0xffffff
+  player:
+    name: Player Role Name
+    color: 0xffffff
+  dead:
+    name: Dead Role Name
+    color: 0xffffff
+  spec:
+    name: Spec Role Name
+    color: 0xffffff
+sheet: Sheet Name Here
