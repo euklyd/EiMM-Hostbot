@@ -1,0 +1,4 @@
+conf/settings.py
+conf/google_creds.json
+__pycache__
+.DS_Store
