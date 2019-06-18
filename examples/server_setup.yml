@@ -8,14 +8,14 @@ channels:
 roles:
   host:
     name: Host Role Name
-    color: 0xffffff
+    color: 0x8855ee
   player:
     name: Player Role Name
-    color: 0xffffff
+    color: 0x00bb99
   dead:
     name: Dead Role Name
-    color: 0xffffff
+    color: 0xbb0055
   spec:
     name: Spec Role Name
-    color: 0xffffff
-sheet: Sheet Name Here
+    color: 0x8181bb
+sheet: Sheet Name Here  # This will provide access to everything on your sheet.
