@@ -1,7 +1,7 @@
 import discord
 from discord.ext import commands
 
-import settings
+import conf.settings as settings
 
 bot = commands.Bot(
     command_prefix=settings.prefix,
@@ -15,5 +15,11 @@ for plugin in settings.plugins:
 async def reload(ctx, plugin):
     bot.reload_extension(f'plugins.{plugin}')
     await ctx.send(f'Reloaded plugin `{plugin}`.')
+
+@bot.command()
+async def shutdown(ctx):
+    await ctx.send('As you wish.')
+    await bot.logout()
+
 
 bot.run(settings.client_token)
