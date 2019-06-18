@@ -7,7 +7,11 @@ import yaml
 from pathlib import Path
 
 from sqlalchemy import create_engine
-import hostbot_schema
+from sqlalchemy.orm import sessionmaker
+import plugins.hostbot_schema as hbs
+
+
+session_maker = None
 
 
 @commands.command()
@@ -20,18 +24,26 @@ async def init(ctx):
 
 @init.command(name='server')
 async def init_server(ctx, *, yml):
-    # TODO: wip
+    session = session_maker()
 
-    yml = yml.strip('```yml\n')
-    ctx.guild
+    yml = yaml.load(yml.strip('```yml\n'))
+    # await ctx.send(f'parsed:```json\n{pprint.pformat(yml)}```')
 
-    for key, role in yml['roles']:
+    server   = hbs.Server(
+        id=ctx.guild.id,
+        name=yml['name'],
+        sheet=yml['sheet']
+    )
+    roles    = []
+    channels = []
+
+    for key, role in yml['roles'].items():
         perms = discord.Permissions()
         if key == 'host':
-            perms.update({
+            perms.update(**{
                 'manage_channels': True,
                 'manage_roles': True,
-                'change_nickname': True
+                'change_nickname': True,
                 'manage_nicknames': True,
                 'manage_messages': True,
                 'mention_everyone': True,
@@ -39,34 +51,68 @@ async def init_server(ctx, *, yml):
             })
         new_role = await ctx.guild.create_role(
             name=role['name'],
-            color=role['color'],
+            color=discord.Color(role['color']),
             permissions=perms,
             hoist=True,
             reason=f'The {key} role.'
         )
         role['role'] = new_role
+        roles.append(hbs.Role(id=new_role.id, type=key))
+    server.roles = roles
 
-    for key, channel_name in yml['channels']:
+    for key, channel_name in yml['channels'].items():
         roles = yml['roles']
         overwrites = {}
         if key == 'gamechat':
             overwrites[roles['player']['role']]: discord.PermissionOverwrite(send_messages=True)
         else:
             overwrites[roles['player']['role']]: discord.PermissionOverwrite(send_messages=False)
-        if key = 'graveyard':
+        if key == 'graveyard':
             overwrites[roles['player']['role']]: discord.PermissionOverwrite(read_messages=False)
             overwrites[roles['dead']['role']]: discord.PermissionOverwrite(send_messages=True)
         else:
             overwrites[roles['dead']['role']]: discord.PermissionOverwrite(send_messages=False)
 
         new_channel = await ctx.guild.create_text_channel(
-            name = channel_name
+            name=channel_name,
+            overwrites=overwrites
         )
-    # await ctx.send(f'```json\n{pprint.pformat(yml)}```')
+        channels.append(hbs.Channel(id=new_channel.id, type=key))
+    server.channels = channels
+
+    session.add(server)
+    session.commit()
+
+    await ctx.send('created a bunch of things')
 
 @init.command(name='reset')
 async def init_reset(ctx):
-    await ctx.send('oh shit lol')
+    session = session_maker()
+    server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+    if server is None:
+        await ctx.send('This server has not been set up; nothing to reset.')
+        return
+
+    reason = f'Server reset by {ctx.author}'
+
+    try:
+        for channel in server.channels:
+            discord_ch = ctx.guild.get_channel(channel.id)
+            await discord_ch.delete(reason=reason)
+    except discord.Forbidden:
+        await ctx.send('Insufficient permissions to delete channels.')
+
+    try:
+        for role in server.roles:
+            discord_role = ctx.guild.get_role(role.id)
+            await discord_role.delete(reason=reason)
+    except discord.Forbidden:
+        await ctx.send('Insufficient permissions to delete roles.')
+
+    session.delete(server)
+    session.commit()
+
+    await ctx.send('i deleted ur stuffz')
 
 # @init.command(name='updaterole')
 # async def init_db_update(ctx, roletype, role):
@@ -78,15 +124,18 @@ async def init_reset(ctx):
 
 
 def setup(bot):
+    global session_maker
     bot.add_command(hello)
     bot.add_command(init)
 
-    db_file = 'databases/hostbot.db'
-    fresh = False
+    db_dir = 'databases/'
+    db_file = f'{db_dir}/hostbot.db'
     if not Path(db_file).exists():
-        # need to create initial tables
-        fresh = True
-    engine = create_engine(f'sqlite:///{db_file}')
+        # TODO: Don't technically need this condition?
+        # Adds a bit of clarity though, so keeping it in for now.
+        Path(db_dir).mkdir(exist_ok=True)
 
-    if fresh:
-        # create the tables
+    engine = create_engine(f'sqlite:///{db_file}')
+    session_maker = sessionmaker(bind=engine)
+
+    hbs.Base.metadata.create_all(engine)
