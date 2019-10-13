@@ -144,8 +144,8 @@ class ProfileValidation:
             raise InputError(birthday, "input has an invalid date format")
         try:
             year = int(2004)  # 2004 is a leap year, so 02/29 will exist
-            month = int(matches.group(2))
-            day = int(matches.group(3))
+            month = int(matches.group(1))
+            day = int(matches.group(2))
             # we don't need to store this result, it is just a check
             datetime.datetime(year=year, month=month, day=day)
         except ValueError:
@@ -289,8 +289,41 @@ class Profiles(commands.Cog):
         Sets the "birthday" and "age range" fields. Opens an input menu.
         All dates are in MM/DD or YYYY/MM/DD. Sorry Euros.
         """
-        # use selection: birthday_year / birthday_day / age_range
-        pass
+        options = ['birthday and year', 'birthday only', 'age range only', 'birthday and age range']
+        selection = await menu.menu_list(ctx, options)
+        birthdate = None
+        birthday = None
+        age_range = None
+        if selection == 'birthday and year':
+            def check(m):
+                try:
+                    ProfileValidation.birthday_year(m.content)
+                    return True
+                except InputError:
+                    return False
+            await ctx.send('Enter your birthdate (YYYY/MM/DD):')
+            msg = await self.bot.wait_for('message', check=check, timeout=600)
+            birthdate = ProfileValidation.birthday_year(msg.content)
+            birthdate = birthdate.strftime('%Y/%m/%d')
+        if selection == 'birthday only' or selection == 'birthday and age range':
+            def check(m):
+                try:
+                    ProfileValidation.birthday_day(m.content)
+                    return True
+                except InputError:
+                    return False
+            await ctx.send('Enter your birthdate (MM/DD):')
+            msg = await self.bot.wait_for('message', check=check, timeout=600)
+            birthday = ProfileValidation.birthday_day(msg.content)
+        if selection == 'age range only' or selection == 'birthday and age range':
+            age_range = await menu.menu_list(ctx, ProfileValidation.legal_age_ranges)
+
+        if birthdate is not None:
+            await ctx.send(f'Checked birthdate: `{birthdate}`')
+        if birthday is not None:
+            await ctx.send(f'Checked birthday: `{birthday}`')
+        if age_range is not None:
+            await ctx.send(f'Checked age range: `{age_range}`')
 
     @set.group(name='student')
     async def set_student(self, ctx: commands.Context, student: str):
