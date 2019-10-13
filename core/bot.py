@@ -31,6 +31,10 @@ class Bot(commands.Bot):
             self._redtick = self.get_emoji(self.conf.redtick_id)  # type: discord.Emoji
         return self._redtick
 
+    @property
+    def default_command_prefix(self) -> str:
+        return self.command_prefix[0]
+
     async def wait_for_first(self, events: List[str], *, checks: Optional[List[Callable[..., bool]]] = None,
                              timeout=None) -> Tuple[Any, str]:
         """|coro|

@@ -12,6 +12,9 @@ bot = Bot(
     owner_id=settings.owner_id,
 )
 
+for cog in settings.cogs:
+    bot.add_cog(cog(bot))
+
 for plugin in settings.plugins:
     bot.load_extension(f'plugins.{plugin}')
 
