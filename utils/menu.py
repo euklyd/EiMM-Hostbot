@@ -1,5 +1,6 @@
 import asyncio
 from contextlib import ExitStack
+import math
 from typing import Iterable, MutableMapping, List, Set, Tuple
 
 import discord
@@ -16,7 +17,7 @@ async def menu_list(ctx: commands.context.Context, ls: Iterable, timeout: int = 
     for i, e in enumerate(ls):
         keys.append(str(i))
         elems.append(e)
-    await menu_wrapper(ctx, keys, elems, timeout)
+    return await menu_wrapper(ctx, keys, elems, timeout)
 
 
 async def menu_dict(ctx: commands.context.Context, d: MutableMapping, timeout: int = 600):
@@ -24,7 +25,7 @@ async def menu_dict(ctx: commands.context.Context, d: MutableMapping, timeout: i
     for k, e in d.items():
         keys.append(str(k))
         elems.append(e)
-    await menu_wrapper(ctx, keys, elems, timeout)
+    return await menu_wrapper(ctx, keys, elems, timeout)
 
 
 def menu_str(keys: List, elements: List, page, items_per_page=20):
@@ -37,7 +38,12 @@ def menu_str(keys: List, elements: List, page, items_per_page=20):
     output_str = ''
     for k, e in zip(keys[start:stop], elements[start:stop]):
         output_str += f'{k!s:>{max_len}}- {e}\n'
-    return f'```{output_str}```'
+    output_str = f'```\n{output_str}\n```'
+    if len(keys) > items_per_page:
+        output_str += f'*(Page {page+1} of {math.ceil(len(keys) / items_per_page)}. Select an item or `cancel`.)*'
+    else:
+        output_str += f'*(Select an item or `cancel`.)*'
+    return output_str
 
 
 async def menu_wrapper(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600):
@@ -47,7 +53,7 @@ async def menu_wrapper(ctx: commands.context.Context, keys: List, elements: List
     _locks.add(lock)
     with ExitStack() as stack:
         stack.callback(_locks.remove, lock)
-        await menu_loop(ctx, keys, elements, timeout)
+        return await menu_loop(ctx, keys, elements, timeout)
 
 
 async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600):
@@ -61,8 +67,10 @@ async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, t
     assert None not in keys
 
     menu_msg = await ctx.send(initial_menu)  # type: discord.Message
-    await menu_msg.add_reaction(ARROW_LEFT)
-    await menu_msg.add_reaction(ARROW_RIGHT)
+
+    if len(keys) > NUM_ITEMS:
+        await menu_msg.add_reaction(ARROW_LEFT)
+        await menu_msg.add_reaction(ARROW_RIGHT)
 
     bot = ctx.bot  # type: core.bot.Bot
 
@@ -84,7 +92,11 @@ async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, t
             assert type(result) is discord.Message, f'result type was {type(result)}, expected discord.Message'
             if result.content in keys:
                 selection = result.content
-                await ctx.send(elements[keys.index(selection)])
+                # await ctx.send(elements[keys.index(selection)])
+                break
+            if result.content.lower() == 'cancel':
+                # exit menu loop
+                selection = 'cancel'
                 break
         else:
             # check for arrow direction
@@ -103,9 +115,13 @@ async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, t
         await menu_msg.remove_reaction(ARROW_LEFT, member=ctx.bot.user)
         await menu_msg.remove_reaction(ARROW_RIGHT, member=ctx.bot.user)
 
-    if selection is None:
+    if selection == 'cancel':
+        await menu_msg.add_reaction(ctx.bot.redtick)
+        return None
+
+    if selection is None or selection not in keys:
         await menu_msg.add_reaction(ctx.bot.redtick)
         raise asyncio.TimeoutError
 
     await menu_msg.add_reaction(ctx.bot.greentick)
-    return selection
+    return elements[keys.index(selection)]
