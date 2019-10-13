@@ -9,6 +9,7 @@ from discord.ext import commands
 
 from oauth2client.service_account import ServiceAccountCredentials
 
+from core.bot import Bot
 from utils import menu
 
 SCOPE = [
@@ -16,13 +17,8 @@ SCOPE = [
     'https://www.googleapis.com/auth/drive'
 ]
 SECRET = 'conf/google_client_secret.json'
+SHEET_NAME = 'EiMM Community Profiles'
 
-
-# class _SENTINEL:
-#     pass
-#
-#
-# BAD_INPUT = _SENTINEL()
 
 class InputError(Exception):
     def __init__(self, bad_input: Any, message: str):
@@ -39,9 +35,9 @@ def open_sheet(sheet_name: str) -> gspread.Spreadsheet:
     return client.open(sheet_name)
 
 
-class Sheet(gspread.Worksheet):
-    def headings(self):
-        return self.row_values(1)
+# class Sheet(gspread.Worksheet):
+#     def headings(self):
+#         return self.row_values(1)
 
 
 class ProfileValidation:
@@ -183,7 +179,7 @@ class ProfileValidation:
 
 
 class Profiles(commands.Cog):
-    def __init__(self, bot):
+    def __init__(self, bot: Bot):
         self.bot = bot
 
     @commands.command()
@@ -236,8 +232,11 @@ class Profiles(commands.Cog):
         - they/them/theirs
         """
         pronouns = await menu.menu_list(ctx, ProfileValidation.legal_pronouns)
-        checked = ProfileValidation.pronouns(pronouns)
-        await ctx.send(f'Checked: `{checked}`.')
+        try:
+            checked = ProfileValidation.pronouns(pronouns)
+            await ctx.send(f'Checked: `{checked}`.')
+        except InputError as ie:
+            await ctx.send(f'Error: `{ie}`')
 
     @set.group(name='communities')
     async def set_communities(self, ctx: commands.Context):
@@ -253,8 +252,12 @@ class Profiles(commands.Cog):
         """
         Sets the "country" field. Opens a selection menu.
         """
-        # use menu: country
-        pass
+        countries = await menu.menu_list(ctx, ProfileValidation.legal_countries)
+        try:
+            checked = ProfileValidation.country(countries)
+            await ctx.send(f'Checked: `{checked}`.')
+        except InputError as ie:
+            await ctx.send(f'Error: `{ie}`')
 
     @set.group(name='offset')
     async def set_offset(self, ctx: commands.Context):
@@ -263,7 +266,22 @@ class Profiles(commands.Cog):
         This is a UTC offset, in the format UTC±HH:MM. See https://en.wikipedia.org/wiki/List_of_time_zone_abbreviations for a list.
         """
         # use selection: offset
-        pass
+        await ctx.send('Enter the UTC offset for your timezone (i.e., `UTC±HH:MM`).')
+        answer = None
+        while answer is None:
+            msg = await self.bot.wait_for(event='message', check=lambda m: m.author == ctx.author, timeout=600)
+            if msg.content.lower() == 'cancel':
+                answer = 'cancel'
+                break
+            try:
+                answer = ProfileValidation.offset(msg.content)
+            except InputError as ie:
+                await ctx.send(f'Error: `{ie}`. Try again.')
+                answer = None
+        if answer == 'cancel':
+            await ctx.send('Canceled.')
+        else:
+            await ctx.send(f'Checked: `{answer}`.')
 
     @set.group(name='birthday')
     async def set_birthday(self, ctx: commands.Context):
