@@ -1,7 +1,8 @@
 import asyncio
+import re
 from contextlib import ExitStack
 import math
-from typing import Iterable, MutableMapping, List, Set, Tuple
+from typing import Iterable, MutableMapping, List, Set, Tuple, Union
 
 import discord
 from discord.ext import commands
@@ -12,23 +13,23 @@ import core
 _locks = set()  # type: Set[Tuple[int, int]]  # represents a tuple of user IDs and channel IDs
 
 
-async def menu_list(ctx: commands.context.Context, ls: Iterable, timeout: int = 600):
+async def menu_list(ctx: commands.context.Context, ls: Iterable, timeout: int = 600, select_max: int = 1):
     keys, elems = [], []
     for i, e in enumerate(ls):
         keys.append(str(i))
         elems.append(e)
-    return await menu_wrapper(ctx, keys, elems, timeout)
+    return await menu_wrapper(ctx, keys, elems, timeout=timeout, select_max=select_max)
 
 
-async def menu_dict(ctx: commands.context.Context, d: MutableMapping, timeout: int = 600):
+async def menu_dict(ctx: commands.context.Context, d: MutableMapping, timeout: int = 600, select_max: int = 1):
     keys, elems = [], []
     for k, e in d.items():
         keys.append(str(k))
         elems.append(e)
-    return await menu_wrapper(ctx, keys, elems, timeout)
+    return await menu_wrapper(ctx, keys, elems, timeout=timeout, select_max=select_max)
 
 
-def menu_str(keys: List, elements: List, page, items_per_page=20):
+def menu_str(keys: List, elements: List, page, items_per_page=20, select_max: int = 1):
     start, stop = page * items_per_page, (page + 1) * items_per_page
 
     max_len = 0
@@ -39,31 +40,50 @@ def menu_str(keys: List, elements: List, page, items_per_page=20):
     for k, e in zip(keys[start:stop], elements[start:stop]):
         output_str += f'{k!s:>{max_len}}- {e}\n'
     output_str = f'```\n{output_str}\n```'
+    select_str = 'an item'
+    if select_max > 1:
+        select_str = f"up to {select_max} items, separated by commas,"
     if len(keys) > items_per_page:
-        output_str += f'*(Page {page+1} of {math.ceil(len(keys) / items_per_page)}. Select an item or `cancel`.)*'
+        output_str += f'*(Page {page+1} of {math.ceil(len(keys) / items_per_page)}. Select {select_str} or `cancel`.)*'
     else:
-        output_str += f'*(Select an item or `cancel`.)*'
+        output_str += f'*(Select {select_str} or `cancel`.)*'
     return output_str
 
 
-async def menu_wrapper(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600):
+async def menu_wrapper(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600, select_max: int = 1):
     lock = (ctx.author.id, ctx.channel.id)
     if lock in _locks:
         raise RuntimeError("you already have a menu instance in this channel")
     _locks.add(lock)
     with ExitStack() as stack:
         stack.callback(_locks.remove, lock)
-        return await menu_loop(ctx, keys, elements, timeout)
+        return await menu_loop(ctx, keys, elements, timeout=timeout, select_max=select_max)
 
 
-async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600):
+async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600, select_max: int = 1):
     NUM_ITEMS = 20
     ARROW_LEFT, ARROW_RIGHT = '◀', '▶'
 
+    def single_condition(s: str):
+        return s in keys
+
+    def multi_condition(ls: List[str]):
+        if ls is None:
+            return False
+        for elem in ls:
+            if elem not in keys:
+                return False
+        return True
+
+    if select_max > 1:
+        cond = multi_condition
+    else:
+        cond = single_condition
+
     page = 0
 
-    initial_menu = menu_str(keys, elements, page, items_per_page=NUM_ITEMS)
-    selection = None
+    initial_menu = menu_str(keys, elements, page, items_per_page=NUM_ITEMS, select_max=select_max)
+    selection = None  # type: Union[None, str, List[str]]
     assert None not in keys
 
     menu_msg = await ctx.send(initial_menu)  # type: discord.Message
@@ -81,7 +101,7 @@ async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, t
         lambda rxn, usr: usr == ctx.author and rxn.message.id == menu_msg.id and rxn.emoji in [ARROW_LEFT, ARROW_RIGHT],
     ]
 
-    while selection not in keys:
+    while not cond(selection):
         try:
             result, event_type = await bot.wait_for_first(events=events, checks=checks, timeout=timeout)
         except asyncio.TimeoutError:
@@ -90,14 +110,17 @@ async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, t
         if event_type == 'message':
             # check for selection
             assert type(result) is discord.Message, f'result type was {type(result)}, expected discord.Message'
-            if result.content in keys:
-                selection = result.content
-                # await ctx.send(elements[keys.index(selection)])
-                break
             if result.content.lower() == 'cancel':
                 # exit menu loop
                 selection = 'cancel'
                 break
+            selection = result.content
+            if select_max > 1:
+                selection = re.split(r', *', selection)
+            # if result.content in keys:
+            #     selection = result.content
+            #     # await ctx.send(elements[keys.index(selection)])
+            #     break
         else:
             # check for arrow direction
             reaction = result[0]
@@ -106,7 +129,7 @@ async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, t
                 page = max(0, page - 1)
             else:
                 page = min(int(len(keys)/NUM_ITEMS), page + 1)
-            new_menu = menu_str(keys, elements, page)
+            new_menu = menu_str(keys, elements, page, items_per_page=NUM_ITEMS, select_max=select_max)
             await menu_msg.edit(content=new_menu)
 
     if ctx.me.permissions_in(ctx.channel).manage_messages:
@@ -119,9 +142,14 @@ async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, t
         await menu_msg.add_reaction(ctx.bot.redtick)
         return None
 
-    if selection is None or selection not in keys:
+    if selection is None:
         await menu_msg.add_reaction(ctx.bot.redtick)
         raise asyncio.TimeoutError
 
+    if select_max > 1:
+        ret = [elements[keys.index(sel)] for sel in selection]
+    else:
+        ret = elements[keys.index(selection)]
+
     await menu_msg.add_reaction(ctx.bot.greentick)
-    return elements[keys.index(selection)]
+    return ret
