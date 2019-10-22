@@ -1,7 +1,8 @@
 import asyncio
-import re
-from contextlib import ExitStack
 import math
+import re
+from collections import OrderedDict
+from contextlib import ExitStack
 from typing import Iterable, MutableMapping, List, Set, Tuple, Union
 
 import discord
@@ -9,27 +10,28 @@ from discord.ext import commands
 
 import core
 
-
 _locks = set()  # type: Set[Tuple[int, int]]  # represents a tuple of user IDs and channel IDs
 
 
-async def menu_list(ctx: commands.context.Context, ls: Iterable, timeout: int = 600, select_max: int = 1):
+async def menu_list(ctx: commands.context.Context, ls: Iterable, timeout: int = 600,
+                    select_max: Union[int, None] = 1, repeats: bool = False):
     keys, elems = [], []
     for i, e in enumerate(ls):
         keys.append(str(i))
         elems.append(e)
-    return await menu_wrapper(ctx, keys, elems, timeout=timeout, select_max=select_max)
+    return await menu_wrapper(ctx, keys, elems, timeout=timeout, select_max=select_max, repeats=repeats)
 
 
-async def menu_dict(ctx: commands.context.Context, d: MutableMapping, timeout: int = 600, select_max: int = 1):
+async def menu_dict(ctx: commands.context.Context, d: MutableMapping, timeout: int = 600,
+                    select_max: Union[int, None] = 1, repeats: bool = False):
     keys, elems = [], []
     for k, e in d.items():
-        keys.append(str(k))
+        keys.append(str(k).replace(',', ''))
         elems.append(e)
-    return await menu_wrapper(ctx, keys, elems, timeout=timeout, select_max=select_max)
+    return await menu_wrapper(ctx, keys, elems, timeout=timeout, select_max=select_max, repeats=repeats)
 
 
-def menu_str(keys: List, elements: List, page, items_per_page=20, select_max: int = 1):
+def menu_str(keys: List, elements: List, page, items_per_page=20, select_max: Union[int, None] = 1):
     start, stop = page * items_per_page, (page + 1) * items_per_page
 
     max_len = 0
@@ -41,7 +43,9 @@ def menu_str(keys: List, elements: List, page, items_per_page=20, select_max: in
         output_str += f'{k!s:>{max_len}}- {e}\n'
     output_str = f'```\n{output_str}\n```'
     select_str = 'an item'
-    if select_max > 1:
+    if select_max is None:
+        select_str = 'one or more items, separated by commas,'
+    elif select_max > 1:
         select_str = f"up to {select_max} items, separated by commas,"
     if len(keys) > items_per_page:
         output_str += f'*(Page {page+1} of {math.ceil(len(keys) / items_per_page)}. Select {select_str} or `cancel`.)*'
@@ -50,17 +54,19 @@ def menu_str(keys: List, elements: List, page, items_per_page=20, select_max: in
     return output_str
 
 
-async def menu_wrapper(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600, select_max: int = 1):
+async def menu_wrapper(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600,
+                       select_max: Union[int, None] = 1, repeats: bool = False):
     lock = (ctx.author.id, ctx.channel.id)
     if lock in _locks:
         raise RuntimeError("you already have a menu instance in this channel")
     _locks.add(lock)
     with ExitStack() as stack:
         stack.callback(_locks.remove, lock)
-        return await menu_loop(ctx, keys, elements, timeout=timeout, select_max=select_max)
+        return await menu_loop(ctx, keys, elements, timeout=timeout, select_max=select_max, repeats=repeats)
 
 
-async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600, select_max: int = 1):
+async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600,
+                    select_max: Union[int, None] = 1, repeats: bool = False):
     NUM_ITEMS = 20
     ARROW_LEFT, ARROW_RIGHT = '◀', '▶'
 
@@ -75,9 +81,11 @@ async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, t
                 return False
         return True
 
-    if select_max > 1:
+    if select_max is None or select_max > 1:
+        multi_select = True
         cond = multi_condition
     else:
+        multi_select = False
         cond = single_condition
 
     page = 0
@@ -115,8 +123,11 @@ async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, t
                 selection = 'cancel'
                 break
             selection = result.content
-            if select_max > 1:
+            if multi_select:
                 selection = re.split(r', *', selection)
+                if select_max is not None and len(selection) > select_max:
+                    await ctx.send(f'ERR: select a maximum of {select_max} options.')
+                    selection = None
             # if result.content in keys:
             #     selection = result.content
             #     # await ctx.send(elements[keys.index(selection)])
@@ -146,8 +157,11 @@ async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, t
         await menu_msg.add_reaction(ctx.bot.redtick)
         raise asyncio.TimeoutError
 
-    if select_max > 1:
+    if multi_select:
         ret = [elements[keys.index(sel)] for sel in selection]
+        if not repeats:
+            # TODO: Once using python 3.7, use the dict built-in, as it is guaranteed to maintain order in >=3.7
+            ret = list(OrderedDict.fromkeys(ret))
     else:
         ret = elements[keys.index(selection)]
 
