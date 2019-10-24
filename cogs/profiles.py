@@ -244,7 +244,12 @@ class Profiles(commands.Cog):
         Sets the "home communities" field. Opens a selection menu.
         If your community isn't listed, feel free to message a staff member.
         """
-        # use menu: home_communities
+        communities = await menu.menu_list(ctx, ProfileValidation.legal_communities, select_max=None)
+        try:
+            checked = ProfileValidation.home_communities(communities)
+            await ctx.send(f'Checked: `{checked}`.')
+        except InputError as ie:
+            await ctx.send(f'Error: `{ie}`')
         pass
 
     @set.group(name='country')
@@ -320,10 +325,13 @@ class Profiles(commands.Cog):
 
         if birthdate is not None:
             await ctx.send(f'Checked birthdate: `{birthdate}`')
+            # TODO: clear prev content
         if birthday is not None:
             await ctx.send(f'Checked birthday: `{birthday}`')
+            # TODO: clear prev content
         if age_range is not None:
             await ctx.send(f'Checked age range: `{age_range}`')
+            # TODO: clear prev content
 
     @set.group(name='student')
     async def set_student(self, ctx: commands.Context, student: str):
@@ -331,6 +339,7 @@ class Profiles(commands.Cog):
         Sets the "student?" field. Simple text entry.
         Enter either Y/N.
         """
+        # lol
         pass
 
     @set.group(name='game')
