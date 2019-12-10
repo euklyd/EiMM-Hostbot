@@ -22,5 +22,5 @@ async def color(ctx: commands.context.Context, hexcode):
     await ctx.send(file=f)
 
 
-def setup(bot):
+def setup(bot: commands.Bot):
     bot.add_command(color)

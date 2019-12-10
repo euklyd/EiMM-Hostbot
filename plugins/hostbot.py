@@ -1,3 +1,5 @@
+from typing import Callable, Union
+
 import discord
 from discord.ext import commands
 
@@ -7,34 +9,35 @@ import yaml
 from pathlib import Path
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, Session
 import plugins.hostbot_schema as hbs
 
-
-session_maker = None
+session_maker = None  # type: Union[None, Callable[[], Session]]
 
 
 @commands.command()
-async def hello(ctx):
+async def hello(ctx: commands.context.Context):
     await ctx.send('Hello {0.display_name}.'.format(ctx.author))
 
+
 @commands.group(invoke_without_command=True)
-async def init(ctx):
+async def init(ctx: commands.context.Context):
     await ctx.send("there's nothing to init!")
 
+
 @init.command(name='server')
-async def init_server(ctx, *, yml):
+async def init_server(ctx: commands.context.Context, *, yml):
     session = session_maker()
 
     yml = yaml.load(yml.strip('```yml\n'))
     # await ctx.send(f'parsed:```json\n{pprint.pformat(yml)}```')
 
-    server   = hbs.Server(
+    server = hbs.Server(
         id=ctx.guild.id,
         name=yml['name'],
         sheet=yml['sheet']
     )
-    roles    = []
+    roles = []
     channels = []
 
     for key, role in yml['roles'].items():
@@ -85,8 +88,9 @@ async def init_server(ctx, *, yml):
 
     await ctx.send('created a bunch of things')
 
+
 @init.command(name='reset')
-async def init_reset(ctx):
+async def init_reset(ctx: commands.context.Context):
     session = session_maker()
     server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
     if server is None:
@@ -114,6 +118,7 @@ async def init_reset(ctx):
 
     await ctx.send('i deleted ur stuffz')
 
+
 # @init.command(name='updaterole')
 # async def init_db_update(ctx, roletype, role):
 #     # TODO
@@ -123,7 +128,7 @@ async def init_reset(ctx):
 #     # TODO
 
 
-def setup(bot):
+def setup(bot: commands.Bot):
     global session_maker
     bot.add_command(hello)
     bot.add_command(init)

@@ -27,7 +27,7 @@ async def reload(ctx, plugin):
 
 @bot.command()
 async def shutdown(ctx):
-    await ctx.send('As you wish.')
+    await ctx.send("I'll be back.")
     await bot.logout()
 
 
