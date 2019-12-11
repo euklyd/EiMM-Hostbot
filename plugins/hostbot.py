@@ -16,17 +16,17 @@ session_maker = None  # type: Union[None, Callable[[], Session]]
 
 
 @commands.command()
-async def hello(ctx: commands.context.Context):
+async def hello(ctx: commands.Context):
     await ctx.send('Hello {0.display_name}.'.format(ctx.author))
 
 
 @commands.group(invoke_without_command=True)
-async def init(ctx: commands.context.Context):
+async def init(ctx: commands.Context):
     await ctx.send("there's nothing to init!")
 
 
 @init.command(name='server')
-async def init_server(ctx: commands.context.Context, *, yml):
+async def init_server(ctx: commands.Context, *, yml):
     session = session_maker()
 
     yml = yaml.load(yml.strip('```yml\n'))
@@ -90,7 +90,7 @@ async def init_server(ctx: commands.context.Context, *, yml):
 
 
 @init.command(name='reset')
-async def init_reset(ctx: commands.context.Context):
+async def init_reset(ctx: commands.Context):
     session = session_maker()
     server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
     if server is None:
