@@ -20,12 +20,14 @@ for plugin in settings.plugins:
 
 
 @bot.command()
+@commands.is_owner()
 async def reload(ctx, plugin):
     bot.reload_extension(f'plugins.{plugin}')
     await ctx.send(f'Reloaded plugin `{plugin}`.')
 
 
 @bot.command()
+@commands.is_owner()
 async def shutdown(ctx):
     await ctx.send("I'll be back.")
     await bot.logout()
