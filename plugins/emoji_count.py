@@ -1,8 +1,9 @@
+import csv
 import json
 import re
-from pathlib import Path
-from typing import Union, Callable, Optional, List
 from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Union, Callable, Optional, List, Dict
 
 import discord
 from discord.ext import commands
@@ -18,7 +19,8 @@ enabled_servers = []  # type: List[int]  # discord server IDs
 enabled_servers_path = 'databases/conf/emoji_enabled_servers.json'
 
 
-def increment_count(session: Session, server: discord.guild, emoji_id: int, user: discord.user, today: datetime.date) -> int:
+def increment_count(session: Session, server: discord.guild, emoji_id: int, user: discord.user,
+                    today: datetime.date) -> int:
     entry = session.query(es.EmojiCount).filter_by(server_id=server.id, emoji_id=emoji_id, user_id=user.id,
                                                    date=today).one_or_none()  # type: Optional[es.EmojiCount]
     if entry is not None:
@@ -41,14 +43,12 @@ async def count_emoji(message: discord.Message):
 
     today = datetime.utcnow().date()
 
-    found = []
-
     for match in _EMOJI_RE.finditer(message.content):
-        emoji_id = int(match.group('id'))  # type: int  # TODO
+        emoji_id = int(match.group('id'))  # type: int
         if emoji_id in emoji_ids:
             # only increment the count if it's an actual emoji that belongs to the server
             count = increment_count(session, message.guild, emoji_id, message.author, today)
-            await message.channel.send(f'Count for {emoji_ids[emoji_id]} is now {count}.')
+            # await message.channel.send(f'Count for {emoji_ids[emoji_id]} is now {count}.')  # NOTE: Only for debug
 
 
 @commands.group(invoke_without_command=True)
@@ -91,7 +91,9 @@ async def emoji_disable(ctx: commands.Context):
 @emoji.command(name='count')
 async def emoji_count(ctx: commands.Context, em: Union[discord.Emoji, int], days: Optional[int] = 30):
     """
-    Count the times a given emoji has been used on this server in the last <days> days.
+    Count the times an emoji has been used in the last <days> days.
+
+    Only returns uses for emojis belonging to this server, and only uses on this server.
     """
     if type(em) is discord.Emoji:
         assert type(em) is discord.Emoji
@@ -115,6 +117,7 @@ async def emoji_count(ctx: commands.Context, em: Union[discord.Emoji, int], days
     for entry in entries:
         count += entry.count
 
+    # -- output conversion --
     if count == 1:
         n_times = f'{count} time'
     else:
@@ -156,6 +159,7 @@ async def emoji_stats(ctx: commands.Context, em: Union[discord.Emoji, int], days
     else:
         user = ctx.guild.get_member(entries[0].user_id)
 
+    # -- output conversion --
     if count == 1:
         n_times = f'{count} time'
     else:
@@ -170,6 +174,51 @@ async def emoji_stats(ctx: commands.Context, em: Union[discord.Emoji, int], days
     else:
         freq = f'Most frequent user: `{user}` (`{entries[0].count}` uses)'
     await ctx.send(f'{ctx.bot.get_emoji(emoji_id)} has been used `{n_times}` in the last `{n_days}`.\n{freq}.')
+
+
+@emoji.command(name='export')
+async def emoji_export(ctx: commands.Context):
+    """
+    Export the emoji usage data for the current server to a CSV.
+    """
+    emojis = {}  # type: Dict[int, discord.Emoji]
+    for em in ctx.guild.emojis:  # type: discord.Emoji
+        # api call unfortunately required for getting detailed emoji info
+        emojis[em.id] = await ctx.guild.fetch_emoji(em.id)
+
+    filename = f'/tmp/{ctx.guild.name}_emojis.csv'
+    with open(filename, 'w') as f:
+        out = csv.writer(f)
+        labels = [
+            'server id', 'server',
+            'user id', 'user',
+            'date of use',
+            'emoji id', 'emoji name', 'emoji url', 'creator', 'creation time',
+            'count'
+        ]
+        out.writerow(labels)
+
+        session = session_maker()
+
+        class NoneEmoji:
+            name = 'Deleted Emoji'
+            url = ''
+            user = ''
+            created_at = ''
+
+        for entry in session.query(es.EmojiCount).filter_by(server_id=ctx.guild.id).all():  # type: es.EmojiCount
+            em = emojis.get(entry.emoji_id)  # type: Union[discord.Emoji, NoneEmoji]
+            if em is None:
+                em = NoneEmoji()
+            out.writerow([
+                entry.server_id, ctx.guild.name,
+                entry.user_id, ctx.guild.get_member(entry.user_id),
+                entry.date,
+                entry.emoji_id, em.name, em.url, em.user, em.created_at,
+                entry.count
+            ])
+
+    await ctx.send('Alright, _nerd_.', file=discord.File(filename))
 
 
 def setup(bot: commands.Bot):
