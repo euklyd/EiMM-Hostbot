@@ -13,7 +13,7 @@ import core
 _locks = set()  # type: Set[Tuple[int, int]]  # represents a tuple of user IDs and channel IDs
 
 
-async def menu_list(ctx: commands.context.Context, ls: Iterable, timeout: int = 600,
+async def menu_list(ctx: commands.Context, ls: Iterable, timeout: int = 600,
                     select_max: Union[int, None] = 1, repeats: bool = False):
     keys, elems = [], []
     for i, e in enumerate(ls):
@@ -22,7 +22,7 @@ async def menu_list(ctx: commands.context.Context, ls: Iterable, timeout: int = 
     return await menu_wrapper(ctx, keys, elems, timeout=timeout, select_max=select_max, repeats=repeats)
 
 
-async def menu_dict(ctx: commands.context.Context, d: MutableMapping, timeout: int = 600,
+async def menu_dict(ctx: commands.Context, d: MutableMapping, timeout: int = 600,
                     select_max: Union[int, None] = 1, repeats: bool = False):
     keys, elems = [], []
     for k, e in d.items():
@@ -48,13 +48,13 @@ def menu_str(keys: List, elements: List, page, items_per_page=20, select_max: Un
     elif select_max > 1:
         select_str = f"up to {select_max} items, separated by commas,"
     if len(keys) > items_per_page:
-        output_str += f'*(Page {page+1} of {math.ceil(len(keys) / items_per_page)}. Select {select_str} or `cancel`.)*'
+        output_str += f'*(Page {page + 1} of {math.ceil(len(keys) / items_per_page)}. Select {select_str} or `cancel`.)*'
     else:
         output_str += f'*(Select {select_str} or `cancel`.)*'
     return output_str
 
 
-async def menu_wrapper(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600,
+async def menu_wrapper(ctx: commands.Context, keys: List, elements: List, timeout: int = 600,
                        select_max: Union[int, None] = 1, repeats: bool = False):
     lock = (ctx.author.id, ctx.channel.id)
     if lock in _locks:
@@ -65,7 +65,7 @@ async def menu_wrapper(ctx: commands.context.Context, keys: List, elements: List
         return await menu_loop(ctx, keys, elements, timeout=timeout, select_max=select_max, repeats=repeats)
 
 
-async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, timeout: int = 600,
+async def menu_loop(ctx: commands.Context, keys: List, elements: List, timeout: int = 600,
                     select_max: Union[int, None] = 1, repeats: bool = False):
     NUM_ITEMS = 20
     ARROW_LEFT, ARROW_RIGHT = '◀', '▶'
@@ -139,7 +139,7 @@ async def menu_loop(ctx: commands.context.Context, keys: List, elements: List, t
             if reaction.emoji == ARROW_LEFT:
                 page = max(0, page - 1)
             else:
-                page = min(int(len(keys)/NUM_ITEMS), page + 1)
+                page = min(int(len(keys) / NUM_ITEMS), page + 1)
             new_menu = menu_str(keys, elements, page, items_per_page=NUM_ITEMS, select_max=select_max)
             await menu_msg.edit(content=new_menu)
 
