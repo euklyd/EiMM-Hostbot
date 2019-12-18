@@ -1,18 +1,20 @@
+from discord import Status
+
 from conf.conf import Conf
 
 from cogs import profiles
 
-
-name         = 'mafia bidoof'
-owner_id     = 123456789012345678
+name = 'mafia bidoof'
+owner_id = 123456789012345678
 client_token = 'your token here'
+status = None
 
 cogs = [
     profiles.Profiles,
 ]
 
 plugins = [
-    'hostbot'
+    'hostbot',
 ]
 
 prefix = ['##']

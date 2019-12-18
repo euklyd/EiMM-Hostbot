@@ -10,6 +10,7 @@ bot = Bot(
     description='https://board8.fandom.com/wiki/Mafia_Bidoof',
     conf=settings.conf,
     owner_id=settings.owner_id,
+    status=settings.status,
 )
 
 for cog in settings.cogs:
