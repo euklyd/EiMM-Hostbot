@@ -15,17 +15,14 @@ import plugins.hostbot_schema as hbs
 session_maker = None  # type: Union[None, Callable[[], Session]]
 
 
-@commands.command()
-async def hello(ctx: commands.Context):
-    await ctx.send('Hello {0.display_name}.'.format(ctx.author))
-
-
 @commands.group(invoke_without_command=True)
+@commands.has_permissions(administrator=True)
 async def init(ctx: commands.Context):
     await ctx.send("there's nothing to init!")
 
 
 @init.command(name='server')
+@commands.has_permissions(administrator=True)
 async def init_server(ctx: commands.Context, *, yml):
     session = session_maker()
 
@@ -90,6 +87,7 @@ async def init_server(ctx: commands.Context, *, yml):
 
 
 @init.command(name='reset')
+@commands.has_permissions(administrator=True)
 async def init_reset(ctx: commands.Context):
     session = session_maker()
     server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
