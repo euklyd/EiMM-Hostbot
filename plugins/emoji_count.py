@@ -3,7 +3,7 @@ import json
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Union, Callable, Optional, List, Dict
+from typing import Union, Callable, Optional, List, Dict, Any
 
 import discord
 from discord.ext import commands
@@ -17,6 +17,16 @@ _EMOJI_RE = re.compile(r'<:(?P<name>\w\w+):(?P<id>\d+)>')
 session_maker = None  # type: Union[None, Callable[[], Session]]
 enabled_servers = []  # type: List[int]  # discord server IDs
 enabled_servers_path = 'databases/conf/emoji_enabled_servers.json'
+
+
+class NoneEmoji:
+    name = 'Deleted Emoji'
+    url = ''
+    user = ''
+    created_at = ''
+
+    def __repr__(self):
+        return f'{self.name}'
 
 
 def increment_count(session: Session, server: discord.guild, emoji_id: int, user: discord.user,
@@ -39,7 +49,7 @@ async def count_emoji(message: discord.Message):
         return
     session = session_maker()
 
-    emoji_ids = {e.id: e for e in message.guild.emojis}
+    emoji_ids = {e.id: e for e in message.guild.emojis}  # type: Dict[int, discord.Emoji]
 
     today = datetime.utcnow().date()
 
@@ -52,6 +62,7 @@ async def count_emoji(message: discord.Message):
 
 
 @commands.group(invoke_without_command=True)
+@commands.has_permissions(administrator=True)
 async def emoji(ctx: commands.Context):
     await ctx.send('nah')
 
@@ -89,6 +100,7 @@ async def emoji_disable(ctx: commands.Context):
 
 
 @emoji.command(name='count')
+@commands.has_permissions(administrator=True)
 async def emoji_count(ctx: commands.Context, em: Union[discord.Emoji, int], days: Optional[int] = 30):
     """
     Count the times an emoji has been used in the last <days> days.
@@ -130,22 +142,40 @@ async def emoji_count(ctx: commands.Context, em: Union[discord.Emoji, int], days
 
 
 @emoji.command(name='stats')
-async def emoji_stats(ctx: commands.Context, em: Union[discord.Emoji, int], days: Optional[int] = 30):
+@commands.has_permissions(administrator=True)
+async def emoji_stats(ctx: commands.Context, em: Optional[Union[discord.Emoji, int]] = None, days: Optional[int] = 30):
     """
     More detailed stats for a given emoji over the last <days> days.
     """
+    if em is None:
+        await ctx.send(f"That's not an emoji on **{ctx.guild}**.")
+        return
+
     if type(em) is discord.Emoji:
         assert type(em) is discord.Emoji
         emoji_id = em.id
     else:
         emoji_id = int(em)
 
+    if emoji_id not in [e.id for e in ctx.guild.emojis]:
+        await ctx.send(f"That's not the ID of an emoji in **{ctx.guild}**.")
+        return
+
     oldest = datetime.utcnow().date() - timedelta(days=days)
 
     session = session_maker()
     entries = session.query(es.EmojiCount).filter_by(
         server_id=ctx.guild.id, emoji_id=emoji_id).filter(
-        func.DATE(es.EmojiCount.date) > oldest).order_by(es.EmojiCount.count).all()  # type: List[es.EmojiCount]
+        func.DATE(es.EmojiCount.date) > oldest).order_by(
+        func.sum(es.EmojiCount.count)).all()  # type: List[es.EmojiCount]
+
+    user_counts = session.query(es.EmojiCount.user_id, func.sum(es.EmojiCount.count)).filter_by(
+        server_id=ctx.guild.id, emoji_id=emoji_id).filter(
+        func.DATE(es.EmojiCount.date) > oldest).group_by(
+        es.EmojiCount.user_id).order_by(func.sum(
+        es.EmojiCount.count).desc()).all()  # idk what type this is, it's just kind of a tuple # type: List[es.EmojiCount]
+
+    print(user_counts)
 
     print(type(entries))
     print(len(entries))
@@ -154,10 +184,10 @@ async def emoji_stats(ctx: commands.Context, em: Union[discord.Emoji, int], days
     for entry in entries:
         count += entry.count
 
-    if len(entries) == 0:
-        user = None
+    if len(user_counts) == 0:
+        max_user = None
     else:
-        user = ctx.guild.get_member(entries[0].user_id)
+        max_user = ctx.guild.get_member(user_counts[0][0])
 
     # -- output conversion --
     if count == 1:
@@ -169,14 +199,77 @@ async def emoji_stats(ctx: commands.Context, em: Union[discord.Emoji, int], days
     else:
         n_days = f'{days} days'
 
-    if user is None:
+    if max_user is None:
         freq = f'Most frequent user: `N/A`'
     else:
-        freq = f'Most frequent user: `{user}` (`{entries[0].count}` uses)'
+        freq = f'Most frequent user: `{max_user}` (`{user_counts[0][1]}` uses)'
     await ctx.send(f'{ctx.bot.get_emoji(emoji_id)} has been used `{n_times}` in the last `{n_days}`.\n{freq}.')
 
 
+@emoji.command(name='head')
+@commands.has_permissions(administrator=True)
+async def emoji_head(ctx: commands.Context, days: int = 30, num: int = 5):
+    """
+    Display the most frequently emojis for the current server.
+    """
+    oldest = datetime.utcnow().date() - timedelta(days=days)
+
+    emoji_ids = {e.id: e for e in ctx.guild.emojis}  # type: Dict[int, discord.Emoji]
+
+    session = session_maker()
+
+    total_counts = session.query(es.EmojiCount.emoji_id, func.sum(es.EmojiCount.count)).filter_by(
+        server_id=ctx.guild.id).filter(
+        func.DATE(es.EmojiCount.date) > oldest).group_by(
+        es.EmojiCount.emoji_id).order_by(
+        func.sum(es.EmojiCount.count).desc()).all()  # type: List[int, int]
+
+    total_counts = total_counts[:num]
+
+    reply = f'__**Top `{num}` emojis in the past `{days}` days for {ctx.guild}:**__\n'
+    print(total_counts)
+    for i, entry in enumerate(total_counts):
+        em = emoji_ids.get(entry[0])
+        if em is None:
+            em = NoneEmoji()
+        reply += f'[{i + 1}] {em} `[:{em.name}:]`: {entry[1]} uses\n'
+
+    await ctx.send(reply)
+
+
+@emoji.command(name='tail')
+@commands.has_permissions(administrator=True)
+async def emoji_tail(ctx: commands.Context, days: int = 30, num: int = 5):
+    """
+    Display the least frequently emojis for the current server.
+    """
+    oldest = datetime.utcnow().date() - timedelta(days=days)
+
+    emoji_ids = {e.id: e for e in ctx.guild.emojis}  # type: Dict[int, discord.Emoji]
+
+    session = session_maker()
+
+    total_counts = session.query(es.EmojiCount.emoji_id, func.sum(es.EmojiCount.count)).filter_by(
+        server_id=ctx.guild.id).filter(
+        func.DATE(es.EmojiCount.date) > oldest).group_by(
+        es.EmojiCount.emoji_id).order_by(
+        func.sum(es.EmojiCount.count).asc()).all()  # type: List[int, int]
+
+    total_counts = total_counts[:num]
+
+    reply = f'__**Bottom `{num}` emojis in the past `{days}` days for {ctx.guild}:**__\n'
+    print(total_counts)
+    for i, entry in enumerate(total_counts):
+        em = emoji_ids.get(entry[0])
+        if em is None:
+            em = NoneEmoji()
+        reply += f'[{i + 1}] {em} `[:{em.name}:]`: {entry[1]} uses\n'
+
+    await ctx.send(reply)
+
+
 @emoji.command(name='export')
+@commands.has_permissions(administrator=True)
 async def emoji_export(ctx: commands.Context):
     """
     Export the emoji usage data for the current server to a CSV.
@@ -199,12 +292,6 @@ async def emoji_export(ctx: commands.Context):
         out.writerow(labels)
 
         session = session_maker()
-
-        class NoneEmoji:
-            name = 'Deleted Emoji'
-            url = ''
-            user = ''
-            created_at = ''
 
         for entry in session.query(es.EmojiCount).filter_by(server_id=ctx.guild.id).all():  # type: es.EmojiCount
             em = emojis.get(entry.emoji_id)  # type: Union[discord.Emoji, NoneEmoji]
