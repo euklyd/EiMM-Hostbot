@@ -24,6 +24,7 @@ for plugin in settings.plugins:
 async def reload(ctx, plugin):
     bot.reload_extension(f'plugins.{plugin}')
     await ctx.send(f'Reloaded plugin `{plugin}`.')
+    print(f'reloaded {plugin}')  # TODO: change to actual logging sometime
 
 
 @bot.command()
