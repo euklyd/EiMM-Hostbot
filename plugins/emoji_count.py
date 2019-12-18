@@ -16,6 +16,9 @@ _EMOJI_RE = re.compile(r'<:(?P<name>\w\w+):(?P<id>\d+)>')
 
 session_maker = None  # type: Union[None, Callable[[], Session]]
 enabled_servers = []  # type: List[int]  # discord server IDs
+needed_dirs = [
+    'databases/conf/',
+]
 enabled_servers_path = 'databases/conf/emoji_enabled_servers.json'
 
 
@@ -321,6 +324,9 @@ def setup(bot: commands.Bot):
     session_maker = sessionmaker(bind=engine)
 
     es.Base.metadata.create_all(engine)
+
+    for needed_dir in needed_dirs:
+        Path(needed_dir).mkdir(exist_ok=True)
 
     if Path(enabled_servers_path).exists():
         with open(enabled_servers_path, 'r') as enabled:
