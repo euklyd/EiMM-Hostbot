@@ -128,7 +128,6 @@ async def init_reset(ctx: commands.Context):
 
 def setup(bot: commands.Bot):
     global session_maker
-    bot.add_command(hello)
     bot.add_command(init)
 
     db_dir = 'databases/'
