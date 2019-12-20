@@ -22,7 +22,7 @@ for plugin in settings.plugins:
 
 @bot.command()
 @commands.is_owner()
-async def reload(ctx, plugin):
+async def reload(ctx: commands.Context, plugin: str):
     bot.reload_extension(f'plugins.{plugin}')
     await ctx.send(f'Reloaded plugin `{plugin}`.')
     print(f'reloaded {plugin}')  # TODO: change to actual logging sometime
@@ -30,7 +30,7 @@ async def reload(ctx, plugin):
 
 @bot.command()
 @commands.is_owner()
-async def shutdown(ctx):
+async def shutdown(ctx: commands.Context):
     await ctx.send("I'll be back.")
     await bot.logout()
 
