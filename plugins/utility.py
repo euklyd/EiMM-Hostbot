@@ -23,6 +23,11 @@ from discord.ext import commands
 
 @commands.command()
 async def bidoof(ctx: commands.Context, key: Optional[str]):
+    """
+    I can't make a Mafia Bidoof bot *without* this command, now can I?
+
+    God bless Mafia Bidoof.
+    """
     BIDOOF_ALBUM = 'kn6ieEv'
     bidoofs = []
     if type(BIDOOF_ALBUM) is list:
