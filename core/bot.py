@@ -6,6 +6,8 @@ import discord
 from discord.ext import commands
 
 from conf.conf import Conf
+# from core.checks import Checks
+from core.imgur import Imgur
 
 
 class Bot(commands.Bot):
@@ -18,6 +20,14 @@ class Bot(commands.Bot):
         self.conf = conf  # type: Conf
         self._greentick = self.get_emoji(conf.greentick_id)  # type: discord.Emoji
         self._redtick = self.get_emoji(conf.redtick_id)  # type: discord.Emoji
+
+        if conf.imgur_keys:
+            self.imgur = Imgur(conf.imgur_keys)
+
+        # I don't like circular includes but there's a bunch of API methods that might need to be invoked
+        # when checking commands.
+        # TODO: implement
+        # self.checks = Checks(self)
 
     @property
     def greentick(self) -> discord.Emoji:
@@ -107,7 +117,8 @@ class Bot(commands.Bot):
             listeners.append((future, check))
             futures.append(future)
 
-        complete, pending = await asyncio.wait(futures, timeout=timeout, loop=self.loop, return_when=asyncio.FIRST_COMPLETED)
+        complete, pending = await asyncio.wait(futures, timeout=timeout, loop=self.loop,
+                                               return_when=asyncio.FIRST_COMPLETED)
         for future in pending:  # type: asyncio.Future
             future.cancel()
         if len(complete) == 0:

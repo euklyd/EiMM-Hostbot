@@ -1,5 +1,6 @@
 discord.py[voice]
 gspread
+imgurpython
 oauth2client
 pillow
 pprint
