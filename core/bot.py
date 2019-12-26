@@ -1,5 +1,7 @@
 import asyncio
+import json
 import time
+from pathlib import Path
 from typing import List, Optional, Callable, Union, Any, Tuple, Iterable
 
 import discord
@@ -20,6 +22,18 @@ class Bot(commands.Bot):
         self.conf = conf  # type: Conf
         self._greentick = self.get_emoji(conf.greentick_id)  # type: discord.Emoji
         self._redtick = self.get_emoji(conf.redtick_id)  # type: discord.Emoji
+
+
+        if Path('conf/google_creds.json').exists():
+            self.google_creds = 'conf/google_creds.json'
+            self.google_scope = [
+                'https://spreadsheets.google.com/feeds',
+                'https://www.googleapis.com/auth/drive'
+            ]
+        else:
+            # TODO: Add a warn log.
+            self.google_creds = None
+            self.google_scope = None
 
         if conf.imgur_keys:
             self.imgur = Imgur(conf.imgur_keys)
