@@ -1,7 +1,7 @@
 import pprint
 import re
 from pathlib import Path
-from typing import Callable, Union
+from typing import Callable, Union, Optional
 
 import discord
 import yaml
@@ -10,33 +10,56 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 
 import plugins.hostbot_schema as hbs
+from core.bot import Bot
+from utils import spreadsheet
 
 session_maker = None  # type: Union[None, Callable[[], Session]]
+connection = None  # type: Optional[spreadsheet.SheetConnection]
+
+
+class NotFoundMember:
+    def __init__(self, name_and_discriminator: str):
+        regex = r'(?P<name>.+)#(?P<disc>\d+)'
+        matches = re.match(regex, name_and_discriminator)
+        self.name = matches.group('name')
+        self.discriminator = int(matches.group('disc'))
+
+    def __str__(self):
+        return f'{self.name}#{self.discriminator}'
 
 
 @commands.group(invoke_without_command=True)
 @commands.has_permissions(administrator=True)
 async def init(ctx: commands.Context):
-    await ctx.send("there's nothing to init!")
+    await ctx.send(f"This isn't a command! Use `{ctx.bot.default_command_prefix}help init`.")
 
 
 @init.command(name='server')
 @commands.has_permissions(administrator=True)
-async def init_server(ctx: commands.Context, *, yml):
-    session = session_maker()
+async def init_server(ctx: commands.Context, *, yml_config):
+    """
+    Initialize a game server with channels and roles.
 
-    yml = yaml.load(yml.strip('```yml\n'))
+    For an example configuration, see: https://hastebin.com/cukamuveru.yml
+    """
+    session = session_maker()
+    server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+    if server is not None:
+        await ctx.send("This server has already been set up; duplicates setups aren't going to work.")
+        return
+
+    yml_config = yaml.load(yml_config.strip('```yml\n'))
     # await ctx.send(f'parsed:```json\n{pprint.pformat(yml)}```')
 
     server = hbs.Server(
         id=ctx.guild.id,
-        name=yml['name'],
-        sheet=yml['sheet']
+        name=yml_config['name'],
+        sheet=yml_config['sheet']
     )
     roles = []
     channels = []
 
-    for key, role in yml['roles'].items():
+    for key, role in yml_config['roles'].items():
         perms = discord.Permissions()
         if key == 'host':
             perms.update(**{
@@ -59,8 +82,8 @@ async def init_server(ctx: commands.Context, *, yml):
         roles.append(hbs.Role(id=new_role.id, type=key))
     server.roles = roles
 
-    for key, channel_name in yml['channels'].items():
-        roles = yml['roles']
+    for key, channel_name in yml_config['channels'].items():
+        roles = yml_config['roles']
         overwrites = {
             ctx.guild.default_role: discord.PermissionOverwrite(send_messages=False),
             roles['host']['role']: discord.PermissionOverwrite(
@@ -71,7 +94,6 @@ async def init_server(ctx: commands.Context, *, yml):
             print(f'gamechat: creating {channel_name} for {key}')
         if key == 'graveyard':
             overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(read_messages=False, send_messages=None)
-            # overwrites[roles['player']['role']] = discord.PermissionOverwrite(read_messages=False)
             overwrites[roles['dead']['role']] = discord.PermissionOverwrite(read_messages=True)
             overwrites[roles['host']['role']] = discord.PermissionOverwrite(read_messages=True)
             overwrites[roles['spec']['role']] = discord.PermissionOverwrite(read_messages=True)
@@ -85,29 +107,35 @@ async def init_server(ctx: commands.Context, *, yml):
             overwrites=overwrites,
         )
         channels.append(hbs.Channel(id=new_channel.id, type=key))
-        # pprint.pprint(f'created {channel_name} `[{key}]` with overwrites:\n{overwrites}\n')
         print(f'created {channel_name} `[{key}]` with overwrites:\n{pprint.pformat(overwrites)}\n')
     server.channels = channels
 
     session.add(server)
     session.commit()
 
-    await ctx.send('created a bunch of things')
+    await ctx.send('Created channels and roles.')
 
 
 def player_channel_name(player: discord.Member):
     name = player.name
     name = re.sub(r'[\W_ -]+', '', name)
     name = re.sub(r' ', '-', name)
-    return f'{name}_{player.discriminator}'
+    return f'{name}_{player.discriminator}_rolepm'
 
 
 @init.command(name='rolepms')
 @commands.has_permissions(administrator=True)
-async def init_rolepms(ctx: commands.Context):
-    # ls_usernames = get_from_sheet()  # TODO
+async def init_rolepms(ctx: commands.Context, page: str = 'Rolesheet', column: str = 'Account'):
+    """
+    Create Role PM channels for players and enrole each.
 
+    Must be used after "init server".
+    If a player is not on the server, or their name is typo'd on the sheet, will create the channel without enroling the player in the player role.
+    """
     session = session_maker()
+
+    server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+
     spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='spec').one_or_none()
     spec_role = ctx.guild.get_role(spec_role_id.id)
 
@@ -120,11 +148,12 @@ async def init_rolepms(ctx: commands.Context):
     print(f'spec_role_id: {spec_role_id}')
     print(f'host_role_id: {spec_role_id}')
 
-    ls_usernames = [
-        'BT#4881',
-        'Kim#9000',
-        'Monde#6197',
-    ]
+    sheet_name = server.sheet
+    print(f'getting page {page} from sheet {sheet_name}')
+    ws = connection.get_page(sheet_name, page)
+    print(ws)
+    ls_usernames = spreadsheet.get_column_values(ws, column)
+    print(ls_usernames)
 
     players = []
     error_names = []
@@ -134,9 +163,10 @@ async def init_rolepms(ctx: commands.Context):
         if player is None:
             error_names.append(name)
             error += f'{name}\n'
+            players.append(NotFoundMember(name))
         else:
             players.append(player)
-    error += '```'
+    error += '```_(Created channels without permissions instead.)_'
 
     players = sorted(players, key=lambda p: p.name.lower())
     category = await ctx.guild.create_category('Role PMs', overwrites={
@@ -145,23 +175,24 @@ async def init_rolepms(ctx: commands.Context):
         host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
         spec_role: discord.PermissionOverwrite(read_messages=True),
     })  # type: discord.CategoryChannel
+
     for player in players:
-        await player.edit(roles=player.roles + [player_role])
         overwrites = {
             ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
             ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
-            player: discord.PermissionOverwrite(read_messages=True, manage_messages=True),  # manage needed for pins
             host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
             spec_role: discord.PermissionOverwrite(read_messages=True),
         }
+        if type(player) is discord.Member:
+            await player.edit(roles=player.roles + [player_role])
+            # manage needed for pins
+            overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
         topic = f"{player}'s Role PM"
         await category.create_text_channel(player_channel_name(player), overwrites=overwrites, topic=topic)
 
     server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
-    # server.rolepms = hbs.RolePMs(id=category.id, server_id=ctx.guild.id)
     server.rolepms_id = category.id
     session.commit()
-    # TODO: save category
 
     if len(error_names) > 0:
         await ctx.send(error)
@@ -170,6 +201,11 @@ async def init_rolepms(ctx: commands.Context):
 @init.command(name='reset')
 @commands.is_owner()
 async def init_reset(ctx: commands.Context):
+    """
+    Delete previously created channels and roles.
+
+    If Role PMs and Roles have been created using 'init rolepms', deletes those too.
+    """
     session = session_maker()
     server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
     if server is None:
@@ -204,7 +240,7 @@ async def init_reset(ctx: commands.Context):
     session.delete(server)
     session.commit()
 
-    await ctx.send('i deleted ur stuffz')
+    await ctx.send('Deleted, like, everything.')
 
 
 # @init.command(name='updaterole')
@@ -216,7 +252,10 @@ async def init_reset(ctx: commands.Context):
 #     # TODO
 
 
-def setup(bot: commands.Bot):
+def setup(bot: Bot):
+    global connection
+    connection = spreadsheet.SheetConnection(bot.google_creds, bot.google_scope)
+
     global session_maker
     bot.add_command(init)
 
