@@ -131,6 +131,7 @@ async def emoji_count(ctx: commands.Context, em: Union[discord.Emoji, int], days
     count = 0
     for entry in entries:
         count += entry.count
+    # TODO: This logic sucks, rewrite it sometime. You can do this in the query.
 
     # -- output conversion --
     if count == 1:
@@ -167,25 +168,18 @@ async def emoji_stats(ctx: commands.Context, em: Optional[Union[discord.Emoji, i
     oldest = datetime.utcnow().date() - timedelta(days=days)
 
     session = session_maker()
-    entries = session.query(es.EmojiCount).filter_by(
-        server_id=ctx.guild.id, emoji_id=emoji_id).filter(
-        func.DATE(es.EmojiCount.date) > oldest).order_by(
-        func.sum(es.EmojiCount.count)).all()  # type: List[es.EmojiCount]
 
+    # list of tuples of users and how many time each has used this emoji, ordered by uses
     user_counts = session.query(es.EmojiCount.user_id, func.sum(es.EmojiCount.count)).filter_by(
         server_id=ctx.guild.id, emoji_id=emoji_id).filter(
         func.DATE(es.EmojiCount.date) > oldest).group_by(
-        es.EmojiCount.user_id).order_by(func.sum(
-        es.EmojiCount.count).desc()).all()  # idk what type this is, it's just kind of a tuple # type: List[es.EmojiCount]
-
-    print(user_counts)
-
-    print(type(entries))
-    print(len(entries))
+        es.EmojiCount.user_id).order_by(
+        func.sum(es.EmojiCount.count).desc()).all()  # type: List[int, int]
+    # really it's a List[sqlalchemy.util._collections.result] but functionally it's a list of int tuples
 
     count = 0
-    for entry in entries:
-        count += entry.count
+    for user, user_count in user_counts:
+        count += user_count
 
     if len(user_counts) == 0:
         max_user = None
@@ -246,6 +240,8 @@ async def emoji_tail(ctx: commands.Context, days: int = 30, num: int = 5):
     """
     Display the least frequently emojis for the current server.
     """
+    # TODO: Fill tail with never-used emojis?
+    #  Add as a flag, probably.
     oldest = datetime.utcnow().date() - timedelta(days=days)
 
     emoji_ids = {e.id: e for e in ctx.guild.emojis}  # type: Dict[int, discord.Emoji]
