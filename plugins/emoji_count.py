@@ -68,6 +68,7 @@ async def count_emoji(message: discord.Message):
 @commands.has_permissions(administrator=True)
 async def emoji(ctx: commands.Context):
     await ctx.send('nah')
+    # await emoji_head(ctx)  # if you wanted to do this by default? idk
 
 
 @emoji.command(name='enable')
@@ -147,9 +148,12 @@ async def emoji_count(ctx: commands.Context, em: Union[discord.Emoji, int], days
 
 @emoji.command(name='stats')
 @commands.has_permissions(administrator=True)
-async def emoji_stats(ctx: commands.Context, em: Optional[Union[discord.Emoji, int]] = None, days: Optional[int] = 30):
+async def emoji_stats(ctx: commands.Context, em: Optional[Union[discord.Emoji, int]] = None, days: Optional[int] = 30,
+                      force: str = ''):
     """
     More detailed stats for a given emoji over the last <days> days.
+
+    Use -f as a third option to check for previous, now-deleted emojis using their ID snowflakes.
     """
     if em is None:
         await ctx.send(f"That's not an emoji on **{ctx.guild}**.")
@@ -161,7 +165,7 @@ async def emoji_stats(ctx: commands.Context, em: Optional[Union[discord.Emoji, i
     else:
         emoji_id = int(em)
 
-    if emoji_id not in [e.id for e in ctx.guild.emojis]:
+    if force != '-f' and emoji_id not in [e.id for e in ctx.guild.emojis]:
         await ctx.send(f"That's not the ID of an emoji in **{ctx.guild}**.")
         return
 
