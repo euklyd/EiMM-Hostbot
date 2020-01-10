@@ -47,6 +47,8 @@ def increment_count(session: Session, server: discord.guild, emoji_id: int, user
 
 
 async def count_emoji(message: discord.Message):
+    if message.guild is None:
+        return
     if message.author.bot:
         # nope
         return
@@ -153,7 +155,7 @@ async def emoji_stats(ctx: commands.Context, em: Optional[Union[discord.Emoji, i
     """
     More detailed stats for a given emoji over the last <days> days.
 
-    Use -f as a third option to check for previous, now-deleted emojis using their ID snowflakes.
+    Use -f as a third option to check for previous, now-deleted emoji using their ID snowflakes.
     """
     if em is None:
         await ctx.send(f"That's not an emoji on **{ctx.guild}**.")
