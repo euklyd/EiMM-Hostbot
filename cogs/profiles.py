@@ -194,7 +194,9 @@ class Profiles(commands.Cog):
     @commands.group(invoke_without_command=True)
     async def set(self, ctx: commands.Context):
         """
-        Set various profile fields. For examples, check the EiMM Community Profiles spreadsheet.
+        Set various profile fields.
+
+        For examples, check the EiMM Community Profiles spreadsheet.
         """
         await ctx.send(f'Use `{self.bot.default_command_prefix}help set` for more info.')
 

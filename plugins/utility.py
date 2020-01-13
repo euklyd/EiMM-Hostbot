@@ -24,7 +24,7 @@ from discord.ext import commands
 @commands.command()
 async def bidoof(ctx: commands.Context, key: Optional[str]):
     """
-    I can't make a Mafia Bidoof bot *without* this command, now can I?
+    I can't make a Mafia Bidoof bot *without* this command.
 
     God bless Mafia Bidoof.
     """
