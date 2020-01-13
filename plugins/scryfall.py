@@ -11,21 +11,26 @@ from core.bot import Bot
 API = 'https://api.scryfall.com/'
 
 
-class Card:
-    def __init__(self, card):
-        self.name = card['name']
-        self.mana_cost = card['mana_cost']
-        self.cmc = card['cmc']
-        self.type_line = card['type_line']
-        self.oracle_text = card['oracle_text']
-        self.power = card['power']
-        self.toughness = card['toughness']
+# class Card:
+#     def __init__(self, card):
+#         self.name = card['name']
+#         self.mana_cost = card['mana_cost']
+#         self.cmc = card['cmc']
+#         self.type_line = card['type_line']
+#         self.oracle_text = card['oracle_text']
+#         self.power = card['power']
+#         self.toughness = card['toughness']
 
 
 @commands.command()
-async def oracle(ctx: commands.Context, *, text: str):
+async def oracle(ctx: commands.Context, *, expr: str):
+    """
+    Search Scryfall for Magic: The Gathering cards.
+
+    Full search syntax guide online: https://scryfall.com/docs/syntax
+    """
     ENDPOINT = 'cards/search?'
-    query = f'{API}{ENDPOINT}q={text}'
+    query = f'{API}{ENDPOINT}q={expr}'
     with requests.get(query) as response:
         if not response.ok:
             # TODO: handle error
