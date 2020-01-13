@@ -14,7 +14,7 @@ async def color(ctx: commands.Context, hexcode: str):
     if hexcode[0] == '#':
         color = hexcode
     else:
-        color = f'#{hex(int(hexcode, 16))[2:]}'
+        color = f'#{hex(int(hexcode, 16))[2:]:>03}'
     # color = ((hexcode >> 16) & 0xff, (hexcode >> 8) & 0xff, hexcode & 0xff)
     im = Image.new('RGB', size=(128, 128), color=color)
     img_bytes = io.BytesIO()
