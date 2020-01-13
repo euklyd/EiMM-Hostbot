@@ -45,5 +45,21 @@ async def bidoof(ctx: commands.Context, key: Optional[str]):
     await ctx.send(embed=em)
 
 
+@commands.command()
+@commands.is_owner()
+async def msg(ctx: commands.Context, channel_id: int, *, message: str):
+    """
+    Send a message to the specified channel ID.
+    """
+    channel = ctx.bot.get_channel(channel_id)  # type: discord.TextChannel
+    if channel is None:
+        channel = ctx.bot.get_user(channel_id)  # type: discord.User
+    if channel is None:
+        # Not a text channel or a user.
+        await ctx.send('No matching channel found.')
+    await channel.send(message)
+
+
 def setup(bot: commands.Bot):
     bot.add_command(bidoof)
+    bot.add_command(msg)
