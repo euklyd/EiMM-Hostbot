@@ -12,9 +12,13 @@ async def reload(ctx: commands.Context, plugin: str):
 
     If it is not loaded yet, load it. Only works for plugins (extensions), NOT cogs.
     """
-    ctx.bot.reload_extension(f'plugins.{plugin}')
-    await ctx.send(f'Reloaded plugin `{plugin}`.')
-    print(f'reloaded {plugin}')  # TODO: change to actual logging sometime
+    if f'plugins.{plugin}' in ctx.bot.extensions:
+        ctx.bot.reload_extension(f'plugins.{plugin}')
+        await ctx.send(f'Reloaded plugin `{plugin}`.')
+        print(f'reloaded {plugin}')  # TODO: change to actual logging sometime
+    else:
+        ctx.bot.load_extension(f'plugins.{plugin}')
+        await ctx.send(f'Loaded plugin `{plugin}`.')
 
 
 @commands.command()
