@@ -49,7 +49,9 @@ async def bidoof(ctx: commands.Context, key: Optional[str]):
 @commands.is_owner()
 async def msg(ctx: commands.Context, channel_id: int, *, message: str):
     """
-    Send a message to the specified channel ID.
+    Send a message to the specified channel.
+
+    Also works for whispering to users. Please don't abuse this!
     """
     channel = ctx.bot.get_channel(channel_id)  # type: discord.TextChannel
     if channel is None:
