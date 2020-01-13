@@ -31,6 +31,9 @@ class NotFoundMember:
 @commands.group(invoke_without_command=True)
 @commands.has_permissions(administrator=True)
 async def init(ctx: commands.Context):
+    """
+    HostBot server initialization commandgroup.
+    """
     await ctx.send(f"This isn't a command! Use `{ctx.bot.default_command_prefix}help init`.")
 
 

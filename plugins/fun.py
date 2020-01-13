@@ -7,7 +7,10 @@ from discord.ext import commands
 
 
 @commands.command()
-async def color(ctx: commands.Context, hexcode):
+async def color(ctx: commands.Context, hexcode: str):
+    """
+    Preview the color of the provided hexcode.
+    """
     if hexcode[0] == '#':
         color = hexcode
     else:
