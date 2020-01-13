@@ -1,38 +1,48 @@
-import discord
 from discord.ext import commands
 
 import conf.settings as settings
-
 from core.bot import Bot
 
-bot = Bot(
-    command_prefix=settings.prefix,
-    description='https://board8.fandom.com/wiki/Mafia_Bidoof',
-    conf=settings.conf,
-    owner_id=settings.owner_id,
-    status=settings.status,
-)
 
-for cog in settings.cogs:
-    bot.add_cog(cog(bot))
-
-for plugin in settings.plugins:
-    bot.load_extension(f'plugins.{plugin}')
-
-
-@bot.command()
+@commands.command()
 @commands.is_owner()
 async def reload(ctx: commands.Context, plugin: str):
-    bot.reload_extension(f'plugins.{plugin}')
+    """
+    Reload the specified plugin.
+
+    If it is not loaded yet, load it. Only works for plugins (extensions), NOT cogs.
+    """
+    ctx.bot.reload_extension(f'plugins.{plugin}')
     await ctx.send(f'Reloaded plugin `{plugin}`.')
     print(f'reloaded {plugin}')  # TODO: change to actual logging sometime
 
 
-@bot.command()
+@commands.command()
 @commands.is_owner()
 async def shutdown(ctx: commands.Context):
+    """
+    Zzz.
+    """
     await ctx.send("I'll be back.")
-    await bot.logout()
+    await ctx.bot.logout()
 
 
-bot.run(settings.client_token)
+if __name__ == '__main__':
+    bot = Bot(
+        command_prefix=settings.prefix,
+        description='https://board8.fandom.com/wiki/Mafia_Bidoof',
+        conf=settings.conf,
+        owner_id=settings.owner_id,
+        status=settings.status,
+    )
+
+    for cog in settings.cogs:
+        bot.add_cog(cog(bot))
+
+    for plugin in settings.plugins:
+        bot.load_extension(f'plugins.{plugin}')
+
+    bot.add_command(shutdown)
+    bot.add_command(reload)
+
+    bot.run(settings.client_token)
