@@ -3,7 +3,7 @@ from typing import Callable, Union, Optional
 
 import discord
 from discord.ext import commands
-from sqlalchemy import create_engine, Column, Integer
+from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 
@@ -17,14 +17,80 @@ session_maker = None  # type: Union[None, Callable[[], Session]]
 # TODO: Fix multi-channel voting. Right now there is a bug, so don't open multiple channels at once.
 
 
+# class Vote(Base):
+#     __tablename__ = 'Vote'
+#     channel_id = Column(Integer, primary_key=True)
+#     voter_id = Column(Integer, primary_key=True)
+#     voted_id = Column(Integer)
+#
+#     def __repr__(self):
+#         return f'<Vote channel_id={self.channel_id}, voter_id={self.voter_id}, voted_id={self.voted_id}>'
+
+
 class Vote(Base):
     __tablename__ = 'Vote'
     channel_id = Column(Integer, primary_key=True)
     voter_id = Column(Integer, primary_key=True)
-    voted_id = Column(Integer)
+    # voted_id = Column(Integer)
+    voted_id = Column(String)
 
     def __repr__(self):
         return f'<Vote channel_id={self.channel_id}, voter_id={self.voter_id}, voted_id={self.voted_id}>'
+
+
+legal_votes = [
+    "[This alias vandalized by nazi mod Euklyd]",
+    "ain't no party like a rakdos party",
+    "aliasn't",
+    "Almonds",
+    "AncestralRecall",
+    "ban flash in commander ffs",
+    "beyond repair",
+    "Black man, don't shoot",
+    "blue signal light",
+    "Collector Oof",
+    "Conq's Harem",
+    "decidedly male",
+    "Diamondozer",
+    "don't watch tower of god",
+    "From the Helvault",
+    "Fullmetal",
+    "Goblin Token",
+    "Hot Mama 69 Meat Lover",
+    "HYDRA BITCH",
+    "i am once again asking did you pay the 2",
+    "i demand fully randomized alias lists",
+    "I'll master your dungeon uwu",
+    "Ignite Memories",
+    "L",
+    "Lodestone",
+    "Lord Gaius",
+    "Lotus",
+    "Maestria com Metais - Contestação Estoica custará 1 a menos para ser conjurado se você controlar três ou mais artefatos.",
+    "Masterful Ninja",
+    "most broken role itg",
+    "Ninja Rodent",
+    "noise alias, \"\"\"rand\"\"\" n1",
+    "orchid",
+    "please make sure i read my role correctly @daycop",
+    "Puzzle Box",
+    "Ratsune Miku",
+    "Remy",
+    "Saproling",
+    "sc/naruse",
+    "seven oxygens (o7)",
+    "Sofiaaaaaaaaaaaaaaa~",
+    "Stuart",
+    "thank you for expansion of game size",
+    "The Bastardliest Bastard",
+    "translucent powder",
+    "Tryna",
+    "White lie",
+    "WHY CAN'T I WAKE UP IN TIME FOR TURNIPS",
+    "Worthless.",
+    "Yogg-Saron, Hope's End",
+    "You have activated my trap card",
+]
 
 
 class Channel(Base):
@@ -85,8 +151,28 @@ async def vote_clear(ctx: commands.Context):
     await ctx.send(f'Votes for {ctx.channel} cleared!')
 
 
+# @commands.command()
+# async def vote(ctx: commands.Context, votee: discord.Member):
+#     """
+#     Vote.
+#     """
+#     session = session_maker()
+#     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
+#     if old_channel is None:
+#         await ctx.send("This channel hasn't been set up for voting.")
+#         return
+#     old_vote = session.query(Vote).filter_by(voter_id=ctx.author.id).one_or_none()
+#     if old_vote is not None:
+#         old_vote.voted_id = votee.id
+#     else:
+#         new_vote = Vote(channel_id=ctx.channel.id, voter_id=ctx.author.id, voted_id=votee.id)
+#         session.add(new_vote)
+#     session.commit()
+#     await ctx.message.add_reaction(ctx.bot.greentick)
+
+
 @commands.command()
-async def vote(ctx: commands.Context, votee: discord.Member):
+async def vote(ctx: commands.Context, *, votee: str):
     """
     Vote.
     """
@@ -96,10 +182,13 @@ async def vote(ctx: commands.Context, votee: discord.Member):
         await ctx.send("This channel hasn't been set up for voting.")
         return
     old_vote = session.query(Vote).filter_by(voter_id=ctx.author.id).one_or_none()
+    if votee not in legal_votes:
+        await ctx.send("That is not a legal vote; please check the alias list again.")
+        return
     if old_vote is not None:
-        old_vote.voted_id = votee.id
+        old_vote.voted_id = votee
     else:
-        new_vote = Vote(channel_id=ctx.channel.id, voter_id=ctx.author.id, voted_id=votee.id)
+        new_vote = Vote(channel_id=ctx.channel.id, voter_id=ctx.author.id, voted_id=votee)
         session.add(new_vote)
     session.commit()
     await ctx.message.add_reaction(ctx.bot.greentick)
@@ -125,8 +214,7 @@ async def votals(ctx: commands.Context):
     sorted_tally = sorted(tally.items(), key=lambda x: x[1], reverse=True)
     reply = '**Votals:**```\n'
     for ballot in sorted_tally:  # type: tuple[int, int]
-        member = ctx.guild.get_member(ballot[0])
-        reply += f'{member}: {ballot[1]}\n'
+        reply += f'{ballot[0]}: {ballot[1]}\n'
     reply += '```'
     await ctx.send(reply)
 
