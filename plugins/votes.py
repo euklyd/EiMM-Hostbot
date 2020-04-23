@@ -90,6 +90,7 @@ legal_votes = [
     "Worthless.",
     "Yogg-Saron, Hope's End",
     "You have activated my trap card",
+    "NULL",
 ]
 
 
