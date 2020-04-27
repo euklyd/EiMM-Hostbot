@@ -1,8 +1,10 @@
-from typing import Optional
+from typing import Optional, List
 
 import random
 # import requests
 import discord
+import requests
+from imgurpython.imgur.models.image import Image
 from discord.ext import commands
 
 
@@ -29,19 +31,20 @@ async def bidoof(ctx: commands.Context, key: Optional[str]):
     God bless Mafia Bidoof.
     """
     BIDOOF_ALBUM = 'kn6ieEv'
-    bidoofs = []
+    bidoofs = []  # type: List[Image]
     if type(BIDOOF_ALBUM) is list:
         for album in BIDOOF_ALBUM:
             bidoofs += ctx.bot.imgur.get_album_images(album)
     else:
         bidoofs = ctx.bot.imgur.get_album_images(BIDOOF_ALBUM)
-    bidoof = random.choice(bidoofs)
+    bidoof_img = random.choice(bidoofs)  # Image
     if key is not None:
+        # if a key is specified, attempt to override the randomly selected image
         for img in bidoofs:
             if img.description is not None and img.description.lower() == key.lower():
-                bidoof = img
+                bidoof_img = img
                 break
-    em = discord.Embed().set_image(url=bidoof.link)
+    em = discord.Embed().set_image(url=bidoof_img.link)
     await ctx.send(embed=em)
 
 
@@ -62,6 +65,25 @@ async def msg(ctx: commands.Context, channel_id: int, *, message: str):
     await channel.send(message)
 
 
+@commands.command()
+@commands.is_owner()
+async def chavi(ctx: commands.Context, *, url: str):
+    try:
+        response = requests.get(url)
+        await ctx.bot.user.edit(avatar=response.content)
+        await ctx.message.add_reaction(ctx.bot.greentick)
+    except Exception as e:
+        await ctx.send(f'`Error: {e}`')
+        await ctx.message.add_reaction(ctx.bot.redtick)
+
+
+@commands.command()
+async def trunc(ctx: commands.Context, size: int, *, msg: str):
+    await ctx.send(f'`{msg[:size]}`')
+
+
 def setup(bot: commands.Bot):
     bot.add_command(bidoof)
     bot.add_command(msg)
+    bot.add_command(chavi)
+    bot.add_command(trunc)
