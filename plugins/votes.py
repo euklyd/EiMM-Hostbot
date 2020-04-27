@@ -220,6 +220,31 @@ async def votals(ctx: commands.Context):
     await ctx.send(reply)
 
 
+@commands.has_permissions(administrator=True)
+@commands.command()
+async def voters(ctx: commands.Context):
+    session = session_maker()
+    old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
+    if old_channel is None:
+        await ctx.send("This channel hasn't been set up for voting.")
+        return
+    votes = session.query(Vote).filter_by(channel_id=ctx.channel.id).all()
+    tally = {}
+    for ballot in votes:  # type: Vote
+        if ballot.voted_id in tally:
+            tally[ballot.voted_id] += [ballot.voter_id]
+        else:
+            tally[ballot.voted_id] = [ballot.voter_id]
+
+    sorted_tally = sorted(tally.items(), key=lambda x: len(x[1]), reverse=True)
+    reply = '**Votals:**```\n'
+    for votee in sorted_tally:  # type: tuple[int, int]
+        voters = [str(ctx.guild.get_member(voter_id)) for voter_id in votee[1]]
+        reply += f'{votee[0]}: {voters}\n'
+    reply += '```'
+    await ctx.send(reply)
+
+
 def setup(bot: Bot):
     global session_maker
 
@@ -228,6 +253,7 @@ def setup(bot: Bot):
     bot.add_command(vote_unsetup)
     bot.add_command(vote)
     bot.add_command(votals)
+    bot.add_command(voters)
 
     db_dir = 'databases/'
     db_file = f'{db_dir}/votes.db'
