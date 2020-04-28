@@ -300,7 +300,7 @@ async def confessional(ctx: commands.Context, *, msg):
         hours, rem = divmod(time_til_next.seconds, 3600)
         mins, secs = divmod(time_til_next.seconds, 60)
         await ctx.send(f'Stop sending confessionals so fast!\n'
-                       f'*(Max {cooldown_max} per {cooldown_delta}; {hours}:{mins}:{secs} to go.)*')
+                       f'*(Max {cooldown_max} per {cooldown_delta}; {hours}:{mins:02}:{secs:02} to go.)*')
         await ctx.message.add_reaction(ctx.bot.redtick)
         return
 
