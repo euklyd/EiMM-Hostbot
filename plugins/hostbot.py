@@ -1,7 +1,8 @@
 import pprint
 import re
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable, Union, Optional
+from typing import Callable, Union, Optional, Dict, Tuple, List
 
 import discord
 import yaml
@@ -12,9 +13,14 @@ from sqlalchemy.orm import sessionmaker, Session
 import plugins.hostbot_schema as hbs
 from core.bot import Bot
 from utils import spreadsheet
+import heapq
 
 session_maker = None  # type: Union[None, Callable[[], Session]]
 connection = None  # type: Optional[spreadsheet.SheetConnection]
+
+confessional_cooldowns = {}  # type: Dict[int, List]
+cooldown_delta = timedelta(hours=1)
+cooldown_max = 2
 
 
 class NotFoundMember:
@@ -246,16 +252,40 @@ async def init_reset(ctx: commands.Context):
     await ctx.send('Deleted, like, everything.')
 
 
+def inc_cooldown(user: discord.Member):
+    if user.id not in confessional_cooldowns:
+        confessional_cooldowns[user.id] = [datetime.utcnow()]
+        return True
+
+    if len(confessional_cooldowns[user.id]) < cooldown_max:
+        confessional_cooldowns[user.id].append(datetime.utcnow())
+        return True
+
+    if confessional_cooldowns[user.id][0] + cooldown_delta > datetime.utcnow():
+        return False
+    confessional_cooldowns[user.id].pop(0)
+    confessional_cooldowns[user.id].append(datetime.utcnow())
+    return True
+
+
 @commands.command()
 async def confessional(ctx: commands.Context, *, msg):
+    """
+    Send a confessional from your Role PM to the graveyard.
+
+    Only usable by living players, and only in their Role PMs.
+    """
     session = session_maker()
     player_role = session.query(hbs.Role).filter_by(type='player', server_id=ctx.guild.id).one_or_none()
     if player_role is None:
         await ctx.send("This server isn't set up for EiMM.")
         await ctx.message.add_reaction(ctx.bot.redtick)
         return
-    player_role = ctx.guild.get_role(player_role)
+    player_role = ctx.guild.get_role(player_role.id)
     if player_role not in ctx.author.roles:
+        # TODO: remove test prints probably, but these are so smol that it doesn't really matter.
+        print(player_role)
+        print(ctx.author.roles)
         await ctx.send('This command is only usable by living players.')
         await ctx.message.add_reaction(ctx.bot.redtick)
         return
@@ -263,6 +293,15 @@ async def confessional(ctx: commands.Context, *, msg):
     gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
     if ctx.channel.id == gamechat_channel.id:
         await ctx.send('Confessionals belong in your role PM.')
+        await ctx.message.add_reaction(ctx.bot.redtick)
+        return
+
+    if inc_cooldown(ctx.author) is False:
+        time_til_next = cooldown_delta - (datetime.utcnow() - confessional_cooldowns[ctx.author.id][0])
+        hours, rem = divmod(time_til_next.seconds, 3600)
+        mins, secs = divmod(time_til_next.seconds, 60)
+        await ctx.send(f'Stop sending confessionals so fast!'
+                       f'*(Max {cooldown_max} per {cooldown_delta}; {hours}:{mins}:{secs} to go.)*')
         await ctx.message.add_reaction(ctx.bot.redtick)
         return
 
