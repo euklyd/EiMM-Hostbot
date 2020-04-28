@@ -304,6 +304,10 @@ async def confessional(ctx: commands.Context, *, msg):
         await ctx.message.add_reaction(ctx.bot.redtick)
         return
 
+    if len(msg) > 1900:
+        await ctx.send('Your confessional is too long! Please keep it below 1900 characters.')
+        await ctx.message.add_reaction(ctx.bot.redtick)
+        return
     gy_channel = session.query(hbs.Channel).filter_by(type='graveyard', server_id=ctx.guild.id).one_or_none()
     gy_channel = ctx.guild.get_channel(gy_channel.id)  # type: discord.TextChannel
     msg = msg.replace('@everyone', '@\u200beveryone`').replace('@here', '@\u200bhere')  # \u200b aka zero-width space
