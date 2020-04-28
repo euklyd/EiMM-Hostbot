@@ -2,7 +2,7 @@ import pprint
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable, Union, Optional, Dict, Tuple, List
+from typing import Callable, Union, Optional, Dict, List
 
 import discord
 import yaml
@@ -13,7 +13,6 @@ from sqlalchemy.orm import sessionmaker, Session
 import plugins.hostbot_schema as hbs
 from core.bot import Bot
 from utils import spreadsheet
-import heapq
 
 session_maker = None  # type: Union[None, Callable[[], Session]]
 connection = None  # type: Optional[spreadsheet.SheetConnection]
@@ -273,7 +272,7 @@ async def confessional(ctx: commands.Context, *, msg):
     """
     Send a confessional from your Role PM to the graveyard.
 
-    Only usable by living players, and only in their Role PMs.
+    Only usable by living players, and only in their Role PMs. Has a cooldown timer, so don't spam it.
     """
     session = session_maker()
     player_role = session.query(hbs.Role).filter_by(type='player', server_id=ctx.guild.id).one_or_none()
@@ -300,7 +299,7 @@ async def confessional(ctx: commands.Context, *, msg):
         time_til_next = cooldown_delta - (datetime.utcnow() - confessional_cooldowns[ctx.author.id][0])
         hours, rem = divmod(time_til_next.seconds, 3600)
         mins, secs = divmod(time_til_next.seconds, 60)
-        await ctx.send(f'Stop sending confessionals so fast!'
+        await ctx.send(f'Stop sending confessionals so fast!\n'
                        f'*(Max {cooldown_max} per {cooldown_delta}; {hours}:{mins}:{secs} to go.)*')
         await ctx.message.add_reaction(ctx.bot.redtick)
         return
