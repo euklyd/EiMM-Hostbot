@@ -246,6 +246,33 @@ async def init_reset(ctx: commands.Context):
     await ctx.send('Deleted, like, everything.')
 
 
+@commands.command()
+async def confessional(ctx: commands.Context, *, msg):
+    session = session_maker()
+    player_role = session.query(hbs.Role).filter_by(type='player', server_id=ctx.guild.id).one_or_none()
+    if player_role is None:
+        await ctx.send("This server isn't set up for EiMM.")
+        await ctx.message.add_reaction(ctx.bot.redtick)
+        return
+    player_role = ctx.guild.get_role(player_role)
+    if player_role not in ctx.author.roles:
+        await ctx.send('This command is only usable by living players.')
+        await ctx.message.add_reaction(ctx.bot.redtick)
+        return
+
+    gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
+    if ctx.channel.id == gamechat_channel.id:
+        await ctx.send('Confessionals belong in your role PM.')
+        await ctx.message.add_reaction(ctx.bot.redtick)
+        return
+
+    gy_channel = session.query(hbs.Channel).filter_by(type='graveyard', server_id=ctx.guild.id).one_or_none()
+    gy_channel = ctx.guild.get_channel(gy_channel.id)  # type: discord.TextChannel
+    conf = f'**Confessional from {ctx.author}:**\n>>> {msg}'
+    await gy_channel.send(conf)
+    await ctx.message.add_reaction(ctx.bot.greentick)
+
+
 # @init.command(name='updaterole')
 # async def init_db_update(ctx, roletype, role):
 #     # TODO
@@ -261,6 +288,7 @@ def setup(bot: Bot):
 
     global session_maker
     bot.add_command(init)
+    bot.add_command(confessional)
 
     db_dir = 'databases/'
     db_file = f'{db_dir}/hostbot.db'
