@@ -211,13 +211,14 @@ async def emoji_stats(ctx: commands.Context, em: Optional[Union[discord.Emoji, i
 
 @emoji.command(name='head')
 @commands.has_permissions(administrator=True)
-async def emoji_head(ctx: commands.Context, days: int = 30, num: int = 5):
+async def emoji_head(ctx: commands.Context, days: int = 30, num: int = 5, anim: bool = False):
     """
     Display the most frequently emojis for the current server.
     """
     oldest = datetime.utcnow().date() - timedelta(days=days)
 
     emoji_ids = {e.id: e for e in ctx.guild.emojis}  # type: Dict[int, discord.Emoji]
+    animated_emojis = {e.id for e in ctx.guild.emojis if e.animated}
 
     session = session_maker()
 
@@ -235,6 +236,8 @@ async def emoji_head(ctx: commands.Context, days: int = 30, num: int = 5):
             emoji_counts[em_id] = 0
 
     total_counts = list(emoji_counts.items())
+    if not anim:
+        total_counts = [e for e in total_counts if e[0] not in animated_emojis]
     total_counts = sorted(total_counts, key=lambda x: -x[1])[:num]
 
     reply = f'__**Top `{num}` emojis in the past `{days}` days for {ctx.guild}:**__\n'
@@ -250,7 +253,7 @@ async def emoji_head(ctx: commands.Context, days: int = 30, num: int = 5):
 
 @emoji.command(name='tail')
 @commands.has_permissions(administrator=True)
-async def emoji_tail(ctx: commands.Context, days: int = 30, num: int = 5):
+async def emoji_tail(ctx: commands.Context, days: int = 30, num: int = 5, anim: bool = False):
     """
     Display the least frequently emojis for the current server.
     """
@@ -259,6 +262,7 @@ async def emoji_tail(ctx: commands.Context, days: int = 30, num: int = 5):
     oldest = datetime.utcnow().date() - timedelta(days=days)
 
     emoji_ids = {e.id: e for e in ctx.guild.emojis}  # type: Dict[int, discord.Emoji]
+    animated_emojis = {e.id for e in ctx.guild.emojis if e.animated}
 
     session = session_maker()
 
@@ -276,6 +280,8 @@ async def emoji_tail(ctx: commands.Context, days: int = 30, num: int = 5):
             emoji_counts[em_id] = 0
 
     total_counts = list(emoji_counts.items())
+    if not anim:
+        total_counts = [e for e in total_counts if e[0] not in animated_emojis]
     total_counts = sorted(total_counts, key=lambda x: x[1])[:num]
 
     reply = f'__**Bottom `{num}` emojis in the past `{days}` days for {ctx.guild}:**__\n'
