@@ -227,7 +227,15 @@ async def emoji_head(ctx: commands.Context, days: int = 30, num: int = 5):
         es.EmojiCount.emoji_id).order_by(
         func.sum(es.EmojiCount.count).desc()).all()  # type: List[int, int]
 
-    total_counts = total_counts[:num]
+    # total_counts = total_counts[:num]
+
+    emoji_counts = {em: ct for em, ct in total_counts}  # type: Dict[int, int]
+    for em_id in emoji_ids:
+        if em_id not in emoji_counts:
+            emoji_counts[em_id] = 0
+
+    total_counts = list(emoji_counts.items())
+    total_counts = sorted(total_counts, key=lambda x: -x[1])[:num]
 
     reply = f'__**Top `{num}` emojis in the past `{days}` days for {ctx.guild}:**__\n'
     print(total_counts)
@@ -260,7 +268,15 @@ async def emoji_tail(ctx: commands.Context, days: int = 30, num: int = 5):
         es.EmojiCount.emoji_id).order_by(
         func.sum(es.EmojiCount.count).asc()).all()  # type: List[int, int]
 
-    total_counts = total_counts[:num]
+    # total_counts = total_counts[:num]
+
+    emoji_counts = {em: ct for em, ct in total_counts}  # type: Dict[int, int]
+    for em_id in emoji_ids:
+        if em_id not in emoji_counts:
+            emoji_counts[em_id] = 0
+
+    total_counts = list(emoji_counts.items())
+    total_counts = sorted(total_counts, key=lambda x: x[1])[:num]
 
     reply = f'__**Bottom `{num}` emojis in the past `{days}` days for {ctx.guild}:**__\n'
     print(total_counts)
