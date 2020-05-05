@@ -11,6 +11,7 @@ from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker, Session
 
 import plugins.emoji_schema as es
+import utils
 
 _EMOJI_RE = re.compile(r'<:(?P<name>\w\w+):(?P<id>\d+)>')
 
@@ -241,7 +242,6 @@ async def emoji_head(ctx: commands.Context, days: int = 30, num: int = 5, anim: 
     total_counts = sorted(total_counts, key=lambda x: -x[1])[:num]
 
     reply = f'__**Top `{num}` emojis in the past `{days}` days for {ctx.guild}:**__\n'
-    print(total_counts)
     for i, entry in enumerate(total_counts):
         em = emoji_ids.get(entry[0])
         if em is None:
@@ -285,7 +285,6 @@ async def emoji_tail(ctx: commands.Context, days: int = 30, num: int = 5, anim: 
     total_counts = sorted(total_counts, key=lambda x: x[1])[:num]
 
     reply = f'__**Bottom `{num}` emojis in the past `{days}` days for {ctx.guild}:**__\n'
-    print(total_counts)
     for i, entry in enumerate(total_counts):
         em = emoji_ids.get(entry[0])
         if em is None:
@@ -293,6 +292,47 @@ async def emoji_tail(ctx: commands.Context, days: int = 30, num: int = 5, anim: 
         reply += f'[{i + 1}] {em} `[:{em.name}:]`: {entry[1]} uses\n'
 
     await ctx.send(reply)
+
+
+@emoji.command(name='all')
+@commands.has_permissions(administrator=True)
+async def emoji_all(ctx: commands.Context, days: int = 30, anim: bool = False):
+    """
+    Display counts for all emojis for the current server.
+    """
+    oldest = datetime.utcnow().date() - timedelta(days=days)
+
+    emoji_ids = {e.id: e for e in ctx.guild.emojis}  # type: Dict[int, discord.Emoji]
+    animated_emojis = {e.id for e in ctx.guild.emojis if e.animated}
+
+    session = session_maker()
+
+    total_counts = session.query(es.EmojiCount.emoji_id, func.sum(es.EmojiCount.count)).filter_by(
+        server_id=ctx.guild.id).filter(
+        func.DATE(es.EmojiCount.date) > oldest).group_by(
+        es.EmojiCount.emoji_id).order_by(
+        func.sum(es.EmojiCount.count).desc()).all()  # type: List[int, int]
+
+    # total_counts = total_counts[:num]
+
+    emoji_counts = {em: ct for em, ct in total_counts}  # type: Dict[int, int]
+    for em_id in emoji_ids:
+        if em_id not in emoji_counts:
+            emoji_counts[em_id] = 0
+
+    total_counts = list(emoji_counts.items())
+    if not anim:
+        total_counts = [e for e in total_counts if e[0] not in animated_emojis]
+
+    reply = f'__**All used emojis in the past `{days}` days for {ctx.guild}:**__\n'
+    emoji_ls = []
+    for i, entry in enumerate(total_counts):
+        em = emoji_ids.get(entry[0])
+        if em is None:
+            em = NoneEmoji()
+        emoji_ls.append(f'{em} : {entry[1]} uses')
+    await ctx.send(reply)
+    await utils.menu.menu_list(ctx, emoji_ls)  # we don't actually care to select anything
 
 
 @emoji.command(name='export')
