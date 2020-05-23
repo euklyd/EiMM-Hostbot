@@ -82,8 +82,18 @@ async def trunc(ctx: commands.Context, size: int, *, msg: str):
     await ctx.send(f'`{msg[:size]}`')
 
 
+@commands.command()
+@commands.has_permissions(administrator=True)
+async def clear(ctx: commands.Context, num: int):
+    assert type(ctx.channel) is discord.TextChannel
+    deleted = await ctx.channel.purge(limit=num+1)  # num+1 because the trigger message is counted too
+    deletion_message = await ctx.send(f'*Cleared {len(deleted)} messages.*')
+    await deletion_message.delete(delay=5)
+
+
 def setup(bot: commands.Bot):
     bot.add_command(bidoof)
     bot.add_command(msg)
     bot.add_command(chavi)
     bot.add_command(trunc)
+    bot.add_command(clear)
