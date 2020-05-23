@@ -85,6 +85,9 @@ async def trunc(ctx: commands.Context, size: int, *, msg: str):
 @commands.command()
 @commands.has_permissions(administrator=True)
 async def clear(ctx: commands.Context, num: int):
+    """
+    Clear messages en masse.
+    """
     assert type(ctx.channel) is discord.TextChannel
     deleted = await ctx.channel.purge(limit=num+1)  # num+1 because the trigger message is counted too
     deletion_message = await ctx.send(f'*Cleared {len(deleted)} messages.*')
