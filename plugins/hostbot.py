@@ -128,7 +128,7 @@ def player_channel_name(player: discord.Member):
     name = player.name
     name = re.sub(r'[\W_ -]+', '', name)
     name = re.sub(r' ', '-', name)
-    return f'{name}_{player.discriminator}_rolepm'
+    return f'{name}-{player.discriminator}'
 
 
 @init.command(name='rolepms')
@@ -255,7 +255,6 @@ async def init_pmlist(ctx: commands.Context, *, playerlist: str):
         ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
         ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
         host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
-        spec_role: discord.PermissionOverwrite(read_messages=True),
     })  # type: discord.CategoryChannel
 
     for player in players:
@@ -263,7 +262,6 @@ async def init_pmlist(ctx: commands.Context, *, playerlist: str):
             ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
             ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
             host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
-            spec_role: discord.PermissionOverwrite(read_messages=True),
         }
         if type(player) is discord.Member:
             await player.edit(roles=player.roles + [player_role])
