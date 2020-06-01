@@ -128,7 +128,7 @@ def player_channel_name(player: discord.Member):
     name = player.name
     name = re.sub(r'[\W_ -]+', '', name)
     name = re.sub(r' ', '-', name)
-    return f'{name}-{player.discriminator}'
+    return f'{name}-{player.discriminator:>04}'
 
 
 @init.command(name='rolepms')
