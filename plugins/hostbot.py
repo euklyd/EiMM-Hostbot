@@ -44,7 +44,7 @@ async def init(ctx: commands.Context):
 
 @init.command(name='server')
 @commands.has_permissions(administrator=True)
-async def init_server(ctx: commands.Context, *, yml_config):
+async def init_server(ctx: commands.Context, *, yml_config: str):
     """
     Initialize a game server with channels and roles.
 
@@ -161,6 +161,80 @@ async def init_rolepms(ctx: commands.Context, page: str = 'Rolesheet', column: s
     ws = connection.get_page(sheet_name, page)
     print(ws)
     ls_usernames = spreadsheet.get_column_values(ws, column)
+    print(ls_usernames)
+
+    players = []
+    error_names = []
+    error = 'Error finding players: ```\n'
+    for name in ls_usernames:
+        player = ctx.guild.get_member_named(name)
+        if player is None:
+            error_names.append(name)
+            error += f'{name}\n'
+            players.append(NotFoundMember(name))
+        else:
+            players.append(player)
+    error += '```_(Created channels without permissions instead.)_'
+
+    players = sorted(players, key=lambda p: p.name.lower())
+    category = await ctx.guild.create_category('Role PMs', overwrites={
+        ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+        ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
+        host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
+        spec_role: discord.PermissionOverwrite(read_messages=True),
+    })  # type: discord.CategoryChannel
+
+    for player in players:
+        overwrites = {
+            ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+            ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
+            host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
+            spec_role: discord.PermissionOverwrite(read_messages=True),
+        }
+        if type(player) is discord.Member:
+            await player.edit(roles=player.roles + [player_role])
+            # manage needed for pins
+            overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
+        topic = f"{player}'s Role PM"
+        await category.create_text_channel(player_channel_name(player), overwrites=overwrites, topic=topic)
+
+    server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+    server.rolepms_id = category.id
+    session.commit()
+
+    if len(error_names) > 0:
+        await ctx.send(error)
+
+
+@init.command(name='pmlist')
+@commands.has_permissions(administrator=True)
+async def init_pmlist(ctx: commands.Context, *, playerlist: str):
+    """
+    Create Role PM channels for players and enrole each, no sheet involved.
+
+    Must be used after "init server".
+    Unlike "init rolepms", passes in a linebreak-separated list as the playerlist argument.
+    """
+    session = session_maker()
+
+    server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+    if server is None:
+        await ctx.send('Server is not set up')
+        return
+
+    spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='spec').one_or_none()
+    spec_role = ctx.guild.get_role(spec_role_id.id)
+
+    host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='host').one_or_none()
+    host_role = ctx.guild.get_role(host_role_id.id)
+
+    player_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').one_or_none()
+    player_role = ctx.guild.get_role(player_role_id.id)
+
+    print(f'spec_role_id: {spec_role_id}')
+    print(f'host_role_id: {spec_role_id}')
+
+    ls_usernames = playerlist.strip('```').strip('\n').split('\n')
     print(ls_usernames)
 
     players = []
