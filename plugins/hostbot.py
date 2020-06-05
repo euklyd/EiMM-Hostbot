@@ -388,6 +388,47 @@ async def confessional(ctx: commands.Context, *, msg):
     await ctx.message.add_reaction(ctx.bot.greentick)
 
 
+@commands.command()
+async def gameavatars(ctx: commands.Context):
+    """
+    List all avatar URLs for all players and hosts.
+    """
+    session = session_maker()
+    player_role = session.query(hbs.Role).filter_by(type='player', server_id=ctx.guild.id).one_or_none()
+    host_role = session.query(hbs.Role).filter_by(type='host', server_id=ctx.guild.id).one_or_none()
+    gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
+    if player_role is None or host_role is None or gamechat_channel is None:
+        await ctx.send("This server isn't set up for EiMM.")
+        await ctx.message.add_reaction(ctx.bot.redtick)
+        return
+
+    if ctx.channel.id == gamechat_channel.id:
+        await ctx.send("Don't spam up gamechat with this, thanks.")
+        await ctx.message.add_reaction(ctx.bot.redtick)
+        return
+
+    player_role = ctx.guild.get_role(player_role.id)  # type: discord.Role
+    host_role = ctx.guild.get_role(host_role.id)  # type: discord.Role
+    replies = []
+    reply = '**Host avatars:**```\n'
+    for host in host_role.members:  # type: discord.Member
+        if len(reply) > 1800:
+            replies.append(reply + '```')
+            reply = '```\n'
+        reply += f'{host}: {host.avatar_url_as(static_format="png")}\n'
+    reply += '```**Player avatars:**```\n'
+    for player in player_role.members:  # type: discord.Member
+        if len(reply) > 1800:
+            replies.append(reply + '```')
+            reply = '```\n'
+        reply += f'{player}: {player.avatar_url_as(static_format="png")}\n'
+    reply += '```'
+    replies.append(reply)
+
+    for r in replies:
+        await ctx.send(r)
+
+
 # @init.command(name='updaterole')
 # async def init_db_update(ctx, roletype, role):
 #     # TODO
