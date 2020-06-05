@@ -445,6 +445,7 @@ def setup(bot: Bot):
     global session_maker
     bot.add_command(init)
     bot.add_command(confessional)
+    bot.add_command(gameavatars)
 
     db_dir = 'databases/'
     db_file = f'{db_dir}/hostbot.db'
