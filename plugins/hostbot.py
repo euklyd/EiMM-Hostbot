@@ -411,13 +411,13 @@ async def gameavatars(ctx: commands.Context):
     host_role = ctx.guild.get_role(host_role.id)  # type: discord.Role
     replies = []
     reply = '**Host avatars:**```\n'
-    for host in host_role.members:  # type: discord.Member
+    for host in sorted(host_role.members, key=lambda x: x.name.lower()):  # type: discord.Member
         if len(reply) > 1800:
             replies.append(reply + '```')
             reply = '```\n'
         reply += f'{host}: {host.avatar_url_as(static_format="png")}\n'
     reply += '```**Player avatars:**```\n'
-    for player in player_role.members:  # type: discord.Member
+    for player in sorted(player_role.members, key=lambda x: x.name.lower()):  # type: discord.Member
         if len(reply) > 1800:
             replies.append(reply + '```')
             reply = '```\n'
