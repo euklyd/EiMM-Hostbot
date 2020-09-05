@@ -48,6 +48,9 @@ def ability_embed(row):
 
 
 class EiMM(commands.Cog):
+    """
+    Meta EiMM (the game) things, including ability queries.
+    """
     def __init__(self, bot: Bot):
         self.load()
         self.bot = bot
@@ -61,15 +64,24 @@ class EiMM(commands.Cog):
 
     @commands.group(invoke_without_command=True)
     async def eimm(self, ctx: commands.Context):
+        # TODO: docstr
         await ctx.send(f'Use `{self.bot.default_command_prefix}help eimm` for more info.')
 
     @eimm.group(name='rebuild')
     async def rebuild(self, ctx: commands.Context):
+        """
+        Rebuild the sheet cache.
+        """
         self.load()
         await ctx.send('Rebuilt cache.')
 
     @eimm.group(name='q')
     async def q(self, ctx: commands.Context, *, term: str):
+        """
+        Search the template sheet for an ability.
+
+        You can also use <<fullblock>> to search for abilities inline.
+        """
         choices = self.abilities.keys()
         matches = process.extractBests(term, choices, limit=10)
         if matches[0][1] == 100:
@@ -80,3 +92,17 @@ class EiMM(commands.Cog):
             match = await menu.menu_list(ctx, matches)
         em = ability_embed(self.abilities[match])
         await ctx.send(embed=em)
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        ability_regex = r'<<([^<>]*)>>'
+        match = re.search(ability_regex, message.content)
+        if match is not None:
+            match = match.group(1)
+        else:
+            return
+        for abil, row in self.abilities.items():
+            if match.lower() == abil.lower():
+                em = ability_embed(row)
+                await message.channel.send(embed=em)
+                return
