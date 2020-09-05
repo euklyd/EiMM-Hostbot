@@ -11,6 +11,7 @@ status = None
 
 cogs = [
     profiles.Profiles,
+    eimm.EiMM
     # add more cogs here!
 ]
 

@@ -1,9 +1,10 @@
 discord.py[voice]
+fuzzywuzzy
 gspread
 imgurpython
+ipython
 oauth2client
 pillow
-pprint
 pycountry
 pytz
 pyyaml
