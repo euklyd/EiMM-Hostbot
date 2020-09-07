@@ -95,14 +95,15 @@ async def oracle(ctx: commands.Context, *, expr: str):
 async def oracle_inline(message: discord.Message):
     img_regex = r'\[\[([^\[\]]*)]]'
     match = re.search(img_regex, message.content)
-    for member in message.channel.members:  # type: discord.Member
-        if member.id == 558508371821723670:
-            if member.status == discord.Status.offline:
-                # karn exists and is online
-                pass  # we can just answer queries instead of karn :)
-            else:
-                # karn exists and is online
-                return
+    if type(message.channel) == discord.TextChannel:
+        for member in message.channel.members:  # type: discord.Member
+            if member.id == 558508371821723670:
+                if member.status == discord.Status.offline:
+                    # karn exists and is online
+                    pass  # we can just answer queries instead of karn :)
+                else:
+                    # karn exists and is online
+                    return
     if match is not None:
         expr = match.group(1)
     else:
