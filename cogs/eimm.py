@@ -162,11 +162,6 @@ class EiMM(commands.Cog):
         em = ability_embed(self.abilities[match])
         await ctx.send(embed=em)
 
-    @eimm.group(name='test')
-    async def test(self, ctx: commands.Context):
-        print(self.keywords.keys())
-        print(self.passives.keys())
-
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         ability_regex = r'<<([^<>]*)>>'
