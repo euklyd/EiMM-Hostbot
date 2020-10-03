@@ -3,15 +3,10 @@ import io
 import re
 from typing import Any, Dict, List
 
-import deepdiff
 import discord
-import gspread
-import pycountry
 import yaml
 from discord.ext import commands
 from fuzzywuzzy import process
-
-from oauth2client.service_account import ServiceAccountCredentials
 
 from core.bot import Bot
 from utils import menu, spreadsheet
