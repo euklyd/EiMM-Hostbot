@@ -1,10 +1,13 @@
 import datetime
+import io
 import re
 from typing import Any, Dict, List
 
+import deepdiff
 import discord
 import gspread
 import pycountry
+import yaml
 from discord.ext import commands
 from fuzzywuzzy import process
 
@@ -64,6 +67,27 @@ def passive_embed(row):
     return em
 
 
+def diff_dict(new_dict, old_dict):
+    diffs = {'rm': {}, 'add': {}, 'ch': {}}
+    for k, e in old_dict.items():
+        if k not in new_dict:
+            diffs['rm'][k] = e
+    for k, e in new_dict.items():
+        if k not in old_dict:
+            diffs['add'][k] = e
+        else:
+            diff = {}
+            for field in e:
+                if field not in old_dict[k]:
+                    diff[field] = (e[field], None)
+                elif e[field] != old_dict[k][field]:
+                    diff[field] = {'new': e[field], 'old': old_dict[k][field]}
+                # we're ignoring "what if a field is deleted," we're not doing that
+            if len(diff) != 0:
+                diffs['ch'][k] = diff
+    return diffs
+
+
 class EiMM(commands.Cog):
     """
     Meta EiMM (the game) things, including ability queries.
@@ -71,24 +95,39 @@ class EiMM(commands.Cog):
 
     def __init__(self, bot: Bot):
         self.bot = bot
+        self.connection = None
         self.abilities = {}  # type: Dict[str, List]
         self.keywords = {}  # type: Dict[str, List]
         self.passives = {}  # type: Dict[str, List]
         self.load()
 
-    def load(self):
+    def load(self) -> Dict[str, Dict]:
         self.connection = spreadsheet.SheetConnection(SECRET, SCOPE)
         abilities = self.connection.get_page(SHEET_NAME, 'Active Abilities')
-        self.abilities = {
+        new_abilities = {
             row['Ability Name']: row for row in abilities.get_all_records()
         }
+        ability_diffs = diff_dict(new_abilities, self.abilities)
+        self.abilities = new_abilities
+
         keywords = self.connection.get_page(SHEET_NAME, 'Keywords')
-        self.keywords = {
+        new_keywords = {
             row['Keyword']: row for row in keywords.get_all_records()
         }
+        keyword_diffs = diff_dict(new_keywords, self.keywords)
+        self.keywords = new_keywords
+
         passives = self.connection.get_page(SHEET_NAME, "Abilities but they're Passives")
-        self.passives = {
+        new_passives = {
             row['Ability']: row for row in passives.get_all_records()
+        }
+        passive_diffs = diff_dict(new_passives, self.passives)
+        self.passives = new_passives
+
+        return {
+            'abilities': ability_diffs,
+            'keywords': keyword_diffs,
+            'passives': passive_diffs,
         }
 
     @commands.group(invoke_without_command=True)
@@ -105,8 +144,10 @@ class EiMM(commands.Cog):
         """
         Rebuild the sheet cache.
         """
-        self.load()
-        await ctx.send('Rebuilt cache.')
+        diffs = self.load()
+        yml = yaml.dump(diffs)
+        f = io.BytesIO(bytes(yml, 'utf-8'))
+        await ctx.send('Rebuilt cache.', file=discord.File(f, f'template diffs {datetime.datetime.utcnow()}'))
 
     @eimm.group(name='q')
     async def q(self, ctx: commands.Context, *, term: str):
