@@ -190,6 +190,7 @@ async def init_rolepms(ctx: commands.Context, page: str = 'Rolesheet', column: s
             ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
             ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
             host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
+            player_role: discord.PermissionOverwrite(manage_messages=True),
             # spec_role: discord.PermissionOverwrite(read_messages=True),
         }
         if type(player) is discord.Member:
