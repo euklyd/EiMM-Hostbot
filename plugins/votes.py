@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Callable, Union, Optional
+from typing import Callable, Union, Optional, Tuple
 
 import discord
 from discord.ext import commands
@@ -17,74 +17,25 @@ session_maker = None  # type: Union[None, Callable[[], Session]]
 # TODO: Fix multi-channel voting. Right now there is a bug, so don't open multiple channels at once.
 
 
-# class Vote(Base):
-#     __tablename__ = 'Vote'
-#     channel_id = Column(Integer, primary_key=True)
-#     voter_id = Column(Integer, primary_key=True)
-#     voted_id = Column(Integer)
-#
-#     def __repr__(self):
-#         return f'<Vote channel_id={self.channel_id}, voter_id={self.voter_id}, voted_id={self.voted_id}>'
-
-
 class Vote(Base):
     __tablename__ = 'Vote'
     channel_id = Column(Integer, primary_key=True)
     voter_id = Column(Integer, primary_key=True)
-    # voted_id = Column(Integer)
-    voted_id = Column(String)
+    voted_id = Column(Integer)
 
     def __repr__(self):
         return f'<Vote channel_id={self.channel_id}, voter_id={self.voter_id}, voted_id={self.voted_id}>'
 
 
-# n5 aliases
-legal_votes = [
-    "ain't no party like a rakdos party",
-    "aliasn't",
-    "AncestralRecall",
-    "Ankle Shanker",
-    "Arms Dealer",
-    "ban flash in commander ffs",
-    "beyond repair",
-    "Black man, don't shoot",
-    "Bog Hoodlums",
-    "Boggart Arsonist",
-    "Boggart Birth Rite",
-    "Boggart Brute",
-    "Boggart Foragers",
-    "Boggart Harbinger",
-    "Boggart Loggers",
-    "Boggart Mob",
-    "Boggart Ram-Gang",
-    "Boggart Shenaningans",
-    "Boggart Sprite-Chaser",
-    "Collector Oof",
-    "Congrats",
-    "Conq's Harem",
-    "From the Helvault",
-    "HYDRA BITCH",
-    "i am once again asking did you pay the 2",
-    "i demand fully randomized alias lists",
-    "Ignite Memories",
-    "Lord Gaius",
-    "Lotus",
-    "Maestria com Metais - Contestação Estoica custará 1 a menos para ser conjurado se você controlar três ou mais artefatos.",
-    "Mistblade Shinobi",
-    "most broken role itg",
-    "Ninja Rodent",
-    "noise alias, \"\"\"rand\"\"\" n1",
-    "Not all rodents are rats, you know. Plus, why is being a rat used as an insult nowadays? By the way, if you're questioning whether I am a rat, I",
-    "Ratboy Slim",
-    "Remy",
-    "Saproling",
-    "Stuart",
-    "thank you for expansion of game size",
-    "The Bastardliest Bastard",
-    "translucent powder",
-    "White lie",
-    "WHY CAN'T I WAKE UP IN TIME FOR TURNIPS",
-]
+# class Vote(Base):
+#     __tablename__ = 'Vote'
+#     channel_id = Column(Integer, primary_key=True)
+#     voter_id = Column(Integer, primary_key=True)
+#     # voted_id = Column(Integer)
+#     voted_id = Column(String)
+#
+#     def __repr__(self):
+#         return f'<Vote channel_id={self.channel_id}, voter_id={self.voter_id}, voted_id={self.voted_id}>'
 
 
 class Channel(Base):
@@ -145,28 +96,8 @@ async def vote_clear(ctx: commands.Context):
     await ctx.send(f'Votes for {ctx.channel} cleared!')
 
 
-# @commands.command()
-# async def vote(ctx: commands.Context, votee: discord.Member):
-#     """
-#     Vote.
-#     """
-#     session = session_maker()
-#     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
-#     if old_channel is None:
-#         await ctx.send("This channel hasn't been set up for voting.")
-#         return
-#     old_vote = session.query(Vote).filter_by(voter_id=ctx.author.id).one_or_none()
-#     if old_vote is not None:
-#         old_vote.voted_id = votee.id
-#     else:
-#         new_vote = Vote(channel_id=ctx.channel.id, voter_id=ctx.author.id, voted_id=votee.id)
-#         session.add(new_vote)
-#     session.commit()
-#     await ctx.message.add_reaction(ctx.bot.greentick)
-
-
 @commands.command()
-async def vote(ctx: commands.Context, *, votee: str):
+async def vote(ctx: commands.Context, votee: discord.Member):
     """
     Vote.
     """
@@ -176,16 +107,36 @@ async def vote(ctx: commands.Context, *, votee: str):
         await ctx.send("This channel hasn't been set up for voting.")
         return
     old_vote = session.query(Vote).filter_by(voter_id=ctx.author.id).one_or_none()
-    if votee not in legal_votes:
-        await ctx.send("That is not a legal vote; please check the alias list again.")
-        return
     if old_vote is not None:
-        old_vote.voted_id = votee
+        old_vote.voted_id = votee.id
     else:
-        new_vote = Vote(channel_id=ctx.channel.id, voter_id=ctx.author.id, voted_id=votee)
+        new_vote = Vote(channel_id=ctx.channel.id, voter_id=ctx.author.id, voted_id=votee.id)
         session.add(new_vote)
     session.commit()
     await ctx.message.add_reaction(ctx.bot.greentick)
+
+
+# @commands.command()
+# async def vote(ctx: commands.Context, *, votee: str):
+#     """
+#     Vote.
+#     """
+#     session = session_maker()
+#     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
+#     if old_channel is None:
+#         await ctx.send("This channel hasn't been set up for voting.")
+#         return
+#     old_vote = session.query(Vote).filter_by(voter_id=ctx.author.id).one_or_none()
+#     if votee not in legal_votes:
+#         await ctx.send("That is not a legal vote; please check the alias list again.")
+#         return
+#     if old_vote is not None:
+#         old_vote.voted_id = votee
+#     else:
+#         new_vote = Vote(channel_id=ctx.channel.id, voter_id=ctx.author.id, voted_id=votee)
+#         session.add(new_vote)
+#     session.commit()
+#     await ctx.message.add_reaction(ctx.bot.greentick)
 
 
 @commands.command()
@@ -207,7 +158,7 @@ async def votals(ctx: commands.Context):
             tally[ballot.voted_id] = 1
     sorted_tally = sorted(tally.items(), key=lambda x: x[1], reverse=True)
     reply = '**Votals:**```\n'
-    for ballot in sorted_tally:  # type: tuple[int, int]
+    for ballot in sorted_tally:  # type: Tuple[int, int]
         reply += f'{ballot[0]}: {ballot[1]}\n'
     reply += '```'
     await ctx.send(reply)
@@ -231,7 +182,7 @@ async def voters(ctx: commands.Context):
 
     sorted_tally = sorted(tally.items(), key=lambda x: len(x[1]), reverse=True)
     reply = '**Votals:**```\n'
-    for votee in sorted_tally:  # type: tuple[int, int]
+    for votee in sorted_tally:  # type: Tuple[int, int]
         voters = [str(ctx.guild.get_member(voter_id)) for voter_id in votee[1]]
         reply += f'{votee[0]}: {voters}\n'
     reply += '```'
