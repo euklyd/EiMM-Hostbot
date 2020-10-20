@@ -1,5 +1,5 @@
 conf/settings.py
-conf/google_creds.json
+conf/*.json
 databases/*
 __pycache__
 .DS_Store
