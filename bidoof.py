@@ -15,7 +15,11 @@ async def reload(ctx: commands.Context, plugin: str):
     if f'plugins.{plugin}' in ctx.bot.extensions:
         ctx.bot.reload_extension(f'plugins.{plugin}')
         await ctx.send(f'Reloaded plugin `{plugin}`.')
-        print(f'reloaded {plugin}')  # TODO: change to actual logging sometime
+        print(f'reloaded plugins.{plugin}')  # TODO: change to actual logging sometime
+    elif f'cogs.{plugin}' in ctx.bot.extensions:
+        ctx.bot.reload_extension(f'cogs.{plugin}')
+        await ctx.send(f'Reloaded cog `{plugin}`.')
+        print(f'reloaded cogs.{plugin}')  # TODO: change to actual logging sometime
     else:
         ctx.bot.load_extension(f'plugins.{plugin}')
         await ctx.send(f'Loaded plugin `{plugin}`.')
@@ -41,7 +45,7 @@ if __name__ == '__main__':
     )
 
     for cog in settings.cogs:
-        bot.add_cog(cog(bot))
+        bot.load_extension(f'cogs.{cog}')
 
     for plugin in settings.plugins:
         bot.load_extension(f'plugins.{plugin}')
@@ -49,4 +53,5 @@ if __name__ == '__main__':
     bot.add_command(shutdown)
     bot.add_command(reload)
 
+    print("starting bot")
     bot.run(settings.client_token)

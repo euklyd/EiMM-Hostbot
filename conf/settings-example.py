@@ -2,16 +2,14 @@ from discord import Status
 
 from conf.conf import Conf
 
-from cogs import profiles
-
 name = 'mafia bidoof'
 owner_id = 123456789012345678  # this is me! it is not you! change it to be you!
 client_token = 'your token here'
 status = None
 
 cogs = [
-    profiles.Profiles,
-    eimm.EiMM
+    'profiles',
+    'eimm',
     # add more cogs here!
 ]
 

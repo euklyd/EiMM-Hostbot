@@ -185,3 +185,7 @@ class EiMM(commands.Cog):
                 em = passive_embed(row)
                 await message.channel.send(embed=em)
                 return
+
+
+def setup(bot: commands.Bot):
+    bot.add_cog(EiMM(bot))

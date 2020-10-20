@@ -368,3 +368,7 @@ class Profiles(commands.Cog):
         """
         # use menu: fave_game_type
         pass
+
+
+def setup(bot: commands.Bot):
+    bot.add_cog(Profiles(bot))
