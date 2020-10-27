@@ -1,3 +1,4 @@
+import discord
 from discord.ext import commands
 
 import conf.settings as settings
@@ -36,12 +37,17 @@ async def shutdown(ctx: commands.Context):
 
 
 if __name__ == '__main__':
+    # At least, needs: members=True, emojis=True, invites=True, messages=True, reactions=True
+    # All of these but members are defaults.
+    intents = discord.Intents.default()
+    intents.members = True
     bot = Bot(
         command_prefix=settings.prefix,
         description='https://board8.fandom.com/wiki/Mafia_Bidoof',
         conf=settings.conf,
         owner_id=settings.owner_id,
         status=settings.status,
+        intents=intents,
     )
 
     for cog in settings.cogs:
