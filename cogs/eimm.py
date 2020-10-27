@@ -170,6 +170,7 @@ class EiMM(commands.Cog):
             match = match.group(1)
         else:
             return
+        match = match.strip()
         for abil, row in self.abilities.items():
             if match.lower() == abil.lower():
                 em = ability_embed(row)
