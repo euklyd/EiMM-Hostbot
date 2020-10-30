@@ -51,35 +51,72 @@ class Interview(commands.Cog):
 
     # == Setup ==
 
-    @commands.group('ivsetup')
+    @commands.group('iv')
     @commands.has_permissions(administrator=True)
-    async def ivsetup(self, ctx: commands.Context):
+    async def iv(self, ctx: commands.Context):
+        """
+        # TODO: Write actual instructions and info for this module here.
+        """
         # TODO: yes.
         #  document command group
+        #  TODO: write instructions on setting up on a new server
         pass
 
-    @ivsetup.command(name='server')
+    @iv.command(name='setup')
     @commands.has_permissions(administrator=True)
-    async def ivsetup_server(self, ctx: commands.Context, answers: discord.TextChannel,
+    async def iv_setup(self, ctx: commands.Context, answers: discord.TextChannel,
                              backstage: discord.TextChannel, sheet_url: str):
+        """
+        Set up the current server for interviews.
+
+        Answer channel is where where answers to questions will be posted, backstage is a private space for
+        the bot to be controlled.
+        """
         # TODO: yes.
         #  setup server + channels for interview
         #  update all databases
         pass
 
-    @ivsetup.command(name='interview')
+    @iv.command(name='next')
     @commands.has_permissions(administrator=True)
-    async def ivsetup_interview(self, ctx: commands.Context, interviewee: discord.Member, *, email: str):
+    async def iv_next(self, ctx: commands.Context, interviewee: discord.Member, *, email: Optional[str] = None):
+        """
+        Set up the next interview for <interviewee>.
+
+        Creates a new interview sheet for the next interviewee. If the optional <email> parameter is provided,
+        shares the document with them. Old emails must still be cleared out manually.
+        # TODO: deprecate former behavior of using current channel as new backstage
+        """
+
         # TODO: yes.
         #  setup a new interview
         #  do we want the email to be private? not sure yet
         #  update metadata (maybe other databases?)
         pass
 
+    # TODO (maybe): Add methods to change the answer/backstage channels.
+
+    @iv.command(name='disable')
+    async def iv_disable(self, ctx: commands.Context):
+        """
+        Disable voting and question asking for the current interview.
+        """
+        pass
+
+    @iv.command(name='enable')
+    async def iv_enable(self, ctx: commands.Context):
+        """
+        Re-enable voting and question asking for the current interview.
+        """
+        pass
+
     # == Questions ==
 
     @commands.command()
     async def ask(self, ctx: commands.Context, *, question: str):
+        """
+        Submit a question for the current interview.
+        """
         # TODO:
         #  upload question to sheet
         #  update metadata
@@ -87,6 +124,11 @@ class Interview(commands.Cog):
 
     @commands.command()
     async def mask(self, ctx: commands.Context, *, questions_str: str):
+        """
+        Submit multiple questions for the current interview.
+
+        Each question must be a single line, separated by linebreaks.
+        """
         # TODO:
         #  split up questions
         #  upload all questions to sheet
@@ -97,6 +139,12 @@ class Interview(commands.Cog):
 
     @commands.command()
     async def answer(self, ctx: commands.Context):
+        """
+        Post all answers to questions that have not yet been posted.
+
+        Questions will be grouped by asker, rather than strictly in chronological order.
+        # TODO: Add a flag to post strictly chronologically?
+        """
         # TODO:
         #  check if invoker is interviewee
         #  dump a bunch of answers
@@ -105,6 +153,9 @@ class Interview(commands.Cog):
 
     @commands.command()
     async def preview(self, ctx: commands.Context):
+        """
+        Preview answers, visible in the backstage channel.
+        """
         # TODO:
         #  check if invoker is interviewee
         #  dump a bunch of answers
@@ -114,6 +165,17 @@ class Interview(commands.Cog):
 
     @commands.command()
     async def vote(self, ctx: commands.Context, mentions: commands.Greedy[discord.Member]):
+        """
+        Vote for up to three nominees for the next interview.
+
+        Voting rules:
+        1. Cannot vote for yourself.
+        2. Cannot vote for anyone who's been interviewed too recently.
+        3. Cannot vote if you've joined the server since the start of the last interview.
+        4. Cannot vote for bots, excepting HaruBot.
+        5. Cannot vote while interviews are disabled.
+        6. Cannot vote for people who are opted out.
+        """
         # TODO: check votes for legality oh no
 
         session = self.session_maker()
@@ -128,6 +190,9 @@ class Interview(commands.Cog):
 
     @commands.command()
     async def votes(self, ctx: commands.Context):
+        """
+        Check who you're voting for.
+        """
         # TODO: list ppl the invoker is voting for
         session = self.session_maker()
         votes = session.query(Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).all()
@@ -135,6 +200,11 @@ class Interview(commands.Cog):
 
     @commands.command()
     async def votals(self, ctx: commands.Context, flag: Optional[str]):
+        """
+        View current vote standings.
+
+        Use the --full flag to view who's voting for each candidate.
+        """
         session = self.session_maker()
         votes = session.query(Vote).filter_by(server_id=ctx.guild.id).all()
         # TODO: preprocessing
