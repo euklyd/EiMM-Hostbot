@@ -5,7 +5,8 @@ from typing import Any, Dict, List, Optional, Union, Generator
 
 import discord
 from discord.ext import commands
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, Session
 
 from cogs import interview_schema as schema
@@ -13,6 +14,28 @@ from cogs.interview_schema import Server, Meta, Vote, OptOut, TotalQuestions
 from core.bot import Bot
 from utils import menu, spreadsheet
 
+_DEBUG_FLAG = True  # TODO: toggle to off
+
+DB_DIR = 'databases'
+DB_FILE = f'{DB_DIR}/interviews.db'
+
+
+# For some awful reason, SQLite doesn't turn on foreign key constraints by default.
+# This is the fix.
+# TODO: Move this to a SQL utility file so it gets run globally every time :)
+@event.listens_for(Engine, 'connect')
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    # Some examples online would have you only run this if the SQLite version is high enough to
+    # support foreign keys. That isn't a concern here. If your SQLite doesn't support foreign keys,
+    # it can crash and burn.
+    cursor = dbapi_connection.cursor()
+    cursor.execute('PRAGMA foreign_keys=ON')
+    cursor.close()
+
+
+session_maker = None  # type: Optional[sessionmaker]
+
+# Google sheets API constants
 SCOPE = [
     'https://spreadsheets.google.com/feeds',
     'https://www.googleapis.com/auth/drive'
@@ -88,7 +111,7 @@ class Question:
         for word in words:
             yield word
 
-    # NOTE: This won't work, since you need to answer multiple questions at once.
+    # NOTE: This won't work, since you need to be able to answer multiple questions at once.
     # def answer(self, channel: discord.TextChannel):
     #     """
     #     Post the answer to a completed question to Discord.
@@ -227,6 +250,17 @@ def add_question(em: discord.Embed, question: Question):
     pass
 
 
+def _server_active(ctx: commands.Context):
+    """
+    Command check to make sure the server is set up for interviews.
+    """
+    if _DEBUG_FLAG:
+        return True
+    session = session_maker()
+    server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+    return server is not None
+
+
 class Interview(commands.Cog):
     """
     Runs member interviews, interfaced with Google Sheets as a GUI.
@@ -237,19 +271,18 @@ class Interview(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot = bot
         self.connection = None  # type: Optional[spreadsheet.SheetConnection]
-        self.session_maker = None  # type:
         self.load()
 
     def load(self):
         self.connection = spreadsheet.SheetConnection(SECRET, SCOPE)
-        db_dir = 'databases/'
-        db_file = f'{db_dir}/interviews.db'
-        if not Path(db_file).exists():
+
+        if not Path(DB_FILE).exists():
             # TODO: Don't technically need this condition?
             # Adds a bit of clarity though, so keeping it in for now.
-            Path(db_dir).mkdir(exist_ok=True)
-        engine = create_engine(f'sqlite:///{db_file}')
-        self.session_maker = sessionmaker(bind=engine)
+            Path(DB_DIR).mkdir(exist_ok=True)
+        engine = create_engine(f'sqlite:///{DB_FILE}')
+        global session_maker
+        session_maker = sessionmaker(bind=engine)
 
         schema.Base.metadata.create_all(engine)
 
@@ -261,6 +294,7 @@ class Interview(commands.Cog):
 
     def _generate_embeds(self, interviewee: discord.Member, questions: List[Question],
                          avatar_url=None) -> Generator[discord.Embed, None, None]:
+        # TODO: it's entirely possible this wants to be a static method
         last_asker = None  # type: Optional[discord.Member]
         em = None  # type: Optional[discord.Embed]
         for question in questions:
@@ -308,6 +342,7 @@ class Interview(commands.Cog):
 
     @iv.command(name='next')
     @commands.has_permissions(administrator=True)
+    @commands.check(_server_active)
     async def iv_next(self, ctx: commands.Context, interviewee: discord.Member, *, email: Optional[str] = None):
         """
         Set up the next interview for <interviewee>.
@@ -328,11 +363,12 @@ class Interview(commands.Cog):
 
     @iv.command(name='disable')
     @commands.has_permissions(administrator=True)
+    @commands.check(_server_active)
     async def iv_disable(self, ctx: commands.Context):
         """
         Disable voting and question asking for the current interview.
         """
-        session = self.session_maker()
+        session = session_maker()
         meta = session.query(schema.Meta).filter_by(server_id=ctx.guild.id).one_or_none()
         if meta is None:
             await ctx.send(f'Interviews are not set up for {ctx.guild}.')
@@ -348,11 +384,12 @@ class Interview(commands.Cog):
 
     @iv.command(name='enable')
     @commands.has_permissions(administrator=True)
+    @commands.check(_server_active)
     async def iv_enable(self, ctx: commands.Context):
         """
         Re-enable voting and question asking for the current interview.
         """
-        session = self.session_maker()
+        session = session_maker()
         meta = session.query(schema.Meta).filter_by(server_id=ctx.guild.id).one_or_none()
         if meta is None:
             await ctx.send(f'Interviews are not set up for {ctx.guild}.')
@@ -367,6 +404,7 @@ class Interview(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @iv.command(name='stats')
+    @commands.check(_server_active)
     async def iv_stats(self, ctx: commands.Context):
         """
         View interview-related stats.
@@ -379,6 +417,7 @@ class Interview(commands.Cog):
     # == Questions ==
 
     @commands.command()
+    @commands.check(_server_active)
     async def ask(self, ctx: commands.Context, *, question: str):
         """
         Submit a question for the current interview.
@@ -389,6 +428,7 @@ class Interview(commands.Cog):
         pass
 
     @commands.command()
+    @commands.check(_server_active)
     async def mask(self, ctx: commands.Context, *, questions_str: str):
         """
         Submit multiple questions for the current interview.
@@ -404,6 +444,7 @@ class Interview(commands.Cog):
     # == Answers ==
 
     @commands.command()
+    @commands.check(_server_active)
     async def answer(self, ctx: commands.Context):
         """
         Post all answers to questions that have not yet been posted.
@@ -418,6 +459,7 @@ class Interview(commands.Cog):
         pass
 
     @commands.command()
+    @commands.check(_server_active)
     async def preview(self, ctx: commands.Context):
         """
         Preview answers, visible in the backstage channel.
@@ -429,7 +471,16 @@ class Interview(commands.Cog):
 
     # == Votes ==
 
+    @staticmethod
+    def _votes_footer(votes: List[discord.User], prefix: str = None):
+        if len(votes) == 0:
+            return f'_You are not currently voting; vote with `{prefix}vote`._'
+
+        votes = sorted(votes, key=lambda x: name_or_default(x).lower())
+        return '_You are currently voting for: ' + ', '.join([f'`{name_or_default(vote)}`' for vote in votes]) + '._'
+
     @commands.command()
+    @commands.check(_server_active)
     async def vote(self, ctx: commands.Context, mentions: commands.Greedy[discord.Member]):
         """
         Vote for up to three nominees for the next interview.
@@ -443,40 +494,48 @@ class Interview(commands.Cog):
         6. Cannot vote for people who are opted out.
         """
         # TODO: check votes for legality oh no
+        #  like, lots to do.
 
-        session = self.session_maker()
+        session = session_maker()
         old_votes = session.query(Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).all()
-        session.delete(old_votes)
+        for vote in old_votes:
+            session.delete(vote)
         votes = []
         for mention in mentions:
             votes.append(Vote(server_id=ctx.guild.id, voter_id=ctx.author.id,
                               candidate_id=mention.id, timestamp=datetime.utcnow()))
+        session.add_all(votes)
         session.commit()
         await ctx.message.add_reaction(self.bot.greentick)
 
     @commands.command()
+    @commands.check(_server_active)
     async def votes(self, ctx: commands.Context):
         """
         Check who you're voting for.
         """
-        # TODO: list ppl the invoker is voting for
-        session = self.session_maker()
+        session = session_maker()
         votes = session.query(Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).all()
-
         member_votes = [ctx.guild.get_member(vote.candidate_id) for vote in votes]
-        member_votes = sorted(member_votes, key=lambda x: name_or_default(x).lower())
 
-        pass
+        response = self._votes_footer(member_votes, prefix=ctx.bot.default_command_prefix)
+        await ctx.send(response)
 
     @commands.command()
+    @commands.check(_server_active)
     async def votals(self, ctx: commands.Context, flag: Optional[str]):
         """
         View current vote standings.
 
         Use the --full flag to view who's voting for each candidate.
         """
-        session = self.session_maker()
+        session = session_maker()
         votes = session.query(Vote).filter_by(server_id=ctx.guild.id).all()
+
+        # filter only the invoker's own votes when generating the footer
+        own_votes = [ctx.guild.get_member(vote.candidate_id) for vote in votes if vote.voter_id == ctx.author.id]
+        footer = self._votes_footer(own_votes, prefix=ctx.bot.default_command_prefix)
+
         # TODO: preprocessing
         if '-f' in flag:
             # TODO: do full votals
@@ -486,33 +545,63 @@ class Interview(commands.Cog):
             pass
 
     @commands.group('opt', invoke_without_command=True)
+    @commands.check(_server_active)
     async def opt(self, ctx: commands.Context):
         """
-        Opt into or out of interview voting.
+        Manage opting into or out of interview voting.
         """
         await ctx.send('Opt into or out of interview voting. '
                        f'Use `{ctx.bot.default_command_prefix}help opt` for more info.')
 
     @opt.command(name='out')
+    @commands.check(_server_active)
     async def opt_out(self, ctx: commands.Context):
         """
         Opt out of voting.
         """
-        pass
+        session = session_maker()
+        status = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id, opt_id=ctx.author.id).one_or_none()
+        if status is None:
+            optout = schema.OptOut(server_id=ctx.guild.id, opt_id=ctx.author.id)
+            session.add(optout)
+            session.commit()
+            await ctx.message.add_reaction(ctx.bot.greentick)
+            return
+        await ctx.send('You are already opted out of interviews.')
+        await ctx.message.add_reaction(ctx.bot.redtick)
 
     @opt.command(name='in')
+    @commands.check(_server_active)
     async def opt_in(self, ctx: commands.Context):
         """
         Opt into voting.
         """
-        pass
+        session = session_maker()
+        status = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id, opt_id=ctx.author.id).one_or_none()
+        if status is None:
+            await ctx.send('You are already opted into interviews.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        session.delete(status)
+        session.commit()
+        await ctx.message.add_reaction(ctx.bot.greentick)
+        return
 
     @opt.command(name='list')
+    @commands.check(_server_active)
     async def opt_list(self, ctx: commands.Context):
         """
         Check who's opted out of interview voting.
         """
+        # TODO: yes.
         pass
+
+    @commands.command()
+    async def dbtest(self, ctx: commands.Context):
+        # TODO: for some reason the foreign key constraint isn't enforced.
+        session = session_maker()
+        status = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id, opt_id=ctx.author.id).one_or_none()
+        print(status.server.id)
 
 
 @commands.command()
