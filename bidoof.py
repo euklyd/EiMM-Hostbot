@@ -52,9 +52,11 @@ if __name__ == '__main__':
 
     for cog in settings.cogs:
         bot.load_extension(f'cogs.{cog}')
+        print(f'loaded cogs.{cog}')
 
     for plugin in settings.plugins:
         bot.load_extension(f'plugins.{plugin}')
+        print(f'loaded plugins.{plugin}')
 
     bot.add_command(shutdown)
     bot.add_command(reload)
