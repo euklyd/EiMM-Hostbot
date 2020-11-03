@@ -1,7 +1,7 @@
 from datetime import datetime
 from pathlib import Path
 import re
-from typing import Any, Dict, List, Optional, Union, Generator
+from typing import Any, Dict, List, Optional, Union, Generator, Tuple
 
 import discord
 from discord.ext import commands
@@ -45,6 +45,40 @@ SHEET_NAME = 'eimm role templates & keywords'
 
 SERVER_LEFT_MSG = '[Member Left]'
 ERROR_MSG = '[Bad User]'
+
+
+class Candidate:
+    """
+    Utility class, used only for votals.
+    """
+
+    def __init__(self, ctx: commands.Context, candidate_id: int):
+        self._ctx = ctx
+        self.candidate = ctx.guild.get_member(candidate_id)
+        self.voters = []
+
+    def str(self, length: int) -> str:
+        return f'{name_or_default(self.candidate) + ":" : <{length + 1}}'
+
+    def voters_str(self) -> str:
+        # Hopefully it should never fall through to default! Preprocessing strips those out.
+        voters = [name_or_default(self._ctx.guild.get_member(voter)) for voter in self.voters]
+        voters = sorted(voters, key=lambda x: str(x).lower())
+        return ', '.join(voters)
+
+    def basic_str(self, length: int) -> str:
+        return f'{self.str(length)} {len(self.voters)}'
+
+    def full_str(self, length: int) -> str:
+        return f'{self.str(length)} {len(self.voters)} ({self.voters_str()})'
+
+    def sortkey(self) -> Tuple[int, str]:
+        """
+        Sort first by number of votes, then alphabetically.
+        Votes are negative so that sorting by votes (greatest to least) can be consistent with sorting
+        alphabetically (A to Z).
+        """
+        return -len(self.voters), name_or_default(self.candidate).lower()
 
 
 class Question:
@@ -266,6 +300,8 @@ class Interview(commands.Cog):
     Runs member interviews, interfaced with Google Sheets as a GUI.
 
     # TODO: Write actual instructions and info for this module here.
+
+    Note: Most commands are not displayed unless your server is set up for interviews.
     """
 
     def __init__(self, bot: Bot):
@@ -294,6 +330,10 @@ class Interview(commands.Cog):
 
     def _generate_embeds(self, interviewee: discord.Member, questions: List[Question],
                          avatar_url=None) -> Generator[discord.Embed, None, None]:
+        """
+        TODO: what was i doing here
+        Generate discord.Embeds to be posted from a list of Questions.
+        """
         # TODO: it's entirely possible this wants to be a static method
         last_asker = None  # type: Optional[discord.Member]
         em = None  # type: Optional[discord.Embed]
@@ -312,6 +352,13 @@ class Interview(commands.Cog):
             # TODO: add footer but idk what to do with it
             yield em
 
+    def _reset_meta(self, server: discord.Guild):
+        """
+        Set up the meta entry for a new interview.
+        """
+        # TODO: yes. also this probably needs more arguments. it may not even want to exist.
+        pass
+
     # == Setup ==
 
     @commands.group('iv')
@@ -328,24 +375,50 @@ class Interview(commands.Cog):
     @iv.command(name='setup')
     @commands.has_permissions(administrator=True)
     async def iv_setup(self, ctx: commands.Context, answers: discord.TextChannel,
-                       backstage: discord.TextChannel, sheet_url: str):
+                       backstage: discord.TextChannel, sheet_name: str):
         """
         Set up the current server for interviews.
 
         Answer channel is where where answers to questions will be posted, backstage is a private space for
-        the bot to be controlled.
+        the bot to be controlled, sheet_name is the URL of your interview sheet.
+        If your sheet name is multiple words, enclose it in double quotes, e.g., "sheet name".
+
+        Copy the sheet template from TODO: add a link here.
         """
         # TODO: yes.
         #  setup server + channels for interview
         #  update all databases
-        pass
+
+        session = session_maker()
+
+        server = schema.Server(
+            id=ctx.guild.id,
+            sheet_name=sheet_name,
+            answer_channel=answers.id,
+            back_channel=backstage.id,
+        )
+        meta = schema.Meta(
+            # server_id field filled in by assigning the relationship in the next statement
+            interviewee_id=0,
+            start_time=datetime.utcnow(),
+            num_questions=0,
+            limit=datetime.utcfromtimestamp(0),
+            reinterviews_allowed=False,
+            active=False,
+        )
+        meta.server = server
+        session.add(server)
+        session.commit()
+        await ctx.send(f'Set up {ctx.guild} for interviews.\n'
+                       f'Answers will be posted in {answers}, hidden channel is {backstage}.')
+        await ctx.message.add_reaction(ctx.bot.greentick)
 
     @iv.command(name='next')
     @commands.has_permissions(administrator=True)
     @commands.check(_server_active)
     async def iv_next(self, ctx: commands.Context, interviewee: discord.Member, *, email: Optional[str] = None):
         """
-        Set up the next interview for <interviewee>.
+        TODO: Set up the next interview for <interviewee>.
 
         Creates a new interview sheet for the next interviewee. If the optional <email> parameter is provided,
         shares the document with them. Old emails must still be cleared out manually.
@@ -407,7 +480,7 @@ class Interview(commands.Cog):
     @commands.check(_server_active)
     async def iv_stats(self, ctx: commands.Context):
         """
-        View interview-related stats.
+        TODO: View interview-related stats.
 
         Which stats? I dunno. # TODO: Figure that out.
         """
@@ -420,7 +493,7 @@ class Interview(commands.Cog):
     @commands.check(_server_active)
     async def ask(self, ctx: commands.Context, *, question: str):
         """
-        Submit a question for the current interview.
+        TODO: Submit a question for the current interview.
         """
         # TODO:
         #  upload question to sheet
@@ -431,7 +504,7 @@ class Interview(commands.Cog):
     @commands.check(_server_active)
     async def mask(self, ctx: commands.Context, *, questions_str: str):
         """
-        Submit multiple questions for the current interview.
+        TODO: Submit multiple questions for the current interview.
 
         Each question must be a single line, separated by linebreaks.
         """
@@ -447,7 +520,7 @@ class Interview(commands.Cog):
     @commands.check(_server_active)
     async def answer(self, ctx: commands.Context):
         """
-        Post all answers to questions that have not yet been posted.
+        TODO: Post all answers to questions that have not yet been posted.
 
         Questions will be grouped by asker, rather than strictly in chronological order.
         # TODO: Add a flag to post strictly chronologically?
@@ -462,7 +535,7 @@ class Interview(commands.Cog):
     @commands.check(_server_active)
     async def preview(self, ctx: commands.Context):
         """
-        Preview answers, visible in the backstage channel.
+        TODO: Preview answers, visible in the backstage channel.
         """
         # TODO:
         #  check if invoker is interviewee
@@ -478,6 +551,55 @@ class Interview(commands.Cog):
 
         votes = sorted(votes, key=lambda x: name_or_default(x).lower())
         return '_You are currently voting for: ' + ', '.join([f'`{name_or_default(vote)}`' for vote in votes]) + '._'
+
+    @staticmethod
+    def _preprocess_votals(ctx: commands.Context, votes: List[schema.Vote]) -> List[Candidate]:
+        """
+        Returns a list of candidates and vote counts, sorted by (vote count, alphabetical name).
+        """
+        candidates = list(set(vote.candidate_id for vote in votes))
+        votals = {}
+        for candidate_id in candidates:
+            votals[candidate_id] = Candidate(ctx, candidate_id)
+            for vote in votes:
+                if vote.candidate_id == candidate_id and ctx.guild.get_member(vote.voter_id) is not None:
+                    votals[candidate_id].voters.append(vote.voter_id)
+
+        return sorted(list(votals.values()), key=lambda x: x.sortkey())
+
+    @staticmethod
+    def _votals_text_basic(ctx: commands.Context, votes: List[schema.Vote]) -> str:
+        votals = Interview._preprocess_votals(ctx, votes)
+        text = ''
+        max_name_length = len(SERVER_LEFT_MSG)
+        for candidate in votals:
+            if len(str(candidate)) > max_name_length:
+                max_name_length = len(str(candidate.candidate))
+        for candidate in votals:
+            s = candidate.basic_str(max_name_length)
+            if len(text) + len(s) > 1750:
+                # Break if it's getting too long for a single message.
+                break
+            text += s + '\n'
+
+        return text
+
+    @staticmethod
+    def _votals_text_full(ctx: commands.Context, votes: List[schema.Vote]) -> str:
+        votals = Interview._preprocess_votals(ctx, votes)
+        text = ''
+        max_name_length = len(SERVER_LEFT_MSG)
+        for candidate in votals:
+            if len(str(candidate)) > max_name_length:
+                max_name_length = len(str(candidate))
+        for candidate in votals:
+            s = candidate.full_str(max_name_length)
+            if len(text) + len(s) > 1750:
+                # Break if it's getting too long for a single message.
+                break
+            text += s + '\n'
+
+        return text
 
     @commands.command()
     @commands.check(_server_active)
@@ -532,17 +654,20 @@ class Interview(commands.Cog):
         session = session_maker()
         votes = session.query(Vote).filter_by(server_id=ctx.guild.id).all()
 
-        # filter only the invoker's own votes when generating the footer
+        # Filter only the invoker's own votes when generating the footer
         own_votes = [ctx.guild.get_member(vote.candidate_id) for vote in votes if vote.voter_id == ctx.author.id]
         footer = self._votes_footer(own_votes, prefix=ctx.bot.default_command_prefix)
 
-        # TODO: preprocessing
-        if '-f' in flag:
-            # TODO: do full votals
-            pass
+        if flag is not None and '-f' in flag:
+            # Do full votals.
+            block_text = Interview._votals_text_full(ctx, votes)
         else:
-            # TODO: do normal votals
-            pass
+            # Do basic votals.
+            block_text = Interview._votals_text_basic(ctx, votes)
+
+        reply = f'**__Votals__**```ini\n{block_text}```{footer}\n'
+
+        await ctx.send(reply)
 
     @commands.group('opt', invoke_without_command=True)
     @commands.check(_server_active)
@@ -564,6 +689,9 @@ class Interview(commands.Cog):
         if status is None:
             optout = schema.OptOut(server_id=ctx.guild.id, opt_id=ctx.author.id)
             session.add(optout)
+
+            # TODO: null votes currently on this user (maybe; check in with The Team)
+
             session.commit()
             await ctx.message.add_reaction(ctx.bot.greentick)
             return
@@ -596,6 +724,7 @@ class Interview(commands.Cog):
         # TODO: yes.
         pass
 
+    # TODO: eliminate before release
     @commands.command()
     async def dbtest(self, ctx: commands.Context):
         # TODO: for some reason the foreign key constraint isn't enforced.
@@ -603,7 +732,16 @@ class Interview(commands.Cog):
         status = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id, opt_id=ctx.author.id).one_or_none()
         print(status.server.id)
 
+    # TODO: eliminate before release
+    @commands.command()
+    async def gstest(self, ctx: commands.Context):
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        worksheet = self.connection.get_sheet(server.sheet_name)
+        await ctx.send(f'sheet1 is {worksheet.sheet1.title}')
 
+
+# TODO: eliminate before release
 @commands.command()
 async def ivembed(ctx: commands.Context):
     me = ctx.guild.get_member(100165629373337600)

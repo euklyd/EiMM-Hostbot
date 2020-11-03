@@ -9,7 +9,7 @@ Base = declarative_base()
 class Server(Base):
     __tablename__ = 'Server'
     id = Column(Integer, primary_key=True)
-    sheet_url = Column(String)
+    sheet_name = Column(String)
     answer_channel = Column(Integer)
     back_channel = Column(Integer)
 
@@ -22,7 +22,7 @@ class Server(Base):
     def __repr__(self):
         return (
             f'<Server id={self.id}, answer_channel={self.answer_channel}, '
-            f'back_channel={self.back_channel}, sheet={self.sheet_url}>'
+            f'back_channel={self.back_channel}, sheet_name={self.sheet_name}>'
         )
 
 
