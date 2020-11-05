@@ -62,6 +62,8 @@ class Bot(commands.Bot):
     async def on_message(self, message: discord.Message):
         """
         Override parent class on_message with author spoofing.
+
+        Spoof with "<message content> -a @user" or "<message content> -a <userid>".
         """
         regex = r'^(.*[^ ]) +-a (?:<@!?(\d+)>|(\d+))$'
         match = re.match(regex, message.content)
@@ -72,6 +74,7 @@ class Bot(commands.Bot):
 
             # As long as the invoker is the bot owner, go ahead and spoof it
             message.content = match.group(1)
+            # this is my bot and you cannot stop me!
             userid = int(match.group(2) if match.group(2) is not None else match.group(3))
             if message.guild is not None:
                 message.author = message.guild.get_member(userid)
