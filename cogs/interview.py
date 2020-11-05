@@ -14,7 +14,7 @@ from cogs.interview_schema import Server, Meta, Vote, OptOut, TotalQuestions
 from core.bot import Bot
 from utils import menu, spreadsheet
 
-_DEBUG_FLAG = True  # TODO: toggle to off
+_DEBUG_FLAG = False  # TODO: toggle to off
 
 DB_DIR = 'databases'
 DB_FILE = f'{DB_DIR}/interviews.db'
@@ -299,9 +299,11 @@ def _interview_enabled(ctx: commands.Context):
     """
     Command check to make sure the interview is not disabled.
 
-    Used for voting, opting out, and answering questions.
+    Checked when voting, opting in or out, and asking questions.
     """
-    pass
+    session = session_maker()
+    result = session.query(schema.Server).filter_by(id=ctx.guild.id, active=True).one_or_none()
+    return result is not None
 
 
 class Interview(commands.Cog):
@@ -370,7 +372,7 @@ class Interview(commands.Cog):
 
     # == Setup ==
 
-    @commands.group('iv')
+    @commands.group(invoke_without_command=True)
     @commands.has_permissions(administrator=True)
     async def iv(self, ctx: commands.Context):
         """
@@ -379,7 +381,12 @@ class Interview(commands.Cog):
         # TODO: yes.
         #  document command group
         #  TODO: write instructions on setting up on a new server
-        pass
+        if _server_active(ctx):
+            await ctx.send(f'Interviews are currently set up for {ctx.guild}; use '
+                           f'`{ctx.bot.default_command_prefix}help Interview` for more info.')
+        else:
+            await ctx.send(f'Interviews are not currently set up for {ctx.guild}; use '
+                           f'`{ctx.bot.default_command_prefix}help iv setup` for more info.')
 
     @iv.command(name='setup')
     @commands.has_permissions(administrator=True)
@@ -405,17 +412,20 @@ class Interview(commands.Cog):
             sheet_name=sheet_name,
             answer_channel=answers.id,
             back_channel=backstage.id,
-        )
-        meta = schema.Meta(
-            # server_id field filled in by assigning the relationship in the next statement
-            interviewee_id=0,
-            start_time=datetime.utcnow(),
-            num_questions=0,
             limit=datetime.utcfromtimestamp(0),
             reinterviews_allowed=False,
             active=False,
         )
-        meta.server = server
+        # meta = schema.Meta(
+        #     # server_id field filled in by assigning the relationship in the next statement
+        #     interviewee_id=0,
+        #     start_time=datetime.utcnow(),
+        #     num_questions=0,
+        #     limit=datetime.utcfromtimestamp(0),
+        #     reinterviews_allowed=False,
+        #     active=False,
+        # )
+        # meta.server = server
         session.add(server)
         session.commit()
         await ctx.send(f'Set up {ctx.guild} for interviews.\n'
@@ -438,7 +448,12 @@ class Interview(commands.Cog):
         #  setup a new interview
         #  upload the interviewee's current avatar to make it not break in the future?
         #  do we want the email to be private? not sure yet
-        #  update metadata (maybe other databases?)
+        #  add new metadata row (maybe other databases?)
+
+        session = session_maker()
+
+        # TODO: create new schema.Meta
+
         pass
 
     # TODO (maybe): Add methods to change the answer/backstage channels.
@@ -451,16 +466,16 @@ class Interview(commands.Cog):
         Disable voting and question asking for the current interview.
         """
         session = session_maker()
-        meta = session.query(schema.Meta).filter_by(server_id=ctx.guild.id).one_or_none()
-        if meta is None:
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if server is None:
             await ctx.send(f'Interviews are not set up for {ctx.guild}.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        if meta.active is False:
+        if server.active is False:
             await ctx.send(f'Interviews are already disabled.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        meta.active = False
+        server.active = False
         session.commit()
         await ctx.message.add_reaction(ctx.bot.greentick)
 
@@ -472,16 +487,16 @@ class Interview(commands.Cog):
         Re-enable voting and question asking for the current interview.
         """
         session = session_maker()
-        meta = session.query(schema.Meta).filter_by(server_id=ctx.guild.id).one_or_none()
-        if meta is None:
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if server is None:
             await ctx.send(f'Interviews are not set up for {ctx.guild}.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        if meta.active is True:
+        if server.active is True:
             await ctx.send(f'Interviews are already enabled.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        meta.active = True
+        server.active = True
         session.commit()
         await ctx.message.add_reaction(ctx.bot.greentick)
 
@@ -507,7 +522,8 @@ class Interview(commands.Cog):
         """
         # TODO:
         #  upload question to sheet
-        #  update metadata
+        #  update schema.TotalQuestions
+        #  update schema.Meta
         pass
 
     @commands.command()
@@ -522,7 +538,9 @@ class Interview(commands.Cog):
         # TODO:
         #  split up questions
         #  upload all questions to sheet
-        #  update metadata
+        #  upload question to sheet
+        #  update schema.TotalQuestions
+        #  update schema.Meta
         pass
 
     # == Answers ==
@@ -620,12 +638,12 @@ class Interview(commands.Cog):
         Vote for up to three nominees for the next interview.
 
         Voting rules:
-        1. Cannot vote for yourself.
-        2. Cannot vote for anyone who's been interviewed too recently.
-        3. Cannot vote if you've joined the server since the start of the last interview.
-        4. Cannot vote for bots, excepting HaruBot.
-        5. Cannot vote while interviews are disabled.
-        6. Cannot vote for people who are opted out.
+        1. Cannot vote while interviews are disabled.
+        2. Cannot vote for people who are opted out.
+        3. Cannot vote for anyone who's been interviewed too recently.
+        4. Cannot vote if you've joined the server since the start of the last interview.
+        5. Cannot vote for bots, excepting HaruBot.
+        6. Cannot vote for yourself.
         """
         # TODO: check votes for legality oh no
         #  like, lots to do.
@@ -685,15 +703,41 @@ class Interview(commands.Cog):
         if flag is not None and '-f' in flag:
             # Do full votals.
             block_text = Interview._votals_text_full(ctx, votes)
+            if block_text == '':
+                block_text = """
+                _  /)
+               mo / )
+               |/)\)
+                /\_
+                \__|=
+               (    )
+               __)(__
+         _____/      \\_____
+        |  _     ___   _   ||
+        | | \     |   | \  ||
+        | |  |    |   |  | ||
+        | |_/     |   |_/  ||
+        | | \     |   |    ||
+        | |  \    |   |    ||
+        | |   \. _|_. | .  ||
+        |                  ||
+        |  PenguinBot3000  ||
+        |   2016 - 2020    ||
+        |                  ||
+*       | *   **    * **   |**      **
+ \))ejm97/.,(//,,..,,\||(,,.,\\,.((//"""
+
         else:
             # Do basic votals.
             block_text = Interview._votals_text_basic(ctx, votes)
+            if block_text == '':
+                block_text = ' '  # avoid the ini syntax highlighting breaking
 
         reply = f'**__Votals__**```ini\n{block_text}```{footer}\n'
 
         await ctx.send(reply)
 
-    @commands.group('opt', invoke_without_command=True)
+    @commands.group(invoke_without_command=True)
     @commands.check(_server_active)
     async def opt(self, ctx: commands.Context):
         """
