@@ -295,6 +295,15 @@ def _server_active(ctx: commands.Context):
     return server is not None
 
 
+def _interview_enabled(ctx: commands.Context):
+    """
+    Command check to make sure the interview is not disabled.
+
+    Used for voting, opting out, and answering questions.
+    """
+    pass
+
+
 class Interview(commands.Cog):
     """
     Runs member interviews, interfaced with Google Sheets as a GUI.
@@ -491,6 +500,7 @@ class Interview(commands.Cog):
 
     @commands.command()
     @commands.check(_server_active)
+    # TODO: check for interview active
     async def ask(self, ctx: commands.Context, *, question: str):
         """
         TODO: Submit a question for the current interview.
@@ -502,6 +512,7 @@ class Interview(commands.Cog):
 
     @commands.command()
     @commands.check(_server_active)
+    # TODO: check for interview active
     async def mask(self, ctx: commands.Context, *, questions_str: str):
         """
         TODO: Submit multiple questions for the current interview.
@@ -603,6 +614,7 @@ class Interview(commands.Cog):
 
     @commands.command()
     @commands.check(_server_active)
+    # TODO: check for interview active
     async def vote(self, ctx: commands.Context, mentions: commands.Greedy[discord.Member]):
         """
         Vote for up to three nominees for the next interview.
@@ -627,6 +639,18 @@ class Interview(commands.Cog):
             votes.append(Vote(server_id=ctx.guild.id, voter_id=ctx.author.id,
                               candidate_id=mention.id, timestamp=datetime.utcnow()))
         session.add_all(votes)
+        session.commit()
+        await ctx.message.add_reaction(self.bot.greentick)
+
+    @commands.command()
+    @commands.check(_server_active)
+    # TODO: check for interview active
+    async def unvote(self, ctx: commands.Context):
+        """
+        Delete your current votes.
+        """
+        session = session_maker()
+        session.query(Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).delete()
         session.commit()
         await ctx.message.add_reaction(self.bot.greentick)
 
@@ -680,9 +704,12 @@ class Interview(commands.Cog):
 
     @opt.command(name='out')
     @commands.check(_server_active)
+    # TODO: check for interview active
     async def opt_out(self, ctx: commands.Context):
         """
         Opt out of voting.
+
+        When opting out, all votes for you are deleted.
         """
         session = session_maker()
         status = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id, opt_id=ctx.author.id).one_or_none()
@@ -690,7 +717,8 @@ class Interview(commands.Cog):
             optout = schema.OptOut(server_id=ctx.guild.id, opt_id=ctx.author.id)
             session.add(optout)
 
-            # TODO: null votes currently on this user (maybe; check in with The Team)
+            # null votes currently on this user
+            session.query(schema.Vote).filter_by(server_id=ctx.guild.id, candidate_id=ctx.author.id).delete()
 
             session.commit()
             await ctx.message.add_reaction(ctx.bot.greentick)
@@ -700,6 +728,7 @@ class Interview(commands.Cog):
 
     @opt.command(name='in')
     @commands.check(_server_active)
+    # TODO: check for interview active
     async def opt_in(self, ctx: commands.Context):
         """
         Opt into voting.
@@ -726,6 +755,7 @@ class Interview(commands.Cog):
 
     # TODO: eliminate before release
     @commands.command()
+    @commands.is_owner()
     async def dbtest(self, ctx: commands.Context):
         # TODO: for some reason the foreign key constraint isn't enforced.
         session = session_maker()
@@ -734,6 +764,7 @@ class Interview(commands.Cog):
 
     # TODO: eliminate before release
     @commands.command()
+    @commands.is_owner()
     async def gstest(self, ctx: commands.Context):
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
@@ -743,6 +774,7 @@ class Interview(commands.Cog):
 
 # TODO: eliminate before release
 @commands.command()
+@commands.is_owner()
 async def ivembed(ctx: commands.Context):
     me = ctx.guild.get_member(100165629373337600)
     charmander = ctx.bot.get_user(139085841581473792)
