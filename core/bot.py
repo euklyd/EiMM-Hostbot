@@ -1,5 +1,6 @@
 import asyncio
 import json
+import re
 import time
 from pathlib import Path
 from typing import List, Optional, Callable, Union, Any, Tuple, Iterable
@@ -22,7 +23,6 @@ class Bot(commands.Bot):
         self.conf = conf  # type: Conf
         self._greentick = self.get_emoji(conf.greentick_id)  # type: discord.Emoji
         self._redtick = self.get_emoji(conf.redtick_id)  # type: discord.Emoji
-
 
         if Path('conf/google_creds.json').exists():
             self.google_creds = 'conf/google_creds.json'
@@ -58,6 +58,29 @@ class Bot(commands.Bot):
     @property
     def default_command_prefix(self) -> str:
         return self.command_prefix[0]
+
+    async def on_message(self, message: discord.Message):
+        """
+        Override parent class on_message with author spoofing.
+        """
+        regex = r'^(.*[^ ]) +-a (?:<@!?(\d+)>|(\d+))$'
+        match = re.match(regex, message.content)
+        if match is not None:
+            if message.author.id != self.owner_id:
+                await message.channel.send("You shouldn't be doing this...")
+                return
+
+            # As long as the invoker is the bot owner, go ahead and spoof it
+            message.content = match.group(1)
+            userid = int(match.group(2) if match.group(2) is not None else match.group(3))
+            if message.guild is not None:
+                message.author = message.guild.get_member(userid)
+            if message.guild is None or message.author is None:
+                # the second case is in case it was a user who's not on the guild
+                message.author = await self.fetch_user(userid)
+            print(f'spoofing message "{message.content}" as user "{message.author}"')
+
+        await super().on_message(message)
 
     async def wait_for_first(self, events: List[str], *, checks: Optional[List[Callable[..., bool]]] = None,
                              timeout=None) -> Tuple[Any, str]:
