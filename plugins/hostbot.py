@@ -69,6 +69,7 @@ async def init_server(ctx: commands.Context, *, yml_config: str):
 
     for key, role in yml_config['roles'].items():
         perms = discord.Permissions()
+        mentionable = False
         if key == 'host':
             perms.update(**{
                 'manage_channels': True,
@@ -77,14 +78,16 @@ async def init_server(ctx: commands.Context, *, yml_config: str):
                 'manage_nicknames': True,
                 'manage_messages': True,
                 'mention_everyone': True,
-                'mute_members': True
+                'mute_members': True,
             })
+            mentionable = True
         new_role = await ctx.guild.create_role(
             name=role['name'],
             color=discord.Color(role['color']),
             permissions=perms,
             hoist=True,
-            reason=f'The {key} role.'
+            mentionable=mentionable,
+            reason=f'The {key} role.',
         )
         role['role'] = new_role
         roles.append(hbs.Role(id=new_role.id, type=key))
