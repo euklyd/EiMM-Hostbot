@@ -16,10 +16,10 @@ class Server(Base):
     reinterviews_allowed = Column(Boolean)
     active = Column(Boolean)  # are interviews open for new questions / voting
 
-    meta = relationship('Meta', back_populates='server')
+    interviews = relationship('Interview', back_populates='server')
     votes = relationship('Vote', back_populates='server')
     opt_outs = relationship('OptOut', back_populates='server')
-    total_questions = relationship('TotalQuestions', back_populates='server')
+    # total_questions = relationship('TotalQuestions', back_populates='server')
     # interviewee_stats = relationship('IntervieweeStats', back_populates='server')
 
     def __repr__(self):
@@ -30,16 +30,17 @@ class Server(Base):
         )
 
 
-class Meta(Base):
+class Interview(Base):
     """
     All the data for a single given interview week.
     """
-    __tablename__ = 'Meta'
+    __tablename__ = 'Interview'
     id = Column(Integer, primary_key=True)  # auto-incremented primary key
     # NOTE: (server_id, interviewee_id) is not a unique keypair, as people can be re-interviewed
     server_id = Column(Integer, ForeignKey('Server.id'))
     interviewee_id = Column(Integer)
     start_time = Column(DateTime)  # use utc timezone internally
+    sheet_name = Column(String)  # what page of the sheet
     questions_asked = Column(Integer)
     questions_answered = Column(Integer)
     # NOTE: the "current" column could probably be removed in favor of just using the most recent timestamp
@@ -47,13 +48,14 @@ class Meta(Base):
     # TODO: oh god there's so much more
     #  later edit: is there??? i think it may be good now
 
-    server = relationship('Server', back_populates='meta')
+    server = relationship('Server', back_populates='interviews')
+    askers = relationship('Asker', back_populates='interview')
 
     def __repr__(self):
         # TODO: update
         return (
-            f'<Meta id={self.id}, server_id={self.server_id}, interviewee_id={self.interviewee_id}, '
-            f'start_time={self.start_time}, questions_asked={self.questions_asked}, '
+            f'<Interview id={self.id}, server_id={self.server_id}, interviewee_id={self.interviewee_id}, '
+            f'start_time={self.start_time}, sheet_name={self.sheet_name}, questions_asked={self.questions_asked}, '
             f'questions_answered={self.questions_answered}, current={self.current}>'
         )
 
@@ -82,18 +84,18 @@ class OptOut(Base):
         return f'<OptOut server_id={self.server_id}, opt_id={self.opt_id}'
 
 
-class TotalQuestions(Base):
+class Asker(Base):
     # TODO: refactor
-    __tablename__ = 'TotalQuestions'
-    server_id = Column(Integer, ForeignKey('Server.id'), primary_key=True)
-    interviewee_id = Column(Integer, primary_key=True)
+    __tablename__ = 'Asker'
+    # server_id = Column(Integer, ForeignKey('Server.id'), primary_key=True)
+    interview_id = Column(Integer, ForeignKey('Interview.id'), primary_key=True)
     asker_id = Column(Integer, primary_key=True)
     num_questions = Column(Integer)
 
-    server = relationship('Server', back_populates='total_questions')
+    interview = relationship('Interview', back_populates='askers')
 
     def __repr__(self):
-        return f'<TotalQuestions server_id={self.server_id}, interviewee_id={self.interviewee_id}, asker_id={self.asker_id}, num_questions={self.num_questions}'
+        return f'<Asker interview_id={self.interview_id}, asker_id={self.asker_id}, num_questions={self.num_questions}'
 
 # class IntervieweeStats(Base):
 #     __tablename__ = 'IntervieweeStats'
