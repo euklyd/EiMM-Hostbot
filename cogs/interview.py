@@ -1,3 +1,5 @@
+import asyncio
+import pprint
 from datetime import datetime
 from pathlib import Path
 import re
@@ -10,7 +12,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, Session
 
 from cogs import interview_schema as schema
-from cogs.interview_schema import Server, Meta, Vote, OptOut, TotalQuestions
+# from cogs.interview_schema import Server, Meta, Vote, OptOut, TotalQuestions
 from core.bot import Bot
 from utils import menu, spreadsheet
 
@@ -446,15 +448,73 @@ class Interview(commands.Cog):
 
         # TODO: yes.
         #  setup a new interview
+        #  set the old interview row to be not-current
         #  upload the interviewee's current avatar to make it not break in the future?
         #  do we want the email to be private? not sure yet
         #  add new metadata row (maybe other databases?)
 
+        # set the old interview row to be not-current
         session = session_maker()
+        old_interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id,
+                                                                  current=True).one_or_none()  # type: schema.Interview
+        old_interview.current = False
 
-        # TODO: create new schema.Meta
+        timestamp = datetime.utcnow()
+        sheet_name = f'{interviewee.name} [{interviewee.id}]-{timestamp}'
 
-        pass
+        # TODO: create new schema.Interview
+
+        new_interview = schema.Interview(
+            server_id=ctx.guild.id,
+            interviewee_id=interviewee.id,
+            start_time=timestamp,
+            sheet_name=sheet_name,
+            questions_asked=0,
+            questions_answered=0,
+            current=True,
+        )
+        session.add(new_interview)
+
+        # TODO: commit
+
+        session.commit()
+
+        # TODO: make & reset a new sheet
+
+        old_sheet = self.connection.get_sheet(old_interview.server.sheet_name).sheet1
+        new_sheet = old_sheet.duplicate(
+            insert_sheet_index=0,
+            new_sheet_name=sheet_name
+        )
+        new_sheet.insert_row(
+            [
+                timestamp.strftime('%m/%d/%Y %H:%M:%S'),
+                timestamp.timestamp(),
+                str(ctx.bot),
+                ctx.bot.id,
+                1,
+                'Will you pregame with me? :piplupcry:',  # TODO: replace this with something else
+                '',
+                False,
+                ctx.guild.id,
+                ctx.channel.id,
+                ctx.message.id
+            ],
+            2
+        )
+        new_sheet.resize(rows=2)
+
+        # TODO: share sheet with new person? maybe
+        #  unsure this is wanted
+        ...
+
+        # TODO: post the votals, etc. info to stage
+        ...
+
+        # TODO: reply to message and/or greentick
+        await ctx.message.add_reaction(ctx.bot.greentick)
+        await asyncio.sleep(2)
+        await ctx.send(f'{ctx.author.mention}, make sure to update the table of contents!')
 
     # TODO (maybe): Add methods to change the answer/backstage channels.
 
@@ -516,15 +576,49 @@ class Interview(commands.Cog):
     @commands.command()
     @commands.check(_server_active)
     # TODO: check for interview active
-    async def ask(self, ctx: commands.Context, *, question: str):
+    async def ask(self, ctx: commands.Context, *, question_str: str):
         """
         TODO: Submit a question for the current interview.
         """
         # TODO:
+        #  create Question
         #  upload question to sheet
-        #  update schema.TotalQuestions
-        #  update schema.Meta
-        pass
+        #  update schema.Asker
+        #  update schema.Interview
+        session = session_maker()
+        interview = session.query(schema.Interview).filter_by(current=True,
+                                                              server_id=ctx.guild.id).one_or_none()  # type: Optional[schema.Interview]
+        interviewee = ctx.guild.get_member(interview.interviewee_id)
+        if interviewee is None:
+            await ctx.send(f"Couldn't find server member `{interview.interviewee_id}`.")
+            return
+
+        asker_meta = None
+        for asker in interview.askers:
+            if asker.asker_id == ctx.author.id:
+                asker_meta = asker
+        if asker_meta is None:
+            asker_meta = schema.Asker(interview_id=interview.id, asker_id=ctx.author.id, num_questions=0)
+            session.add(asker_meta)
+
+        asker_meta.num_questions += 1
+        interview.questions_asked += 1
+
+        q = Question(
+            interviewee=interviewee,
+            asker=ctx.author,
+            question=question_str,
+            question_num=asker_meta.num_questions,
+            message=ctx.message,
+            # answer=,  # unfilled, obviously
+            timestamp=datetime.utcnow(),
+        )
+
+        q.upload(ctx, self.connection)
+
+        session.commit()
+
+        await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.command()
     @commands.check(_server_active)
@@ -533,15 +627,23 @@ class Interview(commands.Cog):
         """
         TODO: Submit multiple questions for the current interview.
 
-        Each question must be a single line, separated by linebreaks.
+        Each question must be a single line, separated by linebreaks. If you want multi-line single questions,
+        use the 'ask' command.
         """
         # TODO:
         #  split up questions
+        #  create a bunch of Questions
         #  upload all questions to sheet
         #  upload question to sheet
-        #  update schema.TotalQuestions
-        #  update schema.Meta
-        pass
+        #  update schema.Asker
+        #  update schema.Interview
+
+        # print(questions_str)
+        #
+        # await ctx.send("You're asking " + ', '.join([f'`{q}`' for q in questions_str.split('\n')]))
+
+        for question_str in questions_str:
+            await self.ask(ctx, question_str=question_str)
 
     # == Answers ==
 
@@ -649,13 +751,13 @@ class Interview(commands.Cog):
         #  like, lots to do.
 
         session = session_maker()
-        old_votes = session.query(Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).all()
+        old_votes = session.query(schema.Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).all()
         for vote in old_votes:
             session.delete(vote)
         votes = []
         for mention in mentions:
-            votes.append(Vote(server_id=ctx.guild.id, voter_id=ctx.author.id,
-                              candidate_id=mention.id, timestamp=datetime.utcnow()))
+            votes.append(schema.Vote(server_id=ctx.guild.id, voter_id=ctx.author.id,
+                                     candidate_id=mention.id, timestamp=datetime.utcnow()))
         session.add_all(votes)
         session.commit()
         await ctx.message.add_reaction(self.bot.greentick)
@@ -668,7 +770,7 @@ class Interview(commands.Cog):
         Delete your current votes.
         """
         session = session_maker()
-        session.query(Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).delete()
+        session.query(schema.Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).delete()
         session.commit()
         await ctx.message.add_reaction(self.bot.greentick)
 
@@ -679,7 +781,7 @@ class Interview(commands.Cog):
         Check who you're voting for.
         """
         session = session_maker()
-        votes = session.query(Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).all()
+        votes = session.query(schema.Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).all()
         member_votes = [ctx.guild.get_member(vote.candidate_id) for vote in votes]
 
         response = self._votes_footer(member_votes, prefix=ctx.bot.default_command_prefix)
@@ -694,7 +796,7 @@ class Interview(commands.Cog):
         Use the --full flag to view who's voting for each candidate.
         """
         session = session_maker()
-        votes = session.query(Vote).filter_by(server_id=ctx.guild.id).all()
+        votes = session.query(schema.Vote).filter_by(server_id=ctx.guild.id).all()
 
         # Filter only the invoker's own votes when generating the footer
         own_votes = [ctx.guild.get_member(vote.candidate_id) for vote in votes if vote.voter_id == ctx.author.id]
