@@ -9,7 +9,8 @@ Base = declarative_base()
 class Server(Base):
     __tablename__ = 'Server'
     id = Column(Integer, primary_key=True)
-    sheet_name = Column(String)
+    sheet_name = Column(String, unique=True)
+    default_question = Column(String)
     answer_channel = Column(Integer)
     back_channel = Column(Integer)
     limit = Column(DateTime)  # time since someone's last interview (start date) to be reinterviewed
@@ -19,14 +20,12 @@ class Server(Base):
     interviews = relationship('Interview', back_populates='server')
     votes = relationship('Vote', back_populates='server')
     opt_outs = relationship('OptOut', back_populates='server')
-    # total_questions = relationship('TotalQuestions', back_populates='server')
-    # interviewee_stats = relationship('IntervieweeStats', back_populates='server')
 
     def __repr__(self):
         return (
             f'<Server id={self.id}, answer_channel={self.answer_channel}, back_channel={self.back_channel}, '
-            f'sheet_name={self.sheet_name}>, limit={self.limit}, reinterviews_allowed={self.reinterviews_allowed}, '
-            f'active={self.active}>'
+            f'sheet_name={self.sheet_name}>, default_question={self.default_question}, limit={self.limit}, '
+            f'reinterviews_allowed={self.reinterviews_allowed}, active={self.active}>'
         )
 
 

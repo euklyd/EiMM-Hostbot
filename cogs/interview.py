@@ -10,6 +10,7 @@ from discord.ext import commands
 from sqlalchemy import create_engine, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, Session
+from gspread.exceptions import SpreadsheetNotFound
 
 from cogs import interview_schema as schema
 # from cogs.interview_schema import Server, Meta, Vote, OptOut, TotalQuestions
@@ -128,8 +129,26 @@ class Question:
         """
         Upload a question to the Google sheet.
         """
-        # TODO: ctx may be unnecessary
-        pass
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if server is None:
+            raise ValueError('No server found on this guild.')
+        sheet = connection.get_sheet(server.sheet_name).sheet1
+        sheet.append_row(
+            [
+                self.timestamp.strftime('%m/%d/%Y %H:%M:%S'),
+                self.timestamp.timestamp(),
+                str(self.asker),
+                str(self.asker.id),
+                self.question_num,
+                self.question,
+                '',  # no answer when uploading
+                False,
+                str(self.message.guild.id),
+                str(self.message.channel.id),
+                str(self.message.id),
+            ]
+        )
 
     def question_words(self) -> Generator[str, None, None]:
         """
@@ -146,6 +165,23 @@ class Question:
         words = self.answer.replace('[', '\\[').replace(']', '\\]').split(' ')
         for word in words:
             yield word
+
+    def backstage_embed(self, ctx: commands.Context) -> discord.Embed:
+        # basic stuff
+        em = discord.Embed(
+            # TODO: fill in image
+            title=f"**{self.interviewee}**'s interview",
+            description=f'[{self.question}]({self.message.jump_url})',
+            color=ctx.bot.user.color,
+            url='',  # TODO: fill in
+        )
+
+        em.set_author(
+            name=f'New question from {ctx.author}',
+            icon_url=ctx.author.avatar_url,
+            url='',  # TODO: fill in
+        )
+        return em
 
     # NOTE: This won't work, since you need to be able to answer multiple questions at once.
     # def answer(self, channel: discord.TextChannel):
@@ -393,13 +429,16 @@ class Interview(commands.Cog):
     @iv.command(name='setup')
     @commands.has_permissions(administrator=True)
     async def iv_setup(self, ctx: commands.Context, answers: discord.TextChannel,
-                       backstage: discord.TextChannel, sheet_name: str):
+                       backstage: discord.TextChannel, sheet_name: str,
+                       default_question: str = 'Make sure to write an intro on stage before you start '
+                                               'answering questions!'):
         """
         Set up the current server for interviews.
 
         Answer channel is where where answers to questions will be posted, backstage is a private space for
         the bot to be controlled, sheet_name is the URL of your interview sheet.
         If your sheet name is multiple words, enclose it in double quotes, e.g., "sheet name".
+        Sheet names must be unique, first-come-first-served.
 
         Copy the sheet template from TODO: add a link here.
         """
@@ -409,9 +448,32 @@ class Interview(commands.Cog):
 
         session = session_maker()
 
+        existing_server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if existing_server is not None:
+            await ctx.send('This server is already set up for interviews.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        existing_server = session.query(schema.Server).filter_by(sheet_name=sheet_name).one_or_none()
+        if existing_server is not None:
+            await ctx.send(f'A sheet with the name `{sheet_name}` has already been registered, '
+                           'please use a different one.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        try:
+            sheet = self.connection.get_sheet(sheet_name)
+        except SpreadsheetNotFound:
+            # TODO: Figure out a way to publicize and pass on the bot account email.
+            await ctx.send(f"Spreadsheet `{sheet_name}` cannot be found, make sure it's been shared with the bot "
+                           "account and try again.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
         server = schema.Server(
             id=ctx.guild.id,
             sheet_name=sheet_name,
+            default_question=default_question,
             answer_channel=answers.id,
             back_channel=backstage.id,
             limit=datetime.utcfromtimestamp(0),
@@ -457,10 +519,12 @@ class Interview(commands.Cog):
         session = session_maker()
         old_interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id,
                                                                   current=True).one_or_none()  # type: schema.Interview
-        old_interview.current = False
+        if old_interview is not None:
+            # if old_interview doesn't exist that just means it's the first interview!
+            old_interview.current = False
 
         timestamp = datetime.utcnow()
-        sheet_name = f'{interviewee.name} [{interviewee.id}]-{timestamp}'
+        sheet_name = f'{interviewee.name} [{interviewee.id}]-{timestamp.timestamp()}'
 
         # TODO: create new schema.Interview
 
@@ -481,7 +545,7 @@ class Interview(commands.Cog):
 
         # TODO: make & reset a new sheet
 
-        old_sheet = self.connection.get_sheet(old_interview.server.sheet_name).sheet1
+        old_sheet = self.connection.get_sheet(new_interview.server.sheet_name).sheet1
         new_sheet = old_sheet.duplicate(
             insert_sheet_index=0,
             new_sheet_name=sheet_name
@@ -490,26 +554,30 @@ class Interview(commands.Cog):
             [
                 timestamp.strftime('%m/%d/%Y %H:%M:%S'),
                 timestamp.timestamp(),
-                str(ctx.bot),
-                ctx.bot.id,
+                str(ctx.bot.user),
+                str(ctx.bot.user.id),
                 1,
-                'Will you pregame with me? :piplupcry:',  # TODO: replace this with something else
+                new_interview.server.default_question,  # TODO: replace this with something else
                 '',
                 False,
-                ctx.guild.id,
-                ctx.channel.id,
-                ctx.message.id
+                str(ctx.guild.id),
+                str(ctx.channel.id),
+                str(ctx.message.id),
             ],
-            2
+            index=2,
         )
         new_sheet.resize(rows=2)
 
         # TODO: share sheet with new person? maybe
-        #  unsure this is wanted
+        #  unsure if this is wanted
         ...
 
         # TODO: post the votals, etc. info to stage
-        ...
+        channel = ctx.guild.get_channel(new_interview.server.answer_channel)
+        await self._votals_in_channel(ctx, flag=None, channel=channel)
+
+        # TODO: clear votes
+        session.query(schema.Vote).filter_by(server_id=ctx.guild.id).delete()
 
         # TODO: reply to message and/or greentick
         await ctx.message.add_reaction(ctx.bot.greentick)
@@ -585,6 +653,7 @@ class Interview(commands.Cog):
         #  upload question to sheet
         #  update schema.Asker
         #  update schema.Interview
+        #  post embed to backstage
         session = session_maker()
         interview = session.query(schema.Interview).filter_by(current=True,
                                                               server_id=ctx.guild.id).one_or_none()  # type: Optional[schema.Interview]
@@ -601,14 +670,11 @@ class Interview(commands.Cog):
             asker_meta = schema.Asker(interview_id=interview.id, asker_id=ctx.author.id, num_questions=0)
             session.add(asker_meta)
 
-        asker_meta.num_questions += 1
-        interview.questions_asked += 1
-
         q = Question(
             interviewee=interviewee,
             asker=ctx.author,
             question=question_str,
-            question_num=asker_meta.num_questions,
+            question_num=asker_meta.num_questions + 1,
             message=ctx.message,
             # answer=,  # unfilled, obviously
             timestamp=datetime.utcnow(),
@@ -616,8 +682,19 @@ class Interview(commands.Cog):
 
         q.upload(ctx, self.connection)
 
+        asker_meta.num_questions += 1
+        interview.questions_asked += 1
+
         session.commit()
 
+        # TODO: post embed to backstage
+        em = q.backstage_embed(ctx)
+        backstage = ctx.guild.get_channel(interview.server.back_channel)
+        if backstage is None:
+            await ctx.send(f'Backstage channel `{interview.server.back_channel}` not found for this server')
+        await backstage.send(embed=em)
+
+        # TODO: This may break on masks, which call this method multiple times; make sure to double-check.
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.command()
@@ -638,11 +715,8 @@ class Interview(commands.Cog):
         #  update schema.Asker
         #  update schema.Interview
 
-        # print(questions_str)
-        #
-        # await ctx.send("You're asking " + ', '.join([f'`{q}`' for q in questions_str.split('\n')]))
-
-        for question_str in questions_str:
+        for question_str in questions_str.split('\n'):
+            # This is such a hacky solution but it also seems correct.
             await self.ask(ctx, question_str=question_str)
 
     # == Answers ==
@@ -710,6 +784,7 @@ class Interview(commands.Cog):
             s = candidate.basic_str(max_name_length)
             if len(text) + len(s) > 1750:
                 # Break if it's getting too long for a single message.
+                text += '...\n'
                 break
             text += s + '\n'
 
@@ -722,11 +797,12 @@ class Interview(commands.Cog):
         max_name_length = len(SERVER_LEFT_MSG)
         for candidate in votals:
             if len(str(candidate)) > max_name_length:
-                max_name_length = len(str(candidate))
+                max_name_length = len(str(candidate.candidate))
         for candidate in votals:
             s = candidate.full_str(max_name_length)
             if len(text) + len(s) > 1750:
                 # Break if it's getting too long for a single message.
+                text += '...\n'
                 break
             text += s + '\n'
 
@@ -787,13 +863,11 @@ class Interview(commands.Cog):
         response = self._votes_footer(member_votes, prefix=ctx.bot.default_command_prefix)
         await ctx.send(response)
 
-    @commands.command()
-    @commands.check(_server_active)
-    async def votals(self, ctx: commands.Context, flag: Optional[str]):
+    async def _votals_in_channel(self, ctx: commands.Context, flag: Optional[str] = None,
+                                 channel: Optional[discord.TextChannel] = None):
         """
-        View current vote standings.
-
-        Use the --full flag to view who's voting for each candidate.
+        The only reason this isn't votals() is because it also gets called by iv_next(), but that wants to place
+        the votals reply in a different channel.
         """
         session = session_maker()
         votes = session.query(schema.Vote).filter_by(server_id=ctx.guild.id).all()
@@ -807,27 +881,27 @@ class Interview(commands.Cog):
             block_text = Interview._votals_text_full(ctx, votes)
             if block_text == '':
                 block_text = """
-                _  /)
-               mo / )
-               |/)\)
-                /\_
-                \__|=
-               (    )
-               __)(__
-         _____/      \\_____
-        |  _     ___   _   ||
-        | | \     |   | \  ||
-        | |  |    |   |  | ||
-        | |_/     |   |_/  ||
-        | | \     |   |    ||
-        | |  \    |   |    ||
-        | |   \. _|_. | .  ||
-        |                  ||
-        |  PenguinBot3000  ||
-        |   2016 - 2020    ||
-        |                  ||
-*       | *   **    * **   |**      **
- \))ejm97/.,(//,,..,,\||(,,.,\\,.((//"""
+                        _  /)
+                       mo / )
+                       |/)\)
+                        /\_
+                        \__|=
+                       (    )
+                       __)(__
+                 _____/      \\_____
+                |  _     ___   _   ||
+                | | \     |   | \  ||
+                | |  |    |   |  | ||
+                | |_/     |   |_/  ||
+                | | \     |   |    ||
+                | |  \    |   |    ||
+                | |   \. _|_. | .  ||
+                |                  ||
+                |  PenguinBot3000  ||
+                |   2016 - 2020    ||
+                |                  ||
+        *       | *   **    * **   |**      **
+         \))ejm97/.,(//,,..,,\||(,,.,\\,.((//"""
 
         else:
             # Do basic votals.
@@ -837,7 +911,17 @@ class Interview(commands.Cog):
 
         reply = f'**__Votals__**```ini\n{block_text}```{footer}\n'
 
-        await ctx.send(reply)
+        await channel.send(reply)
+
+    @commands.command()
+    @commands.check(_server_active)
+    async def votals(self, ctx: commands.Context, flag: Optional[str] = None):
+        """
+        View current vote standings.
+
+        Use the --full flag to view who's voting for each candidate.
+        """
+        await self._votals_in_channel(ctx, flag=flag, channel=ctx.channel)
 
     @commands.group(invoke_without_command=True)
     @commands.check(_server_active)
@@ -923,16 +1007,15 @@ class Interview(commands.Cog):
 @commands.is_owner()
 async def ivembed(ctx: commands.Context):
     me = ctx.guild.get_member(100165629373337600)
-    charmander = ctx.bot.get_user(139085841581473792)
-    link = 'https://discord.com/channels/328399532368855041/508588908829736970/770767582244503622'
-    question = 'who can we get to fill in the last **2 slots** for s5, currently we have: like nobody'
-    answer = 'good question idk, just get eli...eson to run 3 games in one season'
+    charmander = ctx.bot.get_user(129700693329051648)
+    link = 'https://discord.com/channels/328399532368855041/328399532368855041/773778440208908298'
+    question = 'you have a magic the gathering bot, but the interview bot is broke. seems legit'
+    answer = 'every time u complain about it i delay release another day :ok_hand:'
 
     em = blank_answer_embed(me, charmander)
     q_title = 'Question #1'
     q_a = (
-        f'[> {question}\n'
-        f'> more stuff]({link})\n'
+        f'[> {question}]({link})\n'
         f'{answer}'
     )
     em.add_field(name=q_title, value=q_a, inline=False)
