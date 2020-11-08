@@ -354,15 +354,22 @@ async def confessional(ctx: commands.Context, *, msg):
     Only usable by living players, and only in their Role PMs. Has a cooldown timer, so don't spam it.
     """
     session = session_maker()
-    player_role = session.query(hbs.Role).filter_by(type='player', server_id=ctx.guild.id).one_or_none()
-    if player_role is None:
+    # This should never have multiple roles in it, unless I'm manually overriding something for a game,
+    # in which case, that is important to be able to support!
+    player_roles = session.query(hbs.Role).filter_by(type='player', server_id=ctx.guild.id).all()
+    if len(player_roles) == 0:
         await ctx.send("This server isn't set up for EiMM.")
         await ctx.message.add_reaction(ctx.bot.redtick)
         return
-    player_role = ctx.guild.get_role(player_role.id)
-    if player_role not in ctx.author.roles:
+    player_roles = [ctx.guild.get_role(player_role.id) for player_role in player_roles]
+    found = False
+    for player_role in player_roles:
+        if player_role in ctx.author.roles:
+            found = True
+            break
+    if not found:
         # TODO: remove test prints probably, but these are so smol that it doesn't really matter.
-        print(player_role)
+        print(player_roles)
         print(ctx.author.roles)
         await ctx.send('This command is only usable by living players.')
         await ctx.message.add_reaction(ctx.bot.redtick)
