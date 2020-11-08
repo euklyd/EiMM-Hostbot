@@ -12,20 +12,10 @@ from core.bot import Bot
 
 API = 'https://api.scryfall.com/'
 
+
 # NOTE: You probably don't want to be running this module on your instance. It has a bit of
 #  custom code that really doesn't serve any purposes but my own. It won't hurt you if you do
 #  run it, though.
-
-
-# class Card:
-#     def __init__(self, card):
-#         self.name = card['name']
-#         self.mana_cost = card['mana_cost']
-#         self.cmc = card['cmc']
-#         self.type_line = card['type_line']
-#         self.oracle_text = card['oracle_text']
-#         self.power = card['power']
-#         self.toughness = card['toughness']
 
 
 class ScryfallResponse:

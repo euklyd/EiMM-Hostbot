@@ -268,6 +268,7 @@ async def init_pmlist(ctx: commands.Context, *, playerlist: str):
             ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
             ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
             host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
+            player_role: discord.PermissionOverwrite(manage_messages=True),
         }
         if type(player) is discord.Member:
             await player.edit(roles=player.roles + [player_role])

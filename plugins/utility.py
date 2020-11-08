@@ -94,9 +94,26 @@ async def clear(ctx: commands.Context, num: int):
     await deletion_message.delete(delay=5)
 
 
+@commands.command()
+@commands.is_owner()
+async def pin(ctx: commands.Context, msg_id: int, channel: Optional[discord.TextChannel]):
+    """
+    Pin a message.
+
+    msg_id must be for a message in the current channel, unless a channel is specified.
+    """
+    if channel is not None:
+        message = await channel.fetch_message(msg_id)
+    else:
+        message = await ctx.channel.fetch_message(msg_id)
+    await message.pin()
+    await ctx.message.add_reaction(ctx.bot.greentick)
+
+
 def setup(bot: commands.Bot):
     bot.add_command(bidoof)
     bot.add_command(msg)
     bot.add_command(chavi)
     bot.add_command(trunc)
     bot.add_command(clear)
+    bot.add_command(pin)
