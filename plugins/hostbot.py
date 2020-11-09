@@ -443,6 +443,26 @@ async def gameavatars(ctx: commands.Context):
         await ctx.send(r)
 
 
+@commands.command()
+@commands.has_permissions(administrator=True)
+async def enrole(ctx: commands.Context, role: discord.Role, mentions: commands.Greedy[discord.Member]):
+    """
+    Add members to a role en masse.
+    """
+    # NOTE: This is unnecessary as a discord.User mention will never be parsed as a discord.Member.
+    # bad = False
+    # for member in mentions:
+    #     if type(member) is not discord.Member:
+    #         await ctx.send(f'{member} is of type `{type(member)}`, not `discord.Member`.')
+    #         bad = True
+    # if bad:
+    #     await ctx.message.add_reaction(ctx.bot.redtick)
+    #     return
+    for member in mentions:
+        await member.edit(roles=member.roles + [role])
+    await ctx.message.add_reaction(ctx.bot.greentick)
+
+
 # @init.command(name='updaterole')
 # async def init_db_update(ctx, roletype, role):
 #     # TODO
@@ -460,6 +480,7 @@ def setup(bot: Bot):
     bot.add_command(init)
     bot.add_command(confessional)
     bot.add_command(gameavatars)
+    bot.add_command(enrole)
 
     db_dir = 'databases/'
     db_file = f'{db_dir}/hostbot.db'
