@@ -106,6 +106,10 @@ async def pin(ctx: commands.Context, msg_id: int, channel: Optional[discord.Text
         message = await channel.fetch_message(msg_id)
     else:
         message = await ctx.channel.fetch_message(msg_id)
+    if message is None:
+        await ctx.send(f'Message `{msg_id}` not found.')
+        await ctx.message.add_reaction(ctx.bot.redtick)
+        return
     await message.pin()
     await ctx.message.add_reaction(ctx.bot.greentick)
 
