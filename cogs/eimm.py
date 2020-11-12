@@ -171,6 +171,8 @@ class EiMM(commands.Cog):
         else:
             return
         match = match.strip()
+        if match == '':
+            return
         for abil, row in self.abilities.items():
             if match.lower() == abil.lower():
                 em = ability_embed(row)
