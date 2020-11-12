@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional, Union, Generator, Tuple
 
 import discord
 from discord.ext import commands
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, desc
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, Session
 from gspread.exceptions import SpreadsheetNotFound
@@ -109,13 +109,13 @@ class Question:
         """
         Translates a row from the Google sheet to an object.
         """
-        channel = await ctx.bot.get_channel(row['Channel ID'])  # type: discord.TextChannel
+        channel = ctx.bot.get_channel(row['Channel ID'])  # type: discord.TextChannel
         message = await channel.fetch_message(row['Message ID'])
         return Question(
             # This is a bit dangerous, but should be fine! only the interviewee will be calling the answer method:
             interviewee=ctx.author,
             asker=ctx.guild.get_member(row['ID']),
-            question=row['question'],
+            question=row['Question'],
             question_num=row['#'],
             # row['Server ID'],
             # row['Channel ID'],
@@ -166,22 +166,22 @@ class Question:
         for word in words:
             yield word
 
-    def backstage_embed(self, ctx: commands.Context) -> discord.Embed:
-        # basic stuff
-        em = discord.Embed(
-            # TODO: fill in image
-            title=f"**{self.interviewee}**'s interview",
-            description=f'[{self.question}]({self.message.jump_url})',
-            color=ctx.bot.user.color,
-            url='',  # TODO: fill in
-        )
-
-        em.set_author(
-            name=f'New question from {ctx.author}',
-            icon_url=ctx.author.avatar_url,
-            url='',  # TODO: fill in
-        )
-        return em
+    # def backstage_embed(self, ctx: commands.Context) -> discord.Embed:
+    #     # basic stuff
+    #     em = discord.Embed(
+    #         # TODO: fill in image
+    #         title=f"**{self.interviewee}**'s interview",
+    #         description=f'[{self.question}]({self.message.jump_url})',
+    #         color=ctx.bot.user.color,
+    #         url='',  # TODO: fill in
+    #     )
+    #
+    #     em.set_author(
+    #         name=f'New question from {ctx.author}',
+    #         icon_url=ctx.author.avatar_url,
+    #         url='',  # TODO: fill in
+    #     )
+    #     return em
 
     # NOTE: This won't work, since you need to be able to answer multiple questions at once.
     # def answer(self, channel: discord.TextChannel):
@@ -193,6 +193,29 @@ class Question:
     #     await channel.send(...)  # TODO
     #     pass
 
+
+class InterviewEmbed(discord.Embed):
+    @staticmethod
+    def blank(interviewee: discord.Member, asker: Union[discord.Member, discord.User],
+                           avatar_url: str = None) -> 'InterviewEmbed':
+        em = InterviewEmbed(
+            title=f"**{interviewee}**'s interview",
+            description=' ',
+            color=interviewee.color,
+            url='',  # TODO: fill in
+        )
+        if avatar_url is None:
+            em.set_thumbnail(url=interviewee.avatar_url)
+        else:
+            em.set_thumbnail(url=avatar_url)
+        em.set_author(
+            name=f'Asked by {asker}',
+            icon_url=asker.avatar_url,
+            url='',  # TODO: fill in
+        )
+        # +100 length as a buffer for the metadata fields
+        em.length = len(f"**{interviewee}**'s interview" + ' ' + f'Asked by {asker}') + len(asker.avatar_url) + 100
+        return em
 
 # def alphabetize_users(u1: discord.User, u2: discord.User) -> bool:
 #     """
@@ -221,38 +244,24 @@ def translate_name(member: Union[discord.Member, discord.User]):
     return ERROR_MSG
 
 
-def blank_answer_embed(interviewee: discord.Member, asker: Union[discord.Member, discord.User],
-                       avatar_url: str = None) -> discord.Embed:
-    em = discord.Embed(
-        title=f"**{interviewee}**'s interview",
-        description=' ',
-        color=interviewee.color,
-        url='',  # TODO: fill in
-    )
-    if avatar_url is None:
-        em.set_thumbnail(url=interviewee.avatar_url)
-    else:
-        em.set_thumbnail(url=avatar_url)
-    em.set_author(
-        name=f'Asked by {asker}',
-        icon_url=asker.avatar_url,
-        url='',  # TODO: fill in
-    )
-    return em
-
-
 def message_link(server_id: int, channel_id: int, message_id: int) -> str:
     # message = await ctx.guild.get_message(message_id)
     # return message.link
     return f'https://discordapp.com/channels/{server_id}/{channel_id}/{message_id}'
 
 
-def add_question(em: discord.Embed, question: Question):
+def add_question(em: discord.Embed, question: Question, current_length: int) -> int:
     """
     Questions and answers are added to embed fields, each of which has a maximum of 1000 chars.
     Need to check (and possibly split up) each question and answer to make sure they don't overflow and break
     the embed. This is... somewhat frustrating.
+
+    Return length of question/answer strings added, or error codes:
+    -1 if the total is too long
+    -2 if this one question is too long
     """
+    text_length = 0
+
     # TODO: test the replaces
     # question_text = question.question.strip().replace('\n', '\n> ').replace('[', '\\[').replace(']', '\\]')
     question_text = question.question.replace('[', '\\[').replace(']', '\\]')
@@ -262,29 +271,46 @@ def add_question(em: discord.Embed, question: Question):
     # When splitting up questions, assume 85 (round to 100) characters for the message link markdown, so you get 900
     # chars rather than 1000.
     if sum([len(line) for line in question_lines]) + len(question_lines) * 3 + len(question.answer) <= 900:
-        formatted_question_text = f'[> {"> ".join(question_lines)}]({question.message.jump_url}'
+        formatted_question_text = f'[> {"> ".join(question_lines)}]({question.message.jump_url})'
+        text_length = len(f'Question #{question.question_num}') + len(f'{formatted_question_text}\n{question.answer}')
+        if text_length > 4800:
+            return -2
+        if current_length + text_length > 4800:
+            return -1
         em.add_field(
             name=f'Question #{question.question_num}',
-            value=f'{formatted_question_text}\n{question.answer}'
+            value=f'{formatted_question_text}\n{question.answer}',
+            inline=False,
         )
-        return
+        return text_length
 
-    # Split and add to separate fields:
+    # Need to split and add to separate fields:
+
+    if len(question.question) + len(question.answer) > 4700:
+        # I'm far too lazy to calculate exactly, but this should be safe enough
+        return -2
+    if current_length + len(question.question) + len(question.answer) > 4700:
+        return -1
 
     question_chunk = '[> '
     question_chunks = []
-    for word in question.answer_words():
+    for word in question.question_words():
         if len(question_chunk) > 900:
             question_chunk += f']({question.message.jump_url})'
             question_chunks.append(question_chunk)
             question_chunk = '[> '
         word = word.replace("\n", "\n> ")
-        question_chunk += f'{word}'
+        question_chunk += f'{word}' + ' '
     question_chunk += f']({question.message.jump_url})'
     question_chunks.append(question_chunk)
 
     for i, chunk in enumerate(question_chunks):
-        em.add_field(name=f'Question #{question.question_num} [{i}/{len(question_chunks)}]', value=chunk)
+        if len(question_chunks) > 1:
+            name = f'Question #{question.question_num} [{i+1}/{len(question_chunks)}]'
+        else:
+            name = f'Question #{question.question_num}'
+        em.add_field(name=name, value=chunk, inline=False)
+        text_length += len(name) + len(chunk)
 
     answer_chunk = ''
     answer_chunks = []
@@ -292,34 +318,42 @@ def add_question(em: discord.Embed, question: Question):
         if len(answer_chunk) > 950:
             answer_chunks.append(answer_chunk)
             answer_chunk = ''
-        answer_chunk += word
+        answer_chunk += word + ' '
+    answer_chunks.append(answer_chunk)
 
-    for i, chunk in enumerate(question_chunks):
-        em.add_field(name=f'Answer #{question.question_num} [{i}/{len(answer_chunks)}]', value=chunk)
+    for i, chunk in enumerate(answer_chunks):
+        if len(answer_chunks) > 1:
+            name = f'Answer #{question.question_num} [{i + 1}/{len(answer_chunks)}]'
+        else:
+            name = f'Answer #{question.question_num}'
+        em.add_field(name=name, value=chunk, inline=False)
+        text_length += len(name) + len(chunk)
 
-    # split_question = []
-    # # while len(question_text) > 900:
-    # #     pos = question_text[:900].rfind(' ')
+    return text_length
+
+    # # split_question = []
+    # # # while len(question_text) > 900:
+    # # #     pos = question_text[:900].rfind(' ')
+    # # #     if pos == -1:
+    # # #         raise ValueError('Text cannot be split')
+    # # #     text = question_text[:pos]
+    # # #     if text[-1] == '>':
+    # # #         text = text[:-1]
+    # # #     question_text = '> ' + question_text[pos + 1:]
+    # # #     split_question.append(text)
+    # #
+    # # answer_text = question.answer
+    # # split_answer = []
+    # # while len(answer_text) >= 1000:
+    # #     pos = answer_text[:999].rfind(' ')
     # #     if pos == -1:
-    # #         raise ValueError('Text cannot be split')
-    # #     text = question_text[:pos]
-    # #     if text[-1] == '>':
-    # #         text = text[:-1]
-    # #     question_text = '> ' + question_text[pos + 1:]
-    # #     split_question.append(text)
-    #
-    # answer_text = question.answer
-    # split_answer = []
-    # while len(answer_text) >= 1000:
-    #     pos = answer_text[:999].rfind(' ')
-    #     if pos == -1:
-    #         raise ValueError('Answer cannot be split')
-    #     text = answer_text[:pos]
-    #     answer_text = answer_text[pos + 1:]
-    #     split_answer.append(text)
-    #
-    # # TODO: more
-    pass
+    # #         raise ValueError('Answer cannot be split')
+    # #     text = answer_text[:pos]
+    # #     answer_text = answer_text[pos + 1:]
+    # #     split_answer.append(text)
+    # #
+    # # # TODO: more
+    # pass
 
 
 def _server_active(ctx: commands.Context):
@@ -341,6 +375,18 @@ def _interview_enabled(ctx: commands.Context):
     """
     session = session_maker()
     result = session.query(schema.Server).filter_by(id=ctx.guild.id, active=True).one_or_none()
+    return result is not None
+
+
+def _is_interviewee(ctx: commands.Context):
+    """
+    Command check to make sure the invoker is the interviewee.
+
+    Checked when answering questions.
+    """
+    session = session_maker()
+    result = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, interviewee_id=ctx.author.id,
+                                                       current=True).one_or_none()
     return result is not None
 
 
@@ -378,28 +424,44 @@ class Interview(commands.Cog):
     # == Helper methods ==
 
     def _generate_embeds(self, interviewee: discord.Member, questions: List[Question],
-                         avatar_url=None) -> Generator[discord.Embed, None, None]:
+                         avatar_url=None) -> Generator[Union[discord.Embed, Question], None, None]:
         """
         TODO: what was i doing here
         Generate discord.Embeds to be posted from a list of Questions.
         """
+
         # TODO: it's entirely possible this wants to be a static method
+
+        def finalize(em: discord.Embed):
+            # TODO: add footer but idk what to do with it
+            return em
+
         last_asker = None  # type: Optional[discord.Member]
+        length = 0
         em = None  # type: Optional[discord.Embed]
         for question in questions:
             if last_asker != question.asker:
-                if em is not None:
-                    # TODO: add footer but idk what to do with it
-                    yield em
+                if em is not None and len(em.fields) > 0:
+                    yield finalize(em)
                 # make a new embed
-                em = blank_answer_embed(interviewee, question.asker, avatar_url=avatar_url)  # TODO: update avatar url?
+                em = InterviewEmbed.blank(interviewee, question.asker, avatar_url=avatar_url)  # TODO: update avatar url?
+                length = 0
             # TODO: add question/answer fields
-            add_question(em, question)
+            added_length = add_question(em, question, length)
+            if added_length == -1:
+                # question wasn't added, yield and retry
+                if len(em.fields) > 0:
+                    yield finalize(em)
+                em = InterviewEmbed.blank(interviewee, question.asker, avatar_url=avatar_url)  # TODO: update avatar url?
+            if added_length == -2:
+                # question cannot be added, yield an error
+                yield question
+            length += added_length
             # TODO: update answered questions per asker? or whatever it is?
             last_asker = question.asker
         if em is not None:
-            # TODO: add footer but idk what to do with it
-            yield em
+            if len(em.fields) > 0:
+                yield finalize(em)
 
     def _reset_meta(self, server: discord.Guild):
         """
@@ -641,19 +703,7 @@ class Interview(commands.Cog):
 
     # == Questions ==
 
-    @commands.command()
-    @commands.check(_server_active)
-    # TODO: check for interview active
-    async def ask(self, ctx: commands.Context, *, question_str: str):
-        """
-        TODO: Submit a question for the current interview.
-        """
-        # TODO:
-        #  create Question
-        #  upload question to sheet
-        #  update schema.Asker
-        #  update schema.Interview
-        #  post embed to backstage
+    async def _ask_many(self, ctx: commands.Context, questions: List[str]):
         session = session_maker()
         interview = session.query(schema.Interview).filter_by(current=True,
                                                               server_id=ctx.guild.id).one_or_none()  # type: Optional[schema.Interview]
@@ -670,32 +720,101 @@ class Interview(commands.Cog):
             asker_meta = schema.Asker(interview_id=interview.id, asker_id=ctx.author.id, num_questions=0)
             session.add(asker_meta)
 
-        q = Question(
-            interviewee=interviewee,
-            asker=ctx.author,
-            question=question_str,
-            question_num=asker_meta.num_questions + 1,
-            message=ctx.message,
-            # answer=,  # unfilled, obviously
-            timestamp=datetime.utcnow(),
-        )
+        for question_str in questions:
+            q = Question(
+                interviewee=interviewee,
+                asker=ctx.author,
+                question=question_str,
+                question_num=asker_meta.num_questions + 1,
+                message=ctx.message,
+                # answer=,  # unfilled, obviously
+                timestamp=datetime.utcnow(),
+            )
 
-        q.upload(ctx, self.connection)
+            q.upload(ctx, self.connection)
 
-        asker_meta.num_questions += 1
-        interview.questions_asked += 1
+            asker_meta.num_questions += 1
+            interview.questions_asked += 1
 
         session.commit()
 
-        # TODO: post embed to backstage
-        em = q.backstage_embed(ctx)
+        desc = '\n'.join(questions)[:1900] + '...' if len('\n'.join(questions)) > 1900 else '\n'.join(questions)[0:1900]
+        em = discord.Embed(
+            # TODO: fill in image
+            title=f"**{interviewee}**'s interview",
+            description=desc,
+            color=ctx.bot.user.color,
+            url='',  # TODO: fill in
+        )
+        em.set_author(
+            name=f'New question from {ctx.author}',
+            icon_url=ctx.author.avatar_url,
+            url='',  # TODO: fill in
+        )
         backstage = ctx.guild.get_channel(interview.server.back_channel)
         if backstage is None:
             await ctx.send(f'Backstage channel `{interview.server.back_channel}` not found for this server')
         await backstage.send(embed=em)
 
-        # TODO: This may break on masks, which call this method multiple times; make sure to double-check.
         await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @commands.command()
+    @commands.check(_server_active)
+    # TODO: check for interview active
+    async def ask(self, ctx: commands.Context, *, question_str: str):
+        """
+        TODO: Submit a question for the current interview.
+        """
+        # TODO:
+        #  create Question
+        #  upload question to sheet
+        #  update schema.Asker
+        #  update schema.Interview
+        #  post embed to backstage
+        # session = session_maker()
+        # interview = session.query(schema.Interview).filter_by(current=True,
+        #                                                       server_id=ctx.guild.id).one_or_none()  # type: Optional[schema.Interview]
+        # interviewee = ctx.guild.get_member(interview.interviewee_id)
+        # if interviewee is None:
+        #     await ctx.send(f"Couldn't find server member `{interview.interviewee_id}`.")
+        #     return
+        #
+        # asker_meta = None
+        # for asker in interview.askers:
+        #     if asker.asker_id == ctx.author.id:
+        #         asker_meta = asker
+        # if asker_meta is None:
+        #     asker_meta = schema.Asker(interview_id=interview.id, asker_id=ctx.author.id, num_questions=0)
+        #     session.add(asker_meta)
+        #
+        # q = Question(
+        #     interviewee=interviewee,
+        #     asker=ctx.author,
+        #     question=question_str,
+        #     question_num=asker_meta.num_questions + 1,
+        #     message=ctx.message,
+        #     # answer=,  # unfilled, obviously
+        #     timestamp=datetime.utcnow(),
+        # )
+        #
+        # q.upload(ctx, self.connection)
+        #
+        # asker_meta.num_questions += 1
+        # interview.questions_asked += 1
+        #
+        # session.commit()
+        #
+        # # TODO: post embed to backstage
+        # em = q.backstage_embed(ctx)
+        # backstage = ctx.guild.get_channel(interview.server.back_channel)
+        # if backstage is None:
+        #     await ctx.send(f'Backstage channel `{interview.server.back_channel}` not found for this server')
+        # await backstage.send(embed=em)
+        #
+        # # TODO: This may break on masks, which call this method multiple times; make sure to double-check.
+        # await ctx.message.add_reaction(ctx.bot.greentick)
+
+        await self._ask_many(ctx, [question_str])
 
     @commands.command()
     @commands.check(_server_active)
@@ -715,14 +834,59 @@ class Interview(commands.Cog):
         #  update schema.Asker
         #  update schema.Interview
 
-        for question_str in questions_str.split('\n'):
-            # This is such a hacky solution but it also seems correct.
-            await self.ask(ctx, question_str=question_str)
+        # for question_str in questions_str.split('\n'):
+        #     # This is such a hacky solution but it also seems correct.
+        #     await self.ask(ctx, question_str=question_str)
+
+        await self._ask_many(ctx, questions_str.split('\n'))
 
     # == Answers ==
 
+    async def _channel_answer(self, ctx: commands.Context, channel: discord.TextChannel):
+        """
+        Command wrapped by Interview.answer() and Interview.preview(). Greedily dumps as many answered questions
+        into embeds as possible, and posts them to the specified channel.
+        """
+        preview_flag = False
+        if channel == ctx.channel:
+            preview_flag = True
+
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: Optional[schema.Server]
+        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
+        interviewee = ctx.guild.get_member(interview.interviewee_id)
+        sheet = self.connection.get_sheet(server.sheet_name).sheet1
+
+        rows = sheet.get_all_records()
+        filtered_rows = []
+        for row in rows:
+            if row['Answer'] is not None and row['Answer'] != '' and row['Posted?'] == 'FALSE':
+                filtered_rows.append(row)
+
+        print('\n=== raw rows ===\n')
+        pprint.pprint(len(rows))
+        print(f'\n=== filtered ({len(filtered_rows)}) ===\n')
+        pprint.pprint(filtered_rows)
+
+        questions = [await Question.from_row(ctx, row) for row in filtered_rows]
+
+        if len(questions) == 0:
+            await ctx.send('No new questions to be answered.')
+            return
+
+        for embed in self._generate_embeds(interviewee=interviewee, questions=questions):
+            if type(embed) is Question:
+                # question was too long
+                await channel.send(f"Question #{embed.question_num} or its answer from {embed.asker} was too long "
+                                   f"to embed, please split it up and answer it on your own.")
+            await channel.send(embed=embed)
+            # TODO check if answer too long
+
+        # TODO: update metadatas
+
     @commands.command()
     @commands.check(_server_active)
+    @commands.check(_is_interviewee)
     async def answer(self, ctx: commands.Context):
         """
         TODO: Post all answers to questions that have not yet been posted.
@@ -734,10 +898,15 @@ class Interview(commands.Cog):
         #  check if invoker is interviewee
         #  dump a bunch of answers
         #  update sheet
-        pass
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        channel = ctx.guild.get_channel(server.answer_channel)
+
+        await self._channel_answer(ctx, channel)
 
     @commands.command()
     @commands.check(_server_active)
+    @commands.check(_is_interviewee)
     async def preview(self, ctx: commands.Context):
         """
         TODO: Preview answers, visible in the backstage channel.
@@ -745,7 +914,7 @@ class Interview(commands.Cog):
         # TODO:
         #  check if invoker is interviewee
         #  dump a bunch of answers
-        pass
+        await self._channel_answer(ctx, ctx.channel)
 
     # == Votes ==
 
@@ -817,16 +986,115 @@ class Interview(commands.Cog):
 
         Voting rules:
         1. Cannot vote while interviews are disabled.
-        2. Cannot vote for people who are opted out.
-        3. Cannot vote for anyone who's been interviewed too recently.
-        4. Cannot vote if you've joined the server since the start of the last interview.
-        5. Cannot vote for bots, excepting HaruBot.
-        6. Cannot vote for yourself.
+        2. Cannot vote for >3 people.
+        3. Cannot vote for people who are opted out.
+        4. Cannot vote for anyone who's been interviewed too recently.
+        5. Cannot vote if you've joined the server since the start of the last interview.
+        6. Cannot vote for bots, excepting HaruBot.
+        7. Cannot vote for yourself.
+
+        Rules are checked in order, so if you vote for five people, but the first three are illegal votes,
+        none of your votes will count.
         """
+
+        session = session_maker()
+        iv_meta = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+
         # TODO: check votes for legality oh no
         #  like, lots to do.
 
-        session = session_maker()
+        class VoteError:
+            def __init__(self):
+                self.opt_outs = []
+                self.too_recent = []
+                self.bots = []
+                self.self = False
+                self.too_many = []
+
+            @property
+            def is_error(self):
+                return (len(self.opt_outs) > 0 or
+                        len(self.too_recent) > 0 or
+                        len(self.bots) > 0 or
+                        len(self.too_many) > 0 or
+                        self.self is True)
+
+            async def send_errors(self):
+                if not self.is_error:
+                    return
+                reply = 'The following votes were ignored:\n'
+                if len(self.opt_outs) > 0:
+                    reply += '• Opted out:' + ', '.join([f'`{v}`' for v in self.opt_outs]) + '.\n'
+                if len(self.too_recent) > 0:
+                    reply += '• Interviewed too recently: ' + ', '.join([f'`{v}`' for v in self.too_recent]) + '.\n'
+                if len(self.bots) > 0:
+                    reply += ('• As much as I would love to usher in the **Rᴏʙᴏᴛ Rᴇᴠᴏʟᴜᴛɪᴏɴ**, you cannot vote for '
+                              'bots such as ' + ', '.join([f'`{v}`' for v in self.bots]) + '.\n')
+                    bottag = discord.utils.get(ctx.bot.emojis, name='bottag')
+                    if bottag:
+                        await ctx.message.add_reaction(bottag)
+                if self.self:
+                    reply += '• Your **anti-town** self vote.\n'
+                if len(self.too_many) > 0:
+                    reply += ('• ' + ', '.join([f'`{v}`' for v in self.too_many]) + ' exceeded your limit of '
+                                                                                    'three (3) votes.\n')
+                await ctx.send(reply)
+
+        vote_error = VoteError()
+
+        # 1. Cannot vote while interviews are disabled.  (return immediately)
+        if not _interview_enabled(ctx):
+            await ctx.send('Voting is currently **closed**; please wait for the next round to begin.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        # 2. Cannot vote for >3 people.
+        if len(mentions) > 3:
+            # await ctx.send('Vote for no more than three candidates. Additional votes are ignored.')
+            # await ctx.message.add_reaction(ctx.bot.redtick)
+            vote_error.too_many = mentions[3:]
+            mentions = mentions[:3]
+        elif len(mentions) < 1:
+            await ctx.send('Vote at least one candidate.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        # 3. Cannot vote for people who are opted out.
+        for mention in mentions:
+            opted_out = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id, opt_id=mention.id).one_or_none()
+            if opted_out is not None:
+                vote_error.opt_outs.append(mention)
+        for mention in vote_error.opt_outs:
+            mentions.remove(mention)
+
+        # 4. Cannot vote for anyone who's been interviewed too recently.
+        for mention in mentions:
+            old = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, interviewee_id=mention.id).order_by(
+                desc('start_time')).first()  # type: schema.Interview
+            if old and old.start_time > server.limit:
+                vote_error.too_recent.append(mention)
+        for mention in vote_error.too_recent:
+            mentions.remove(mention)
+
+        # 5. Cannot vote if you've joined the server since the start of the last interview.  (return immediately)
+        if ctx.author.joined_at > iv_meta.start_time:
+            await ctx.send(f"Don't just rejoin servers only to vote, {ctx.author}, have some respect.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        # 6. Cannot vote for bots, excepting HaruBot.
+        for mention in mentions:
+            if mention.bot:
+                vote_error.bots.append(mention)
+        for mention in vote_error.bots:
+            mentions.remove(mention)
+
+        # 7. Cannot vote for yourself.
+        if ctx.author in mentions:
+            vote_error.self = True
+            mentions.remove(ctx.author)
+
         old_votes = session.query(schema.Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).all()
         for vote in old_votes:
             session.delete(vote)
@@ -836,7 +1104,13 @@ class Interview(commands.Cog):
                                      candidate_id=mention.id, timestamp=datetime.utcnow()))
         session.add_all(votes)
         session.commit()
-        await ctx.message.add_reaction(self.bot.greentick)
+
+        if vote_error.is_error:
+            await ctx.message.add_reaction(self.bot.redtick)
+            await vote_error.send_errors()
+        if len(mentions) > 0:
+            # some votes went through
+            await ctx.message.add_reaction(self.bot.greentick)
 
     @commands.command()
     @commands.check(_server_active)
@@ -1012,7 +1286,7 @@ async def ivembed(ctx: commands.Context):
     question = 'you have a magic the gathering bot, but the interview bot is broke. seems legit'
     answer = 'every time u complain about it i delay release another day :ok_hand:'
 
-    em = blank_answer_embed(me, charmander)
+    em = InterviewEmbed.blank(me, charmander)
     q_title = 'Question #1'
     q_a = (
         f'[> {question}]({link})\n'
