@@ -197,7 +197,7 @@ class Question:
 class InterviewEmbed(discord.Embed):
     @staticmethod
     def blank(interviewee: discord.Member, asker: Union[discord.Member, discord.User],
-                           avatar_url: str = None) -> 'InterviewEmbed':
+              avatar_url: str = None) -> 'InterviewEmbed':
         em = InterviewEmbed(
             title=f"**{interviewee}**'s interview",
             description=' ',
@@ -216,16 +216,6 @@ class InterviewEmbed(discord.Embed):
         # +100 length as a buffer for the metadata fields
         em.length = len(f"**{interviewee}**'s interview" + ' ' + f'Asked by {asker}') + len(asker.avatar_url) + 100
         return em
-
-# def alphabetize_users(u1: discord.User, u2: discord.User) -> bool:
-#     """
-#     True if u1 is alphabetically ahead of u2. Case-insensitive.
-#     """
-#     if u2 is None:
-#         return True
-#     if u1 is None:
-#         return False
-#     return str(u1).lower() <= str(u2).lower()
 
 
 def name_or_default(user: discord.User) -> str:
@@ -306,7 +296,7 @@ def add_question(em: discord.Embed, question: Question, current_length: int) -> 
 
     for i, chunk in enumerate(question_chunks):
         if len(question_chunks) > 1:
-            name = f'Question #{question.question_num} [{i+1}/{len(question_chunks)}]'
+            name = f'Question #{question.question_num} [{i + 1}/{len(question_chunks)}]'
         else:
             name = f'Question #{question.question_num}'
         em.add_field(name=name, value=chunk, inline=False)
@@ -444,7 +434,8 @@ class Interview(commands.Cog):
                 if em is not None and len(em.fields) > 0:
                     yield finalize(em)
                 # make a new embed
-                em = InterviewEmbed.blank(interviewee, question.asker, avatar_url=avatar_url)  # TODO: update avatar url?
+                em = InterviewEmbed.blank(interviewee, question.asker,
+                                          avatar_url=avatar_url)  # TODO: update avatar url?
                 length = 0
             # TODO: add question/answer fields
             added_length = add_question(em, question, length)
@@ -452,7 +443,8 @@ class Interview(commands.Cog):
                 # question wasn't added, yield and retry
                 if len(em.fields) > 0:
                     yield finalize(em)
-                em = InterviewEmbed.blank(interviewee, question.asker, avatar_url=avatar_url)  # TODO: update avatar url?
+                em = InterviewEmbed.blank(interviewee, question.asker,
+                                          avatar_url=avatar_url)  # TODO: update avatar url?
             if added_length == -2:
                 # question cannot be added, yield an error
                 yield question
@@ -542,16 +534,6 @@ class Interview(commands.Cog):
             reinterviews_allowed=False,
             active=False,
         )
-        # meta = schema.Meta(
-        #     # server_id field filled in by assigning the relationship in the next statement
-        #     interviewee_id=0,
-        #     start_time=datetime.utcnow(),
-        #     num_questions=0,
-        #     limit=datetime.utcfromtimestamp(0),
-        #     reinterviews_allowed=False,
-        #     active=False,
-        # )
-        # meta.server = server
         session.add(server)
         session.commit()
         await ctx.send(f'Set up {ctx.guild} for interviews.\n'
@@ -588,7 +570,7 @@ class Interview(commands.Cog):
         timestamp = datetime.utcnow()
         sheet_name = f'{interviewee.name} [{interviewee.id}]-{timestamp.timestamp()}'
 
-        # TODO: create new schema.Interview
+        # TODO: create new Interview
 
         new_interview = schema.Interview(
             server_id=ctx.guild.id,
@@ -692,14 +674,57 @@ class Interview(commands.Cog):
 
     @iv.command(name='stats')
     @commands.check(_server_active)
-    async def iv_stats(self, ctx: commands.Context):
+    async def iv_stats(self, ctx: commands.Context, member: Optional[discord.Member]):
         """
         TODO: View interview-related stats.
 
         Which stats? I dunno. # TODO: Figure that out.
         """
-        # TODO: yes.
-        pass
+        session = session_maker()
+        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id,
+                                                              current=True).one_or_none()  # type: schema.Interview
+        interviewee = ctx.guild.get_member(interview.interviewee_id)
+        past_interviews = session.query(schema.Interview).filter_by(
+            server_id=ctx.guild.id, interviewee_id=interview.interviewee_id).all()  # type: List[schema.Interview]
+        if member is None:
+            # view general stats
+            em = discord.Embed(
+                title=f"{interviewee}'s interview",
+                color=interviewee.color,
+            )
+            em.set_thumbnail(url=interviewee.avatar_url)
+            if len(past_interviews) > 1:
+                description = f"{interviewee}'s past interviews were:\n"
+                for iv in past_interviews:
+                    description += f'• {iv.start_time}: {iv.questions_asked} out of {iv.questions_asked}\n'
+            else:
+                description = f"This is {interviewee}'s first interview!"
+            em.description = description
+            em.add_field(name='Questions asked', value=str(interview.questions_asked))
+            em.add_field(name='Questions answered', value=str(interview.questions_answered))
+            em.set_footer(text=f'Interview started on {interview.start_time}')
+            await ctx.send(embed=em)
+            return
+
+        em = discord.Embed(
+            title=f'Interview stats for {member}',
+            color=member.color,
+        )
+        em.set_thumbnail(url=member.avatar_url)
+        current_qs = session.query(schema.Asker).filter_by(interview_id=interview.id, asker_id=member.id).one_or_none()
+        if current_qs is None:
+            # hasn't asked questions
+            current_qs = 0
+        else:
+            current_qs = current_qs.num_questions
+        ls_past_qs = session.query(schema.Asker).filter_by(asker_id=member.id).all()
+        past_qs = 0
+        for asker in ls_past_qs:
+            past_qs += asker.num_questions
+
+        em.add_field(name='Questions asked this interview', value=str(current_qs))
+        em.add_field(name='Questions total', value=str(past_qs))
+        await ctx.send(embed=em)
 
     # == Questions ==
 
@@ -768,12 +793,12 @@ class Interview(commands.Cog):
         # TODO:
         #  create Question
         #  upload question to sheet
-        #  update schema.Asker
-        #  update schema.Interview
+        #  update Asker
+        #  update Interview
         #  post embed to backstage
         # session = session_maker()
-        # interview = session.query(schema.Interview).filter_by(current=True,
-        #                                                       server_id=ctx.guild.id).one_or_none()  # type: Optional[schema.Interview]
+        # interview = session.query(Interview).filter_by(current=True,
+        #                                                       server_id=ctx.guild.id).one_or_none()  # type: Optional[Interview]
         # interviewee = ctx.guild.get_member(interview.interviewee_id)
         # if interviewee is None:
         #     await ctx.send(f"Couldn't find server member `{interview.interviewee_id}`.")
@@ -784,7 +809,7 @@ class Interview(commands.Cog):
         #     if asker.asker_id == ctx.author.id:
         #         asker_meta = asker
         # if asker_meta is None:
-        #     asker_meta = schema.Asker(interview_id=interview.id, asker_id=ctx.author.id, num_questions=0)
+        #     asker_meta = Asker(interview_id=interview.id, asker_id=ctx.author.id, num_questions=0)
         #     session.add(asker_meta)
         #
         # q = Question(
@@ -831,8 +856,8 @@ class Interview(commands.Cog):
         #  create a bunch of Questions
         #  upload all questions to sheet
         #  upload question to sheet
-        #  update schema.Asker
-        #  update schema.Interview
+        #  update Asker
+        #  update Interview
 
         # for question_str in questions_str.split('\n'):
         #     # This is such a hacky solution but it also seems correct.
@@ -852,16 +877,22 @@ class Interview(commands.Cog):
             preview_flag = True
 
         session = session_maker()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: Optional[schema.Server]
-        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id,
+                                                              current=True).one_or_none()  # type: schema.Interview
         interviewee = ctx.guild.get_member(interview.interviewee_id)
         sheet = self.connection.get_sheet(server.sheet_name).sheet1
 
         rows = sheet.get_all_records()
         filtered_rows = []
-        for row in rows:
+        filtered_cells = []
+        for i, row in enumerate(rows):
             if row['Answer'] is not None and row['Answer'] != '' and row['Posted?'] == 'FALSE':
                 filtered_rows.append(row)
+                filtered_cells.append({
+                    'range': f'H{i + 2}',
+                    'values': [[True]]
+                })
 
         print('\n=== raw rows ===\n')
         pprint.pprint(len(rows))
@@ -879,10 +910,18 @@ class Interview(commands.Cog):
                 # question was too long
                 await channel.send(f"Question #{embed.question_num} or its answer from {embed.asker} was too long "
                                    f"to embed, please split it up and answer it on your own.")
-            await channel.send(embed=embed)
+            else:
+                await channel.send(embed=embed)
             # TODO check if answer too long
 
-        # TODO: update metadatas
+        # TODO: update metadatas if not previewing
+
+        if preview_flag is True:
+            return
+
+        sheet.batch_update(filtered_cells)
+        interview.questions_answered += len(questions)
+        session.commit()
 
     @commands.command()
     @commands.check(_server_active)
