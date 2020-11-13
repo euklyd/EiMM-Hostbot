@@ -41,7 +41,8 @@ def ability_embed(row):
     em.add_field(name='B/H', value=bh_val)
     em.add_field(name='Categories', value=default_val(row['Categories']))
     em.add_field(name='Rules Text', value=default_val(row['Rules Text']), inline=False)
-    em.add_field(name='Details & Design Notes', value=default_val(row['Details & Design Notes']), inline=False)
+    em.add_field(name='Resolution Details', value=default_val(row['Resolution Details']), inline=False)
+    em.add_field(name='Design Notes', value=default_val(row['Design Notes']), inline=False)
 
     return em
 
