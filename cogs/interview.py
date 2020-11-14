@@ -300,36 +300,65 @@ def add_question(em: discord.Embed, question: Question, current_length: int) -> 
 
 def _server_active(ctx: commands.Context):
     """
-    Command check to make sure the server is set up for interviews.
+    Exposed so that it can be checked in help commands.
     """
-    if _DEBUG_FLAG:
-        return True
     session = session_maker()
     server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
     return server is not None
 
 
-def _interview_enabled(ctx: commands.Context):
+def _ck_server_active():
+    """
+    Command check to make sure the server is set up for interviews.
+    """
+
+    async def predicate(ctx: commands.Context):
+        if _DEBUG_FLAG:
+            return True
+        active = _server_active(ctx)
+        if not active:
+            await ctx.send('Server is not set up for interviews.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+        return active
+
+    return commands.check(predicate)
+
+
+def _ck_interview_enabled():
     """
     Command check to make sure the interview is not disabled.
 
     Checked when voting, opting in or out, and asking questions.
     """
-    session = session_maker()
-    result = session.query(schema.Server).filter_by(id=ctx.guild.id, active=True).one_or_none()
-    return result is not None
+
+    async def predicate(ctx: commands.Context):
+        session = session_maker()
+        result = session.query(schema.Server).filter_by(id=ctx.guild.id, active=True).one_or_none()
+        if result is None:
+            await ctx.send('Interviews are currently disabled.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+        return result is not None
+
+    return commands.check(predicate)
 
 
-def _is_interviewee(ctx: commands.Context):
+def _ck_is_interviewee():
     """
     Command check to make sure the invoker is the interviewee.
 
     Checked when answering questions.
     """
-    session = session_maker()
-    result = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, interviewee_id=ctx.author.id,
-                                                       current=True).one_or_none()
-    return result is not None
+
+    async def predicate(ctx: commands.Context):
+        session = session_maker()
+        result = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, interviewee_id=ctx.author.id,
+                                                           current=True).one_or_none()
+        if result is None:
+            await ctx.send(f'**{ctx.author}**, you are not the interviewee.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+        return result is not None
+
+    return commands.check(predicate)
 
 
 class Interview(commands.Cog):
@@ -430,6 +459,28 @@ class Interview(commands.Cog):
             await ctx.send(f'Interviews are not currently set up for {ctx.guild}; use '
                            f'`{ctx.bot.default_command_prefix}help iv setup` for more info.')
 
+    async def _check_sheet(self, ctx: commands.Context, sheet_name: str):
+        """
+        Check if the specified sheet name is legal.
+        """
+        session = session_maker()
+        existing_server = session.query(schema.Server).filter_by(sheet_name=sheet_name).one_or_none()
+        if existing_server is not None:
+            await ctx.send(f'A sheet with the name `{sheet_name}` has already been registered, '
+                           'please use a different one.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return False
+
+        try:
+            sheet = self.connection.get_sheet(sheet_name)
+        except SpreadsheetNotFound:
+            # TODO: Figure out a way to publicize and pass on the bot account email.
+            await ctx.send(f"Spreadsheet `{sheet_name}` cannot be found, make sure it's been shared with the bot "
+                           "account and try again.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return False
+        return True
+
     @iv.command(name='setup')
     @commands.has_permissions(administrator=True)
     async def iv_setup(self, ctx: commands.Context, answers: discord.TextChannel,
@@ -458,20 +509,7 @@ class Interview(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        existing_server = session.query(schema.Server).filter_by(sheet_name=sheet_name).one_or_none()
-        if existing_server is not None:
-            await ctx.send(f'A sheet with the name `{sheet_name}` has already been registered, '
-                           'please use a different one.')
-            await ctx.message.add_reaction(ctx.bot.redtick)
-            return
-
-        try:
-            sheet = self.connection.get_sheet(sheet_name)
-        except SpreadsheetNotFound:
-            # TODO: Figure out a way to publicize and pass on the bot account email.
-            await ctx.send(f"Spreadsheet `{sheet_name}` cannot be found, make sure it's been shared with the bot "
-                           "account and try again.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
+        if self._check_sheet(ctx, sheet_name) is False:
             return
 
         server = schema.Server(
@@ -492,14 +530,13 @@ class Interview(commands.Cog):
 
     @iv.command(name='next')
     @commands.has_permissions(administrator=True)
-    @commands.check(_server_active)
+    @_ck_server_active()
     async def iv_next(self, ctx: commands.Context, interviewee: discord.Member, *, email: Optional[str] = None):
         """
-        TODO: Set up the next interview for <interviewee>.
+        Set up the next interview for <interviewee>.
 
         Creates a new interview sheet for the next interviewee. If the optional <email> parameter is provided,
         shares the document with them. Old emails must still be cleared out manually.
-        # TODO: deprecate former behavior of using current channel as new backstage
         """
 
         # TODO: yes.
@@ -516,11 +553,14 @@ class Interview(commands.Cog):
         if old_interview is not None:
             # if old_interview doesn't exist that just means it's the first interview!
             old_interview.current = False
+            server = old_interview.server
+        else:
+            server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
 
         timestamp = datetime.utcnow()
         sheet_name = f'{interviewee.name} [{interviewee.id}]-{timestamp.timestamp()}'
 
-        # TODO: create new Interview
+        # Create new schema.Interview & add it do database
 
         new_interview = schema.Interview(
             server_id=ctx.guild.id,
@@ -533,13 +573,9 @@ class Interview(commands.Cog):
         )
         session.add(new_interview)
 
-        # TODO: commit
+        # Make & clear a new sheet page
 
-        session.commit()
-
-        # TODO: make & reset a new sheet
-
-        old_sheet = self.connection.get_sheet(new_interview.server.sheet_name).sheet1
+        old_sheet = self.connection.get_sheet(server.sheet_name).sheet1
         new_sheet = old_sheet.duplicate(
             insert_sheet_index=0,
             new_sheet_name=sheet_name
@@ -551,7 +587,7 @@ class Interview(commands.Cog):
                 str(ctx.bot.user),
                 str(ctx.bot.user.id),
                 1,
-                new_interview.server.default_question,  # TODO: replace this with something else
+                server.default_question,  # TODO: replace this with something else
                 '',
                 False,
                 str(ctx.guild.id),
@@ -567,22 +603,86 @@ class Interview(commands.Cog):
         ...
 
         # TODO: post the votals, etc. info to stage
-        channel = ctx.guild.get_channel(new_interview.server.answer_channel)
+        channel = ctx.guild.get_channel(server.answer_channel)
         await self._votals_in_channel(ctx, flag=None, channel=channel)
 
         # TODO: clear votes
         session.query(schema.Vote).filter_by(server_id=ctx.guild.id).delete()
+
+        # Only commit after the new page is up and old votes are deleted.
+        session.commit()
 
         # TODO: reply to message and/or greentick
         await ctx.message.add_reaction(ctx.bot.greentick)
         await asyncio.sleep(2)
         await ctx.send(f'{ctx.author.mention}, make sure to update the table of contents!')
 
-    # TODO (maybe): Add methods to change the answer/backstage channels.
+    @iv.command(name='settings')
+    @commands.has_permissions(administrator=True)
+    @_ck_server_active()
+    async def iv_settings(self, ctx: commands.Context):
+        """
+        Check current settings for this server's interviews.
+        """
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        answer = ctx.guild.get_channel(server.answer_channel)
+        backstage = ctx.guild.get_channel(server.back_channel)
+        em = discord.Embed(title=f'{ctx.guild} interview settings', color=ctx.bot.user.color)
+
+        em.add_field(name='Answer channel', value=f'{answer.mention}')
+        em.add_field(name='Backstage channel', value=f'{backstage.mention}')
+        em.add_field(name='Sheet name', value=f'{server.sheet_name}')
+        em.add_field(name='Default question', value=f'{server.default_question}')
+        em.add_field(name='Reinterview limit', value=f'{server.limit}')
+        await ctx.send(embed=em)
+
+
+    @iv.command(name='channel')
+    @commands.has_permissions(administrator=True)
+    @_ck_server_active()
+    async def iv_channel(self, ctx: commands.Context, channel_type: str, channel: discord.TextChannel):
+        """
+        Change saved answer/question channels.
+
+        channel_type must be 'answer' or 'backstage'.
+        """
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        answer = ctx.guild.get_channel(server.answer_channel)
+        backstage = ctx.guild.get_channel(server.back_channel)
+        if channel_type.lower() == 'answer':
+            server.answer_channel = channel.id
+            session.commit()
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        elif channel_type.lower() == 'backstage':
+            server.back_channel = channel.id
+            session.commit()
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send(f'The only channels to set up are the `answer` ({answer.mention}) and '
+                           f'`backstage` ({backstage.mention}) channels.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+
+    @iv.command(name='sheet')
+    @commands.has_permissions(administrator=True)
+    @_ck_server_active()
+    async def iv_sheet(self, ctx: commands.Context, sheet_name: str):
+        """
+        Change saved sheet name.
+        """
+        if self._check_sheet(ctx, sheet_name) is False:
+            return
+
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        server.sheet_name = sheet_name
+        session.commit()
+        await ctx.message.add_reaction(ctx.bot.greentick)
 
     @iv.command(name='disable')
     @commands.has_permissions(administrator=True)
-    @commands.check(_server_active)
+    @_ck_server_active()
     async def iv_disable(self, ctx: commands.Context):
         """
         Disable voting and question asking for the current interview.
@@ -603,7 +703,7 @@ class Interview(commands.Cog):
 
     @iv.command(name='enable')
     @commands.has_permissions(administrator=True)
-    @commands.check(_server_active)
+    @_ck_server_active()
     async def iv_enable(self, ctx: commands.Context):
         """
         Re-enable voting and question asking for the current interview.
@@ -623,7 +723,7 @@ class Interview(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @iv.command(name='stats')
-    @commands.check(_server_active)
+    @_ck_server_active()
     async def iv_stats(self, ctx: commands.Context, member: Optional[discord.Member]):
         """
         View interview-related stats.
@@ -751,8 +851,9 @@ class Interview(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.command()
-    @commands.check(_server_active)
-    @commands.check(_interview_enabled)
+    # @commands.check(_interview_enabled)
+    @_ck_server_active()
+    @_ck_interview_enabled()
     async def ask(self, ctx: commands.Context, *, question_str: str):
         """
         Submit a question for the current interview.
@@ -760,8 +861,9 @@ class Interview(commands.Cog):
         await self._ask_many(ctx, [question_str])
 
     @commands.command()
-    @commands.check(_server_active)
-    @commands.check(_interview_enabled)
+    # @commands.check(_interview_enabled)
+    @_ck_server_active()
+    @_ck_interview_enabled()
     async def mask(self, ctx: commands.Context, *, questions_str: str):
         """
         Submit multiple questions for the current interview.
@@ -829,8 +931,9 @@ class Interview(commands.Cog):
         session.commit()
 
     @commands.command()
-    @commands.check(_server_active)
-    @commands.check(_is_interviewee)
+    # @commands.check(_is_interviewee)
+    @_ck_server_active()
+    @_ck_is_interviewee()
     async def answer(self, ctx: commands.Context):
         """
         Post all answers to questions that have not yet been posted.
@@ -846,8 +949,9 @@ class Interview(commands.Cog):
         await self._channel_answer(ctx, channel)
 
     @commands.command()
-    @commands.check(_server_active)
-    @commands.check(_is_interviewee)
+    # @commands.check(_is_interviewee)
+    @_ck_server_active()
+    @_ck_is_interviewee()
     async def preview(self, ctx: commands.Context):
         """
         Preview answers, visible in the backstage channel.
@@ -916,8 +1020,9 @@ class Interview(commands.Cog):
         return text
 
     @commands.command()
-    @commands.check(_server_active)
-    @commands.check(_interview_enabled)
+    # @commands.check(_interview_enabled)
+    @_ck_server_active()
+    @_ck_interview_enabled()
     async def vote(self, ctx: commands.Context, mentions: commands.Greedy[discord.Member]):
         """
         Vote for up to three nominees for the next interview.
@@ -982,10 +1087,11 @@ class Interview(commands.Cog):
         vote_error = VoteError()
 
         # 1. Cannot vote while interviews are disabled.  (return immediately)
-        if not _interview_enabled(ctx):
-            await ctx.send('Voting is currently **closed**; please wait for the next round to begin.')
-            await ctx.message.add_reaction(ctx.bot.redtick)
-            return
+        # NOTE: Taken care of in command checks.
+        # if not _interview_enabled(ctx):
+        #     await ctx.send('Voting is currently **closed**; please wait for the next round to begin.')
+        #     await ctx.message.add_reaction(ctx.bot.redtick)
+        #     return
 
         # 2. Cannot vote for >3 people.
         if len(mentions) > 3:
@@ -1051,8 +1157,9 @@ class Interview(commands.Cog):
             await ctx.message.add_reaction(self.bot.greentick)
 
     @commands.command()
-    @commands.check(_server_active)
-    @commands.check(_interview_enabled)
+    # @commands.check(_interview_enabled)
+    @_ck_server_active()
+    @_ck_interview_enabled()
     async def unvote(self, ctx: commands.Context):
         """
         Delete your current votes.
@@ -1063,7 +1170,7 @@ class Interview(commands.Cog):
         await ctx.message.add_reaction(self.bot.greentick)
 
     @commands.command()
-    @commands.check(_server_active)
+    @_ck_server_active()
     async def votes(self, ctx: commands.Context):
         """
         Check who you're voting for.
@@ -1126,7 +1233,7 @@ class Interview(commands.Cog):
         await channel.send(reply)
 
     @commands.command()
-    @commands.check(_server_active)
+    @_ck_server_active()
     async def votals(self, ctx: commands.Context, flag: Optional[str] = None):
         """
         View current vote standings.
@@ -1136,7 +1243,7 @@ class Interview(commands.Cog):
         await self._votals_in_channel(ctx, flag=flag, channel=ctx.channel)
 
     @commands.group(invoke_without_command=True)
-    @commands.check(_server_active)
+    @_ck_server_active()
     async def opt(self, ctx: commands.Context):
         """
         Manage opting into or out of interview voting.
@@ -1145,8 +1252,9 @@ class Interview(commands.Cog):
                        f'Use `{ctx.bot.default_command_prefix}help opt` for more info.')
 
     @opt.command(name='out')
-    @commands.check(_server_active)
-    @commands.check(_interview_enabled)
+    # @commands.check(_interview_enabled)
+    @_ck_server_active()
+    @_ck_interview_enabled()
     async def opt_out(self, ctx: commands.Context):
         """
         Opt out of voting.
@@ -1169,8 +1277,9 @@ class Interview(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.redtick)
 
     @opt.command(name='in')
-    @commands.check(_server_active)
-    @commands.check(_interview_enabled)
+    # @commands.check(_interview_enabled)
+    @_ck_server_active()
+    @_ck_interview_enabled()
     async def opt_in(self, ctx: commands.Context):
         """
         Opt into voting.
@@ -1187,7 +1296,7 @@ class Interview(commands.Cog):
         return
 
     @opt.command(name='list')
-    @commands.check(_server_active)
+    @_ck_server_active()
     async def opt_list(self, ctx: commands.Context):
         """
         TODO: Check who's opted out of interview voting.
@@ -1196,7 +1305,10 @@ class Interview(commands.Cog):
         pass
 
 
-# TODO: eliminate before release
+# ===
+# TODO: begin eliminate before release
+# ===
+
 @commands.command()
 @commands.is_owner()
 async def ivembed(ctx: commands.Context):
@@ -1216,7 +1328,55 @@ async def ivembed(ctx: commands.Context):
     await ctx.send(embed=em)
 
 
+def fail_check(ctx: commands.Context):
+    raise commands.CommandError('lol fail')
+
+
+@commands.command()
+@commands.check(fail_check)
+async def failme(ctx: commands.Context):
+    await ctx.send('you should never see this')
+
+
+@failme.error
+async def failme_error(ctx: commands.Context, error: Exception):
+    await ctx.send(str(error))
+
+
+def fail_check2():
+    async def predicate(ctx: commands.Context):
+        await ctx.send('still failing')
+        return False
+
+    return commands.check(predicate)
+
+
+@commands.command()
+@fail_check2()
+async def failme2(ctx: commands.Context):
+    await ctx.send('you should also never see this')
+
+
+# def fail_check3(ctx: commands.Context):
+#     ctx.send('does this work tho')
+#     return False
+#
+#
+# @commands.command()
+# @commands.check(fail_check3)
+# async def failme3(ctx: commands.Context):
+#     await ctx.send('definitely never see this')
+
+
+# ===
+# TODO: end eliminate before release
+# ===
+
+
 def setup(bot: commands.Bot):
     bot.add_cog(Interview(bot))
 
     bot.add_command(ivembed)
+    bot.add_command(failme)
+    bot.add_command(failme2)
+    # bot.add_command(failme3)
