@@ -1,3 +1,5 @@
+from typing import Iterable
+
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy import ForeignKey, Boolean
 from sqlalchemy.ext.declarative import declarative_base
@@ -17,9 +19,10 @@ class Server(Base):
     reinterviews_allowed = Column(Boolean)
     active = Column(Boolean)  # are interviews open for new questions / voting
 
-    interviews = relationship('Interview', back_populates='server')
-    votes = relationship('Vote', back_populates='server')
-    opt_outs = relationship('OptOut', back_populates='server')
+    # I'm typing the relationships manually, since type hinting is getting messed up elsewhere without it.
+    interviews = relationship('Interview', back_populates='server')  # type: Iterable[Interview]
+    votes = relationship('Vote', back_populates='server')  # type: Iterable[Vote]
+    opt_outs = relationship('OptOut', back_populates='server')  # type: Iterable[OptOut]
 
     def __repr__(self):
         return (
@@ -47,8 +50,8 @@ class Interview(Base):
     # TODO: oh god there's so much more
     #  later edit: is there??? i think it may be good now
 
-    server = relationship('Server', back_populates='interviews')
-    askers = relationship('Asker', back_populates='interview')
+    server = relationship('Server', back_populates='interviews')  # type: Server
+    askers = relationship('Asker', back_populates='interview')  # type: Iterable[Asker]
 
     def __repr__(self):
         # TODO: update
@@ -91,22 +94,11 @@ class Asker(Base):
     asker_id = Column(Integer, primary_key=True)
     num_questions = Column(Integer)
 
-    interview = relationship('Interview', back_populates='askers')
+    interview = relationship('Interview', back_populates='askers')  # type: Interview
 
     def __repr__(self):
         return f'<Asker interview_id={self.interview_id}, asker_id={self.asker_id}, num_questions={self.num_questions}'
 
-# class IntervieweeStats(Base):
-#     __tablename__ = 'IntervieweeStats'
-#     server_id = Column(Integer, ForeignKey('Server.id'), primary_key=True)
-#     interviewee_id = Column(Integer, primary_key=True)
-#     timestamp = Column(DateTime, primary_key=True)  # people will eventually be reinterviewed
-#     num_questions = Column(Integer)
-#
-#     server = relationship('Server', back_populates='interviewee_stats')
-#
-#     def __repr__(self):
-#         return f'<IntervieweeStats server_id={self.server_id}, interviewee_id={self.interviewee_id}, timestamp={self.timestamp}, num_questions={self.num_questions}'
 
 # TODO: reorganize InterviewMeta into a one(server)-to-many(metas), with a "current" boolean flag field
 #  to mark the current one. Also, merge IntervieweeStats in with that.

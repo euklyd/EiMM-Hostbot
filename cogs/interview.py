@@ -2,20 +2,18 @@ import asyncio
 import pprint
 from datetime import datetime
 from pathlib import Path
-import re
 from typing import Any, Dict, List, Optional, Union, Generator, Tuple
 
 import discord
 from discord.ext import commands
 from sqlalchemy import create_engine, event, desc
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import sessionmaker
 from gspread.exceptions import SpreadsheetNotFound
 
 from cogs import interview_schema as schema
-# from cogs.interview_schema import Server, Meta, Vote, OptOut, TotalQuestions
 from core.bot import Bot
-from utils import menu, spreadsheet
+from utils import spreadsheet
 
 _DEBUG_FLAG = False  # TODO: toggle to off
 
@@ -94,9 +92,6 @@ class Question:
         self.question = question
         self.question_num = question_num
         self.message = message
-        # self.server_id = server_id
-        # self.channel_id = channel_id
-        # self.message_id = message_id
 
         self.answer = answer
         if timestamp is None:
@@ -125,30 +120,42 @@ class Question:
             timestamp=datetime.utcfromtimestamp(row['POSIX Timestamp']),  # TODO: need to test this conversion
         )
 
-    def upload(self, ctx: commands.Context, connection: spreadsheet.SheetConnection):
+    def to_row(self, ctx: commands.Context) -> list:
         """
-        Upload a question to the Google sheet.
+        Convert this Question to a row for uploading to Sheets.
         """
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is None:
             raise ValueError('No server found on this guild.')
+        return [
+            self.timestamp.strftime('%m/%d/%Y %H:%M:%S'),
+            self.timestamp.timestamp(),
+            str(self.asker),
+            str(self.asker.id),
+            self.question_num,
+            self.question,
+            '',  # no answer when uploading
+            False,
+            str(self.message.guild.id),
+            str(self.message.channel.id),
+            str(self.message.id),
+        ]
+
+    @staticmethod
+    def upload_many(ctx: commands.Context, connection: spreadsheet.SheetConnection, questions: List['Question']):
+        """
+        Upload a list of Questions to a spreadsheet.
+
+        This would normally be a normal method, but there's a separate command (append_rows vs append_row) for
+        bulk upload, and we need to use that to dodge Sheets API rate limits.
+        """
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+
+        rows = [q.to_row(ctx) for q in questions]
         sheet = connection.get_sheet(server.sheet_name).sheet1
-        sheet.append_row(
-            [
-                self.timestamp.strftime('%m/%d/%Y %H:%M:%S'),
-                self.timestamp.timestamp(),
-                str(self.asker),
-                str(self.asker.id),
-                self.question_num,
-                self.question,
-                '',  # no answer when uploading
-                False,
-                str(self.message.guild.id),
-                str(self.message.channel.id),
-                str(self.message.id),
-            ]
-        )
+        sheet.append_rows(rows)
 
     def question_words(self) -> Generator[str, None, None]:
         """
@@ -165,33 +172,6 @@ class Question:
         words = self.answer.replace('[', '\\[').replace(']', '\\]').split(' ')
         for word in words:
             yield word
-
-    # def backstage_embed(self, ctx: commands.Context) -> discord.Embed:
-    #     # basic stuff
-    #     em = discord.Embed(
-    #         # TODO: fill in image
-    #         title=f"**{self.interviewee}**'s interview",
-    #         description=f'[{self.question}]({self.message.jump_url})',
-    #         color=ctx.bot.user.color,
-    #         url='',  # TODO: fill in
-    #     )
-    #
-    #     em.set_author(
-    #         name=f'New question from {ctx.author}',
-    #         icon_url=ctx.author.avatar_url,
-    #         url='',  # TODO: fill in
-    #     )
-    #     return em
-
-    # NOTE: This won't work, since you need to be able to answer multiple questions at once.
-    # def answer(self, channel: discord.TextChannel):
-    #     """
-    #     Post the answer to a completed question to Discord.
-    #     """
-    #     assert self.answer is not None  # probably important
-    #     embed = answer_embed
-    #     await channel.send(...)  # TODO
-    #     pass
 
 
 class InterviewEmbed(discord.Embed):
@@ -235,8 +215,6 @@ def translate_name(member: Union[discord.Member, discord.User]):
 
 
 def message_link(server_id: int, channel_id: int, message_id: int) -> str:
-    # message = await ctx.guild.get_message(message_id)
-    # return message.link
     return f'https://discordapp.com/channels/{server_id}/{channel_id}/{message_id}'
 
 
@@ -252,12 +230,10 @@ def add_question(em: discord.Embed, question: Question, current_length: int) -> 
     """
     text_length = 0
 
-    # TODO: test the replaces
-    # question_text = question.question.strip().replace('\n', '\n> ').replace('[', '\\[').replace(']', '\\]')
     question_text = question.question.replace('[', '\\[').replace(']', '\\]')
     question_lines = [line.strip() for line in question_text.split('\n')]
 
-    # sum of all text in all lines PLUS accounting for adding '> ' and '\n' to each line PLUS the question's answer:
+    # Sum of all text in all lines PLUS accounting for adding '> ' and '\n' to each line PLUS the question's answer:
     # When splitting up questions, assume 85 (round to 100) characters for the message link markdown, so you get 900
     # chars rather than 1000.
     if sum([len(line) for line in question_lines]) + len(question_lines) * 3 + len(question.answer) <= 900:
@@ -321,30 +297,6 @@ def add_question(em: discord.Embed, question: Question, current_length: int) -> 
 
     return text_length
 
-    # # split_question = []
-    # # # while len(question_text) > 900:
-    # # #     pos = question_text[:900].rfind(' ')
-    # # #     if pos == -1:
-    # # #         raise ValueError('Text cannot be split')
-    # # #     text = question_text[:pos]
-    # # #     if text[-1] == '>':
-    # # #         text = text[:-1]
-    # # #     question_text = '> ' + question_text[pos + 1:]
-    # # #     split_question.append(text)
-    # #
-    # # answer_text = question.answer
-    # # split_answer = []
-    # # while len(answer_text) >= 1000:
-    # #     pos = answer_text[:999].rfind(' ')
-    # #     if pos == -1:
-    # #         raise ValueError('Answer cannot be split')
-    # #     text = answer_text[:pos]
-    # #     answer_text = answer_text[pos + 1:]
-    # #     split_answer.append(text)
-    # #
-    # # # TODO: more
-    # pass
-
 
 def _server_active(ctx: commands.Context):
     """
@@ -398,8 +350,7 @@ class Interview(commands.Cog):
         self.connection = spreadsheet.SheetConnection(SECRET, SCOPE)
 
         if not Path(DB_FILE).exists():
-            # TODO: Don't technically need this condition?
-            # Adds a bit of clarity though, so keeping it in for now.
+            # Note: Don't technically need this condition, but it adds a bit of clarity, so keeping it in for now.
             Path(DB_DIR).mkdir(exist_ok=True)
         engine = create_engine(f'sqlite:///{DB_FILE}')
         global session_maker
@@ -409,22 +360,21 @@ class Interview(commands.Cog):
 
     def new_interview(self):
         # TODO: yes.
+        #  i don't actually think this is useful?
         pass
 
     # == Helper methods ==
 
-    def _generate_embeds(self, interviewee: discord.Member, questions: List[Question],
+    @staticmethod
+    def _generate_embeds(interviewee: discord.Member, questions: List[Question],
                          avatar_url=None) -> Generator[Union[discord.Embed, Question], None, None]:
         """
-        TODO: what was i doing here
         Generate discord.Embeds to be posted from a list of Questions.
         """
 
-        # TODO: it's entirely possible this wants to be a static method
-
-        def finalize(em: discord.Embed):
+        def finalize(final_embed: discord.Embed):
             # TODO: add footer but idk what to do with it
-            return em
+            return final_embed
 
         last_asker = None  # type: Optional[discord.Member]
         length = 0
@@ -676,9 +626,9 @@ class Interview(commands.Cog):
     @commands.check(_server_active)
     async def iv_stats(self, ctx: commands.Context, member: Optional[discord.Member]):
         """
-        TODO: View interview-related stats.
+        View interview-related stats.
 
-        Which stats? I dunno. # TODO: Figure that out.
+        If no user specified, view stats for the current interview.
         """
         session = session_maker()
         interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id,
@@ -728,7 +678,20 @@ class Interview(commands.Cog):
 
     # == Questions ==
 
-    async def _ask_many(self, ctx: commands.Context, questions: List[str]):
+    async def _ask_many(self, ctx: commands.Context, question_strs: List[str]):
+        """
+        Ask a bunch of questions at once. Or just one. Either way, use the batch upload command rather than
+        doing it one at a time.
+
+        TODO:
+         split up questions
+         create a bunch of Questions
+         upload all questions to sheet
+         upload question to sheet
+         update Asker
+         update Interview
+        Note: I think these are all done?
+        """
         session = session_maker()
         interview = session.query(schema.Interview).filter_by(current=True,
                                                               server_id=ctx.guild.id).one_or_none()  # type: Optional[schema.Interview]
@@ -745,7 +708,8 @@ class Interview(commands.Cog):
             asker_meta = schema.Asker(interview_id=interview.id, asker_id=ctx.author.id, num_questions=0)
             session.add(asker_meta)
 
-        for question_str in questions:
+        questions = []
+        for question_str in question_strs:
             q = Question(
                 interviewee=interviewee,
                 asker=ctx.author,
@@ -756,14 +720,17 @@ class Interview(commands.Cog):
                 timestamp=datetime.utcnow(),
             )
 
-            q.upload(ctx, self.connection)
+            questions.append(q)
 
             asker_meta.num_questions += 1
             interview.questions_asked += 1
 
+        Question.upload_many(ctx, self.connection, questions)
+
         session.commit()
 
-        desc = '\n'.join(questions)[:1900] + '...' if len('\n'.join(questions)) > 1900 else '\n'.join(questions)[0:1900]
+        desc = '\n'.join(question_strs)[:1900] + '...' if len('\n'.join(question_strs)) > 1900 else '\n'.join(
+            question_strs)[0:1900]
         em = discord.Embed(
             # TODO: fill in image
             title=f"**{interviewee}**'s interview",
@@ -785,84 +752,23 @@ class Interview(commands.Cog):
 
     @commands.command()
     @commands.check(_server_active)
-    # TODO: check for interview active
+    @commands.check(_interview_enabled)
     async def ask(self, ctx: commands.Context, *, question_str: str):
         """
-        TODO: Submit a question for the current interview.
+        Submit a question for the current interview.
         """
-        # TODO:
-        #  create Question
-        #  upload question to sheet
-        #  update Asker
-        #  update Interview
-        #  post embed to backstage
-        # session = session_maker()
-        # interview = session.query(Interview).filter_by(current=True,
-        #                                                       server_id=ctx.guild.id).one_or_none()  # type: Optional[Interview]
-        # interviewee = ctx.guild.get_member(interview.interviewee_id)
-        # if interviewee is None:
-        #     await ctx.send(f"Couldn't find server member `{interview.interviewee_id}`.")
-        #     return
-        #
-        # asker_meta = None
-        # for asker in interview.askers:
-        #     if asker.asker_id == ctx.author.id:
-        #         asker_meta = asker
-        # if asker_meta is None:
-        #     asker_meta = Asker(interview_id=interview.id, asker_id=ctx.author.id, num_questions=0)
-        #     session.add(asker_meta)
-        #
-        # q = Question(
-        #     interviewee=interviewee,
-        #     asker=ctx.author,
-        #     question=question_str,
-        #     question_num=asker_meta.num_questions + 1,
-        #     message=ctx.message,
-        #     # answer=,  # unfilled, obviously
-        #     timestamp=datetime.utcnow(),
-        # )
-        #
-        # q.upload(ctx, self.connection)
-        #
-        # asker_meta.num_questions += 1
-        # interview.questions_asked += 1
-        #
-        # session.commit()
-        #
-        # # TODO: post embed to backstage
-        # em = q.backstage_embed(ctx)
-        # backstage = ctx.guild.get_channel(interview.server.back_channel)
-        # if backstage is None:
-        #     await ctx.send(f'Backstage channel `{interview.server.back_channel}` not found for this server')
-        # await backstage.send(embed=em)
-        #
-        # # TODO: This may break on masks, which call this method multiple times; make sure to double-check.
-        # await ctx.message.add_reaction(ctx.bot.greentick)
-
         await self._ask_many(ctx, [question_str])
 
     @commands.command()
     @commands.check(_server_active)
-    # TODO: check for interview active
+    @commands.check(_interview_enabled)
     async def mask(self, ctx: commands.Context, *, questions_str: str):
         """
-        TODO: Submit multiple questions for the current interview.
+        Submit multiple questions for the current interview.
 
         Each question must be a single line, separated by linebreaks. If you want multi-line single questions,
         use the 'ask' command.
         """
-        # TODO:
-        #  split up questions
-        #  create a bunch of Questions
-        #  upload all questions to sheet
-        #  upload question to sheet
-        #  update Asker
-        #  update Interview
-
-        # for question_str in questions_str.split('\n'):
-        #     # This is such a hacky solution but it also seems correct.
-        #     await self.ask(ctx, question_str=question_str)
-
         await self._ask_many(ctx, questions_str.split('\n'))
 
     # == Answers ==
@@ -905,7 +811,7 @@ class Interview(commands.Cog):
             await ctx.send('No new questions to be answered.')
             return
 
-        for embed in self._generate_embeds(interviewee=interviewee, questions=questions):
+        for embed in Interview._generate_embeds(interviewee=interviewee, questions=questions):
             if type(embed) is Question:
                 # question was too long
                 await channel.send(f"Question #{embed.question_num} or its answer from {embed.asker} was too long "
@@ -914,11 +820,10 @@ class Interview(commands.Cog):
                 await channel.send(embed=embed)
             # TODO check if answer too long
 
-        # TODO: update metadatas if not previewing
-
         if preview_flag is True:
             return
 
+        # Update sheet and metadata if not previewing:
         sheet.batch_update(filtered_cells)
         interview.questions_answered += len(questions)
         session.commit()
@@ -928,15 +833,12 @@ class Interview(commands.Cog):
     @commands.check(_is_interviewee)
     async def answer(self, ctx: commands.Context):
         """
-        TODO: Post all answers to questions that have not yet been posted.
+        Post all answers to questions that have not yet been posted.
 
-        Questions will be grouped by asker, rather than strictly in chronological order.
+        Questions posted in chronological order, grouped by asker. If an answer is too long to be posted,
+        the interviewee may have to post it manually.
         # TODO: Add a flag to post strictly chronologically?
         """
-        # TODO:
-        #  check if invoker is interviewee
-        #  dump a bunch of answers
-        #  update sheet
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
         channel = ctx.guild.get_channel(server.answer_channel)
@@ -948,11 +850,8 @@ class Interview(commands.Cog):
     @commands.check(_is_interviewee)
     async def preview(self, ctx: commands.Context):
         """
-        TODO: Preview answers, visible in the backstage channel.
+        Preview answers, visible in the backstage channel.
         """
-        # TODO:
-        #  check if invoker is interviewee
-        #  dump a bunch of answers
         await self._channel_answer(ctx, ctx.channel)
 
     # == Votes ==
@@ -1018,7 +917,7 @@ class Interview(commands.Cog):
 
     @commands.command()
     @commands.check(_server_active)
-    # TODO: check for interview active
+    @commands.check(_interview_enabled)
     async def vote(self, ctx: commands.Context, mentions: commands.Greedy[discord.Member]):
         """
         Vote for up to three nominees for the next interview.
@@ -1153,7 +1052,7 @@ class Interview(commands.Cog):
 
     @commands.command()
     @commands.check(_server_active)
-    # TODO: check for interview active
+    @commands.check(_interview_enabled)
     async def unvote(self, ctx: commands.Context):
         """
         Delete your current votes.
@@ -1247,7 +1146,7 @@ class Interview(commands.Cog):
 
     @opt.command(name='out')
     @commands.check(_server_active)
-    # TODO: check for interview active
+    @commands.check(_interview_enabled)
     async def opt_out(self, ctx: commands.Context):
         """
         Opt out of voting.
@@ -1271,7 +1170,7 @@ class Interview(commands.Cog):
 
     @opt.command(name='in')
     @commands.check(_server_active)
-    # TODO: check for interview active
+    @commands.check(_interview_enabled)
     async def opt_in(self, ctx: commands.Context):
         """
         Opt into voting.
@@ -1291,28 +1190,10 @@ class Interview(commands.Cog):
     @commands.check(_server_active)
     async def opt_list(self, ctx: commands.Context):
         """
-        Check who's opted out of interview voting.
+        TODO: Check who's opted out of interview voting.
         """
         # TODO: yes.
         pass
-
-    # TODO: eliminate before release
-    @commands.command()
-    @commands.is_owner()
-    async def dbtest(self, ctx: commands.Context):
-        # TODO: for some reason the foreign key constraint isn't enforced.
-        session = session_maker()
-        status = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id, opt_id=ctx.author.id).one_or_none()
-        print(status.server.id)
-
-    # TODO: eliminate before release
-    @commands.command()
-    @commands.is_owner()
-    async def gstest(self, ctx: commands.Context):
-        session = session_maker()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
-        worksheet = self.connection.get_sheet(server.sheet_name)
-        await ctx.send(f'sheet1 is {worksheet.sheet1.title}')
 
 
 # TODO: eliminate before release
