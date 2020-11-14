@@ -637,7 +637,6 @@ class Interview(commands.Cog):
         em.add_field(name='Reinterview limit', value=f'{server.limit}')
         await ctx.send(embed=em)
 
-
     @iv.command(name='channel')
     @commands.has_permissions(administrator=True)
     @_ck_server_active()
@@ -719,6 +718,23 @@ class Interview(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
         server.active = True
+        session.commit()
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @iv.command(name='limit')
+    @commands.has_permissions(administrator=True)
+    @_ck_server_active()
+    async def iv_limit(self, ctx: commands.Context, date: str):
+        """
+        Set the new reinterview limit (YYYY/MM/DD).
+
+        Only reinterviews whose most recent interview is before the specified date will be allowed.
+        (I'm lazy, if you want to disable reinterviews, just set it to like, the year 2000.)
+        """
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        print(datetime.strptime(date, '%Y/%m/%d'))
+        server.limit = datetime.strptime(date, '%Y/%m/%d')
         session.commit()
         await ctx.message.add_reaction(ctx.bot.greentick)
 
@@ -1301,8 +1317,18 @@ class Interview(commands.Cog):
         """
         TODO: Check who's opted out of interview voting.
         """
-        # TODO: yes.
-        pass
+        session = session_maker()
+        opts = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id).all()
+        cowards = [ctx.guild.get_member(opt.opt_id) for opt in opts]
+        cowards = [coward for coward in cowards if coward is not None]
+        cowards = sorted(cowards, key=lambda x: str(x).lower())
+        if len(cowards) > 0:
+            reply = '__**Opted-Out Users**__```ini\n'
+        else:
+            reply = '__**Opted-Out Users**__``` '
+        reply += '\n'.join([str(coward) for coward in cowards])
+        reply += '```_As they have opted-out, you cannot vote for any of these users for interviews._'
+        await ctx.send(reply)
 
 
 # ===
