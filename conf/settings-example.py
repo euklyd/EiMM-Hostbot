@@ -8,14 +8,16 @@ client_token = 'your token here'
 status = None
 
 cogs = [
-    'profiles',
     'eimm',
-    # add more cogs here!
+    'hostbot',
+    'profiles',
+    # Add more cogs here!
 ]
 
 plugins = [
-    'hostbot',
-    # add more plugins here!
+    # Add more plugins here!
+    # Plugins are used mostly for simple, one-off commands, rather than groups, which are best done as cogs!
+    # (These may be phased out in the future, they're not nearly as useful as cogs.)
 ]
 
 imgur_keys = {
