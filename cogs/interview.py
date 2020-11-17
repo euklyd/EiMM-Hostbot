@@ -59,11 +59,11 @@ class Candidate:
         self.voters = []
 
     def str(self, length: int) -> str:
-        return f'{name_or_default(self.candidate) + ":" : <{length + 1}}'
+        return f'{_name_or_default(self.candidate) + ":" : <{length + 1}}'
 
     def voters_str(self) -> str:
         # Hopefully it should never fall through to default! Preprocessing strips those out.
-        voters = [name_or_default(self._ctx.guild.get_member(voter)) for voter in self.voters]
+        voters = [_name_or_default(self._ctx.guild.get_member(voter)) for voter in self.voters]
         voters = sorted(voters, key=lambda x: str(x).lower())
         return ', '.join(voters)
 
@@ -79,25 +79,32 @@ class Candidate:
         Votes are negative so that sorting by votes (greatest to least) can be consistent with sorting
         alphabetically (A to Z).
         """
-        return -len(self.voters), name_or_default(self.candidate).lower()
+        return -len(self.voters), _name_or_default(self.candidate).lower()
 
 
 class Question:
     def __init__(self, interviewee: discord.Member, asker: Union[discord.Member, discord.User],
-                 # question: str, question_num: int, server_id: int, channel_id: int, message_id: int,
-                 question: str, question_num: int, message: discord.Message,
+                 question: str, question_num: int, server_id: int, channel_id: int, message_id: int,
+                 # question: str, question_num: int, message: discord.Message,
                  answer: str = None, timestamp: datetime = None):
         self.interviewee = interviewee
         self.asker = asker
         self.question = question
         self.question_num = question_num
-        self.message = message
+        # self.message = message
+        self.server_id = server_id
+        self.channel_id = channel_id
+        self.message_id = message_id
 
         self.answer = answer
         if timestamp is None:
             self.timestamp = datetime.utcnow()
         else:
             self.timestamp = timestamp
+
+    @property
+    def jump_url(self) -> str:
+        return f'https://discordapp.com/channels/{self.server_id}/{self.channel_id}/{self.message_id}'
 
     @staticmethod
     async def from_row(ctx: commands.Context, row: Dict[str, Any]) -> 'Question':
@@ -112,10 +119,10 @@ class Question:
             asker=ctx.guild.get_member(row['ID']),
             question=row['Question'],
             question_num=row['#'],
-            # row['Server ID'],
-            # row['Channel ID'],
-            # row['Message ID'],
-            message=message,  # replaced the prev three rows
+            server_id=row['Server ID'],
+            channel_id=row['Channel ID'],
+            message_id=row['Message ID'],
+            # message=message,  # replaced the prev three rows
             answer=row['Answer'],
             timestamp=datetime.utcfromtimestamp(row['POSIX Timestamp']),  # TODO: need to test this conversion
         )
@@ -137,9 +144,12 @@ class Question:
             self.question,
             '',  # no answer when uploading
             False,
-            str(self.message.guild.id),
-            str(self.message.channel.id),
-            str(self.message.id),
+            str(self.server_id),
+            str(self.channel_id),
+            str(self.message_id),
+            # str(self.message.guild.id),
+            # str(self.message.channel.id),
+            # str(self.message.id),
         ]
 
     @staticmethod
@@ -157,37 +167,53 @@ class Question:
         sheet = connection.get_sheet(server.sheet_name).sheet1
         sheet.append_rows(rows)
 
+    @staticmethod
+    def _generate_words(text: str) -> Generator[str, None, None]:
+        words = text.replace('[', '\\[').replace(']', '\\]').split(' ')
+        for word in words:
+            while len(word) > 900:
+                yield word[:900]
+                word = word[900:]
+            yield word
+
     def question_words(self) -> Generator[str, None, None]:
         """
         Add angle braces as quote styling *after* this method.
         """
-        words = self.question.replace('[', '\\[').replace(']', '\\]').split(' ')
-        for word in words:
-            yield word
+        # words = self.question.replace('[', '\\[').replace(']', '\\]').split(' ')
+        # for word in words:
+        #     while len(word) > 900:
+        #         yield word[:900]
+        #         word = word[900:]
+        #     yield word
+        return self._generate_words(self.question)
 
     def answer_words(self) -> Generator[str, None, None]:
         """
         Add angle braces as quote styling *after* this method.
         """
-        words = self.answer.replace('[', '\\[').replace(']', '\\]').split(' ')
-        for word in words:
-            yield word
+        # words = self.answer.replace('[', '\\[').replace(']', '\\]').split(' ')
+        # for word in words:
+        #     while len(word) > 900:
+        #         yield word[:900]
+        #         word = word[900:]
+        #     yield word
+        return self._generate_words(self.answer)
 
 
 class InterviewEmbed(discord.Embed):
     @staticmethod
     def blank(interviewee: discord.Member, asker: Union[discord.Member, discord.User],
               avatar_url: str = None) -> 'InterviewEmbed':
+        if avatar_url is None:
+            avatar_url = interviewee.avatar_url
         em = InterviewEmbed(
             title=f"**{interviewee}**'s interview",
             description=' ',
             color=interviewee.color,
             url='',  # TODO: fill in
         )
-        if avatar_url is None:
-            em.set_thumbnail(url=interviewee.avatar_url)
-        else:
-            em.set_thumbnail(url=avatar_url)
+        em.set_thumbnail(url=avatar_url)
         em.set_author(
             name=f'Asked by {asker}',
             icon_url=asker.avatar_url,
@@ -198,24 +224,24 @@ class InterviewEmbed(discord.Embed):
         return em
 
 
-def name_or_default(user: discord.User) -> str:
+def _name_or_default(user: discord.User) -> str:
     if user is not None:
         return str(user)
     return SERVER_LEFT_MSG
 
 
-def translate_name(member: Union[discord.Member, discord.User]):
-    if member is None:
-        return SERVER_LEFT_MSG
-    if type(member) is discord.User:
-        return member.name
-    if type(member) is discord.Member:
-        return member.nick
-    return ERROR_MSG
+# def translate_name(member: Union[discord.Member, discord.User]):
+#     if member is None:
+#         return SERVER_LEFT_MSG
+#     if type(member) is discord.User:
+#         return member.name
+#     if type(member) is discord.Member:
+#         return member.nick
+#     return ERROR_MSG
 
 
-def message_link(server_id: int, channel_id: int, message_id: int) -> str:
-    return f'https://discordapp.com/channels/{server_id}/{channel_id}/{message_id}'
+# def message_link(server_id: int, channel_id: int, message_id: int) -> str:
+#     return f'https://discordapp.com/channels/{server_id}/{channel_id}/{message_id}'
 
 
 def add_question(em: discord.Embed, question: Question, current_length: int) -> int:
@@ -237,7 +263,8 @@ def add_question(em: discord.Embed, question: Question, current_length: int) -> 
     # When splitting up questions, assume 85 (round to 100) characters for the message link markdown, so you get 900
     # chars rather than 1000.
     if sum([len(line) for line in question_lines]) + len(question_lines) * 3 + len(question.answer) <= 900:
-        formatted_question_text = f'[> {"> ".join(question_lines)}]({question.message.jump_url})'
+        # formatted_question_text = f'[> {"> ".join(question_lines)}]({question.message.jump_url})'
+        formatted_question_text = f'[> {"> ".join(question_lines)}]({question.jump_url})'
         text_length = len(f'Question #{question.question_num}') + len(f'{formatted_question_text}\n{question.answer}')
         if text_length > 4800:
             return -2
@@ -261,13 +288,15 @@ def add_question(em: discord.Embed, question: Question, current_length: int) -> 
     question_chunk = '[> '
     question_chunks = []
     for word in question.question_words():
-        if len(question_chunk) > 900:
-            question_chunk += f']({question.message.jump_url})'
+        if len(question_chunk + word) > 900:
+            # question_chunk += f']({question.message.jump_url})'
+            question_chunk += f']({question.jump_url})'
             question_chunks.append(question_chunk)
             question_chunk = '[> '
         word = word.replace("\n", "\n> ")
         question_chunk += f'{word}' + ' '
-    question_chunk += f']({question.message.jump_url})'
+    # question_chunk += f']({question.message.jump_url})'
+    question_chunk += f']({question.jump_url})'
     question_chunks.append(question_chunk)
 
     for i, chunk in enumerate(question_chunks):
@@ -281,7 +310,7 @@ def add_question(em: discord.Embed, question: Question, current_length: int) -> 
     answer_chunk = ''
     answer_chunks = []
     for word in question.answer_words():
-        if len(answer_chunk) > 950:
+        if len(answer_chunk + word) > 950:
             answer_chunks.append(answer_chunk)
             answer_chunk = ''
         answer_chunk += word + ' '
@@ -313,10 +342,12 @@ def _ck_server_active():
     """
 
     async def predicate(ctx: commands.Context):
+        if ctx.guild is None:
+            return False
         if _DEBUG_FLAG:
             return True
         active = _server_active(ctx)
-        if not active:
+        if not active and not ctx.message.content.startswith(ctx.prefix + 'help'):
             await ctx.send('Server is not set up for interviews.')
             await ctx.message.add_reaction(ctx.bot.redtick)
         return active
@@ -332,9 +363,11 @@ def _ck_interview_enabled():
     """
 
     async def predicate(ctx: commands.Context):
+        if ctx.guild is None:
+            return False
         session = session_maker()
         result = session.query(schema.Server).filter_by(id=ctx.guild.id, active=True).one_or_none()
-        if result is None:
+        if result is None and not ctx.message.content.startswith(ctx.prefix + 'help'):
             await ctx.send('Interviews are currently disabled.')
             await ctx.message.add_reaction(ctx.bot.redtick)
         return result is not None
@@ -350,10 +383,12 @@ def _ck_is_interviewee():
     """
 
     async def predicate(ctx: commands.Context):
+        if ctx.guild is None:
+            return False
         session = session_maker()
         result = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, interviewee_id=ctx.author.id,
                                                            current=True).one_or_none()
-        if result is None:
+        if result is None and not ctx.message.content.startswith(ctx.prefix + 'help'):
             await ctx.send(f'**{ctx.author}**, you are not the interviewee.')
             await ctx.message.add_reaction(ctx.bot.redtick)
         return result is not None
@@ -395,14 +430,20 @@ class Interview(commands.Cog):
     # == Helper methods ==
 
     @staticmethod
-    def _generate_embeds(interviewee: discord.Member, questions: List[Question],
-                         avatar_url=None) -> Generator[Union[discord.Embed, Question], None, None]:
+    def _generate_embeds(interviewee: discord.Member, interview: schema.Interview, questions: List[Question],
+                         avatar_url: str = None) -> Generator[Union[discord.Embed, Question], None, None]:
         """
         Generate discord.Embeds to be posted from a list of Questions.
         """
+        if avatar_url is None:
+            avatar_url = interviewee.avatar_url
+
+        n_answered = 0
+        n_asked = interview.questions_asked
 
         def finalize(final_embed: discord.Embed):
-            # TODO: add footer but idk what to do with it
+            final_embed.set_footer(text=f'{n_answered + interview.questions_answered} questions answered '
+                                        f'(of {n_asked + n_answered})')
             return final_embed
 
         last_asker = None  # type: Optional[discord.Member]
@@ -418,6 +459,7 @@ class Interview(commands.Cog):
                 length = 0
             # TODO: add question/answer fields
             added_length = add_question(em, question, length)
+            n_answered += 1
             if added_length == -1:
                 # question wasn't added, yield and retry
                 if len(em.fields) > 0:
@@ -431,6 +473,7 @@ class Interview(commands.Cog):
             # TODO: update answered questions per asker? or whatever it is?
             last_asker = question.asker
         if em is not None:
+            # yield the final embed
             if len(em.fields) > 0:
                 yield finalize(em)
 
@@ -831,7 +874,10 @@ class Interview(commands.Cog):
                 asker=ctx.author,
                 question=question_str,
                 question_num=asker_meta.num_questions + 1,
-                message=ctx.message,
+                server_id=ctx.guild.id,
+                channel_id=ctx.channel.id,
+                message_id=ctx.message.id,
+                # message=ctx.message,
                 # answer=,  # unfilled, obviously
                 timestamp=datetime.utcnow(),
             )
@@ -867,7 +913,6 @@ class Interview(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.command()
-    # @commands.check(_interview_enabled)
     @_ck_server_active()
     @_ck_interview_enabled()
     async def ask(self, ctx: commands.Context, *, question_str: str):
@@ -877,7 +922,6 @@ class Interview(commands.Cog):
         await self._ask_many(ctx, [question_str])
 
     @commands.command()
-    # @commands.check(_interview_enabled)
     @_ck_server_active()
     @_ck_interview_enabled()
     async def mask(self, ctx: commands.Context, *, questions_str: str):
@@ -918,6 +962,7 @@ class Interview(commands.Cog):
                     'values': [[True]]
                 })
 
+        # TODO: remove on release
         print('\n=== raw rows ===\n')
         pprint.pprint(len(rows))
         print(f'\n=== filtered ({len(filtered_rows)}) ===\n')
@@ -929,12 +974,13 @@ class Interview(commands.Cog):
             await ctx.send('No new questions to be answered.')
             return
 
-        for embed in Interview._generate_embeds(interviewee=interviewee, questions=questions):
+        for embed in Interview._generate_embeds(interviewee=interviewee, interview=interview, questions=questions):
             if type(embed) is Question:
                 # question was too long
                 await channel.send(f"Question #{embed.question_num} or its answer from {embed.asker} was too long "
-                                   f"to embed, please split it up and answer it on your own.")
+                                   f"to embed, please split it up and answer it manually.")
             else:
+                pprint.pprint(embed.to_dict())
                 await channel.send(embed=embed)
             # TODO check if answer too long
 
@@ -947,7 +993,6 @@ class Interview(commands.Cog):
         session.commit()
 
     @commands.command()
-    # @commands.check(_is_interviewee)
     @_ck_server_active()
     @_ck_is_interviewee()
     async def answer(self, ctx: commands.Context):
@@ -965,7 +1010,6 @@ class Interview(commands.Cog):
         await self._channel_answer(ctx, channel)
 
     @commands.command()
-    # @commands.check(_is_interviewee)
     @_ck_server_active()
     @_ck_is_interviewee()
     async def preview(self, ctx: commands.Context):
@@ -981,8 +1025,8 @@ class Interview(commands.Cog):
         if len(votes) == 0:
             return f'_You are not currently voting; vote with `{prefix}vote`._'
 
-        votes = sorted(votes, key=lambda x: name_or_default(x).lower())
-        return '_You are currently voting for: ' + ', '.join([f'`{name_or_default(vote)}`' for vote in votes]) + '._'
+        votes = sorted(votes, key=lambda x: _name_or_default(x).lower())
+        return '_You are currently voting for: ' + ', '.join([f'`{_name_or_default(vote)}`' for vote in votes]) + '._'
 
     @staticmethod
     def _preprocess_votals(ctx: commands.Context, votes: List[schema.Vote]) -> List[Candidate]:
@@ -1036,7 +1080,6 @@ class Interview(commands.Cog):
         return text
 
     @commands.command()
-    # @commands.check(_interview_enabled)
     @_ck_server_active()
     @_ck_interview_enabled()
     async def vote(self, ctx: commands.Context, mentions: commands.Greedy[discord.Member]):
@@ -1173,7 +1216,6 @@ class Interview(commands.Cog):
             await ctx.message.add_reaction(self.bot.greentick)
 
     @commands.command()
-    # @commands.check(_interview_enabled)
     @_ck_server_active()
     @_ck_interview_enabled()
     async def unvote(self, ctx: commands.Context):
@@ -1268,7 +1310,6 @@ class Interview(commands.Cog):
                        f'Use `{ctx.bot.default_command_prefix}help opt` for more info.')
 
     @opt.command(name='out')
-    # @commands.check(_interview_enabled)
     @_ck_server_active()
     @_ck_interview_enabled()
     async def opt_out(self, ctx: commands.Context):
@@ -1293,7 +1334,6 @@ class Interview(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.redtick)
 
     @opt.command(name='in')
-    # @commands.check(_interview_enabled)
     @_ck_server_active()
     @_ck_interview_enabled()
     async def opt_in(self, ctx: commands.Context):
@@ -1371,7 +1411,8 @@ async def failme_error(ctx: commands.Context, error: Exception):
 
 def fail_check2():
     async def predicate(ctx: commands.Context):
-        await ctx.send('still failing')
+        if not ctx.message.content.startswith(ctx.prefix + 'help'):
+            await ctx.send('still failing')
         return False
 
     return commands.check(predicate)
@@ -1381,17 +1422,6 @@ def fail_check2():
 @fail_check2()
 async def failme2(ctx: commands.Context):
     await ctx.send('you should also never see this')
-
-
-# def fail_check3(ctx: commands.Context):
-#     ctx.send('does this work tho')
-#     return False
-#
-#
-# @commands.command()
-# @commands.check(fail_check3)
-# async def failme3(ctx: commands.Context):
-#     await ctx.send('definitely never see this')
 
 
 # ===
@@ -1405,4 +1435,3 @@ def setup(bot: commands.Bot):
     bot.add_command(ivembed)
     bot.add_command(failme)
     bot.add_command(failme2)
-    # bot.add_command(failme3)
