@@ -16,6 +16,8 @@ session_maker = None  # type: Union[None, Callable[[], Session]]
 
 # TODO: Fix multi-channel voting. Right now there is a bug, so don't open multiple channels at once.
 
+# NOTE: Deprecated until I've renamed this so it doesn't conflict with interviews, a far more important module.
+
 
 class Vote(Base):
     __tablename__ = 'Vote'
@@ -44,8 +46,16 @@ class Channel(Base):
     server_id = Column(Integer)
 
 
+@commands.group(invoke_without_command=True)
+async def vote(ctx: commands.Context):
+    """
+    Run votes for mafia-style games.
+    """
+    await ctx.send("this isn't a command")
+
+
+@vote.command(name='setup')
 @commands.is_owner()
-@commands.command()
 async def vote_setup(ctx: commands.Context):
     """
     Set up a channel for voting.
@@ -61,8 +71,8 @@ async def vote_setup(ctx: commands.Context):
     await ctx.send(f'{ctx.channel} set up for voting!')
 
 
+@vote.command(name='unsetup')
 @commands.is_owner()
-@commands.command()
 async def vote_unsetup(ctx: commands.Context):
     """
     Un-set up a channel for voting.
@@ -78,8 +88,8 @@ async def vote_unsetup(ctx: commands.Context):
     await ctx.send(f'{ctx.channel} no longer open for voting.')
 
 
+@vote.command(name='clear')
 @commands.is_owner()
-@commands.command()
 async def vote_clear(ctx: commands.Context):
     """
     Clear all votes for a channel.
@@ -96,8 +106,8 @@ async def vote_clear(ctx: commands.Context):
     await ctx.send(f'Votes for {ctx.channel} cleared!')
 
 
-@commands.command()
-async def vote(ctx: commands.Context, votee: discord.Member):
+@vote.command(name='for')
+async def vote_for(ctx: commands.Context, votee: discord.Member):
     """
     Vote.
     """
@@ -139,8 +149,8 @@ async def vote(ctx: commands.Context, votee: discord.Member):
 #     await ctx.message.add_reaction(ctx.bot.greentick)
 
 
-@commands.command()
-async def votals(ctx: commands.Context):
+@vote.command(name='totals')
+async def vote_totals(ctx: commands.Context):
     """
     Current votecounts.
     """
@@ -164,9 +174,9 @@ async def votals(ctx: commands.Context):
     await ctx.send(reply)
 
 
+@vote.command(name='voters')
 @commands.has_permissions(administrator=True)
-@commands.command()
-async def voters(ctx: commands.Context):
+async def vote_voters(ctx: commands.Context):
     session = session_maker()
     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
     if old_channel is None:
@@ -192,12 +202,13 @@ async def voters(ctx: commands.Context):
 def setup(bot: Bot):
     global session_maker
 
-    bot.add_command(vote_setup)
-    bot.add_command(vote_clear)
-    bot.add_command(vote_unsetup)
+    # bot.add_command(vote_setup)
+    # bot.add_command(vote_clear)
+    # bot.add_command(vote_unsetup)
+    # bot.add_command(vote)
+    # bot.add_command(votals)
+    # bot.add_command(voters)
     bot.add_command(vote)
-    bot.add_command(votals)
-    bot.add_command(voters)
 
     db_dir = 'databases/'
     db_file = f'{db_dir}/votes.db'
