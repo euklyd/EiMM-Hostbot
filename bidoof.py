@@ -22,8 +22,29 @@ async def reload(ctx: commands.Context, plugin: str):
         await ctx.send(f'Reloaded cog `{plugin}`.')
         print(f'reloaded cogs.{plugin}')  # TODO: change to actual logging sometime
     else:
-        ctx.bot.load_extension(f'plugins.{plugin}')
-        await ctx.send(f'Loaded plugin `{plugin}`.')
+        try:
+            ctx.bot.load_extension(f'plugins.{plugin}')
+            await ctx.send(f'Loaded plugin `{plugin}`.')
+        except commands.errors.ExtensionNotFound:
+            await ctx.send(f'Could not find plugin `{plugin}`.')
+
+
+@commands.command()
+@commands.is_owner()
+async def unload(ctx: commands.Context, plugin: str):
+    """
+    Unload the specified plugin.
+    """
+    if f'plugins.{plugin}' in ctx.bot.extensions:
+        ctx.bot.unload_extension(f'plugins.{plugin}')
+        await ctx.send(f'Unloaded plugin `{plugin}`.')
+        print(f'reloaded plugins.{plugin}')  # TODO: change to actual logging sometime
+    elif f'cogs.{plugin}' in ctx.bot.extensions:
+        ctx.bot.unload_extension(f'cogs.{plugin}')
+        await ctx.send(f'Unloaded cog `{plugin}`.')
+        print(f'reloaded cogs.{plugin}')  # TODO: change to actual logging sometime
+    else:
+        await ctx.send(f'Plugin `{plugin}` not loaded.')
 
 
 @commands.command()
@@ -60,6 +81,7 @@ if __name__ == '__main__':
 
     bot.add_command(shutdown)
     bot.add_command(reload)
+    bot.add_command(unload)
 
     print("starting bot")
     bot.run(settings.client_token)
