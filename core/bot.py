@@ -66,7 +66,7 @@ class Bot(commands.Bot):
         Spoof with "<message content> -a @user" or "<message content> -a <userid>".
         """
         regex = r'^(.*[^ ]) +-a (?:<@!?(\d+)>|(\d+))$'
-        match = re.match(regex, message.content)
+        match = re.match(regex, message.content, flags=re.DOTALL)
         if match is not None:
             if message.author.id != self.owner_id:
                 await message.channel.send("You shouldn't be doing this...")
