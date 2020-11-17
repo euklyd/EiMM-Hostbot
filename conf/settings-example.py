@@ -30,8 +30,12 @@ imgur_keys = {
 prefix = ['##']
 
 conf = Conf(
-    greentick_id=632481525325103114,  # change these to reflect your own emojis
-    redtick_id=632481525979676712,  # change these to reflect your own emojis
+    # NOTE: Emojis must be uploaded to your own server or add your bot to the discord.py server. They're used
+    #  to acknowledge commands and report errors. You can use your own, or steal them; their URLs, for now, are:
+    #  https://cdn.discordapp.com/emojis/596576670815879169.png?v=1
+    #  https://cdn.discordapp.com/emojis/596576672149667840.png?v=1
+    greentick_id=632481525325103114,  # change these to reflect your own emoji ID
+    redtick_id=632481525979676712,  # change these to reflect your own emoji ID
     plugins=plugins,
     imgur_keys=imgur_keys,
 )
