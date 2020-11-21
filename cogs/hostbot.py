@@ -328,23 +328,32 @@ class HostBot(commands.Cog):
         try:
             for channel in server.channels:
                 discord_ch = ctx.guild.get_channel(channel.id)
-                await discord_ch.delete(reason=reason)
+                if discord_ch is not None:
+                    await discord_ch.delete(reason=reason)
+                else:
+                    await ctx.send(f'Could not find {channel.type} channel.')
         except discord.Forbidden:
             await ctx.send('Insufficient permissions to delete channels.')
 
         try:
             for role in server.roles:
                 discord_role = ctx.guild.get_role(role.id)
-                await discord_role.delete(reason=reason)
+                if discord_role is not None:
+                    await discord_role.delete(reason=reason)
+                else:
+                    await ctx.send(f'Could not find `{role.type}` role.')
         except discord.Forbidden:
             await ctx.send('Insufficient permissions to delete roles.')
 
         if server.rolepms_id is not None:
             try:
                 category = ctx.guild.get_channel(server.rolepms_id)  # type: discord.CategoryChannel
-                for channel in category.channels:
-                    await channel.delete(reason=reason)
-                await category.delete(reason=reason)
+                if category is not None:
+                    for channel in category.channels:
+                        await channel.delete(reason=reason)
+                    await category.delete(reason=reason)
+                else:
+                    await ctx.send('Could not find Role PMs category.')
             except discord.Forbidden:
                 await ctx.send('Insufficient permissions to delete Role PMs.')
 
@@ -432,10 +441,10 @@ class HostBot(commands.Cog):
         List all avatar URLs for all players and hosts.
         """
         session = session_maker()
-        player_role = session.query(hbs.Role).filter_by(type='player', server_id=ctx.guild.id).one_or_none()
+        player_role_rows = session.query(hbs.Role).filter_by(type='player', server_id=ctx.guild.id).all()
         host_role = session.query(hbs.Role).filter_by(type='host', server_id=ctx.guild.id).one_or_none()
         gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
-        if player_role is None or host_role is None or gamechat_channel is None:
+        if host_role is None or gamechat_channel is None or player_role_rows is None or len(player_role_rows) == 0:
             await ctx.send("This server isn't set up for EiMM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -445,22 +454,25 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        player_role = ctx.guild.get_role(player_role.id)  # type: discord.Role
+        player_roles = []  # type: List[discord.Role]
+        for row in player_role_rows:
+            player_roles.append(ctx.guild.get_role(row.id))
         host_role = ctx.guild.get_role(host_role.id)  # type: discord.Role
         replies = []
-        reply = '**Host avatars:**```\n'
+        reply = '**Host avatars:**``` \n'
         for host in sorted(host_role.members, key=lambda x: x.name.lower()):  # type: discord.Member
             if len(reply) > 1800:
                 replies.append(reply + '```')
                 reply = '```\n'
             reply += f'{host}: {host.avatar_url_as(static_format="png")}\n'
         reply += '```**Player avatars:**```\n'
-        for player in sorted(player_role.members, key=lambda x: x.name.lower()):  # type: discord.Member
-            if len(reply) > 1800:
-                replies.append(reply + '```')
-                reply = '```\n'
-            reply += f'{player}: {player.avatar_url_as(static_format="png")}\n'
-        reply += '```'
+        for player_role in player_roles:
+            for player in sorted(player_role.members, key=lambda x: x.name.lower()):  # type: discord.Member
+                if len(reply) > 1800:
+                    replies.append(reply + '```')
+                    reply = '```\n'
+                reply += f'{player}: {player.avatar_url_as(static_format="png")}\n'
+            reply += '```'
         replies.append(reply)
 
         for r in replies:

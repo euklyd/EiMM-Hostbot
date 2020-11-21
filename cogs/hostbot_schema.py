@@ -2,6 +2,7 @@ from sqlalchemy import ForeignKey
 from sqlalchemy import Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from typing import Iterable
 
 Base = declarative_base()
 
@@ -12,8 +13,9 @@ class Server(Base):
     name = Column(String)
     sheet = Column(String)
     rolepms_id = Column(Integer)
-    roles = relationship('Role', back_populates='server')
-    channels = relationship('Channel', back_populates='server')
+    roles = relationship('Role', back_populates='server')  # type: Iterable[Role]
+    channels = relationship('Channel', back_populates='server')  # type: Iterable[Channel]
+
     # rolepms = relationship('RolePMs', back_populates='server', uselist=False)
 
     def __repr__(self):
@@ -48,7 +50,6 @@ class Channel(Base):
             f'type={self.type}, '
             f'server_id={self.server_id}>'
         )
-
 
 # class RolePMs(Base):
 #     __tablename__ = 'RolePMs'
