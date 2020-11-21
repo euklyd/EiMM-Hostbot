@@ -474,8 +474,7 @@ class HostBot(commands.Cog):
                     replies.append(reply + '```')
                     reply = '```\n'
                 reply += f'{player}: {player.avatar_url_as(static_format="png")}\n'
-            if len(player_role.members) != 0:
-                reply += '```'
+        reply += '```'
         replies.append(reply)
 
         for r in replies:
