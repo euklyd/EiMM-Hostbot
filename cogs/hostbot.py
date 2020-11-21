@@ -459,12 +459,14 @@ class HostBot(commands.Cog):
             player_roles.append(ctx.guild.get_role(row.id))
         host_role = ctx.guild.get_role(host_role.id)  # type: discord.Role
         replies = []
-        reply = '**Host avatars:**``` \n'
+        reply = '**Host avatars:**```\n'
         for host in sorted(host_role.members, key=lambda x: x.name.lower()):  # type: discord.Member
             if len(reply) > 1800:
                 replies.append(reply + '```')
                 reply = '```\n'
             reply += f'{host}: {host.avatar_url_as(static_format="png")}\n'
+        if len(host_role.members) == 0:
+            reply += ' '
         reply += '```**Player avatars:**```\n'
         for player_role in player_roles:
             for player in sorted(player_role.members, key=lambda x: x.name.lower()):  # type: discord.Member
