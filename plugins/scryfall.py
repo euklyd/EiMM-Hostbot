@@ -1,10 +1,13 @@
 import asyncio
 import json
 import re
-from typing import Optional, List
+from pprint import pprint
+from typing import Optional, List, Dict
 
 import discord
+from fuzzywuzzy import process
 import requests
+import ygoprodeck
 from discord.ext import commands
 
 import utils
@@ -19,10 +22,15 @@ API = 'https://api.scryfall.com/'
 
 
 class ScryfallResponse:
-    def __init__(self, cards, cardnames, card_map):
+    def __init__(self, cards: dict, cardnames: List[str], card_map: Dict[str, dict]):
         self.cards = cards
         self.names = cardnames
         self.map = card_map
+
+    def closest(self, query: str) -> dict:
+        # match = process.extractBests(query, self.names, limit=1)
+        match = process.extractOne(query, self.names)
+        return self.map[match[0]]
 
 
 def scryfall_search(expr: str) -> ScryfallResponse:
@@ -101,13 +109,30 @@ async def oracle_inline(message: discord.Message):
     resp = scryfall_search(expr)
     if len(resp.cards) == 0:
         return
-    card = resp.cards[0]
+    card = resp.closest(message.content)
+    for c in resp.cards:
+        if c['name'].lower() == expr.lower():
+            card = c
     if 'image_uris' in card:
         await message.channel.send(card['image_uris']['normal'])
     else:
         await message.channel.send(f"`'image_uris'` not present ( `{card['uri']}` ). Try: {card['scryfall_uri']}")
 
 
+@commands.command()
+async def ygo(ctx: commands.Context, *, query):
+    ygo = ygoprodeck.YGOPro()
+    result = ygo.get_cards(fname=query)
+    # top level: dict key: data
+    # second level: list of matches
+
+    intermediate_keys = {card['name']: card for card in result['data']}
+    matches = process.extractBests(query, intermediate_keys.keys(), limit=10)
+    card = intermediate_keys[matches[0][0]]
+    await ctx.send(card['card_images'][0]['image_url'])
+
+
 def setup(bot: Bot):
     bot.add_command(oracle)
     bot.add_listener(oracle_inline, 'on_message')
+    bot.add_command(ygo)
