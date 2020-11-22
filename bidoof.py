@@ -69,6 +69,7 @@ if __name__ == '__main__':
         owner_id=settings.owner_id,
         status=settings.status,
         intents=intents,
+        case_insensitive=True,  # unfortunately this doesn't help with "help <cogname>"
     )
 
     for cog in settings.cogs:
