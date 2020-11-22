@@ -38,4 +38,5 @@ conf = Conf(
     redtick_id=632481525979676712,  # change these to reflect your own emoji ID
     plugins=plugins,
     imgur_keys=imgur_keys,
+    google_email='your-bot-here@your-bot-here.iam.gserviceaccount.com',
 )
