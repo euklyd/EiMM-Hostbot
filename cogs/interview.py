@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Union, Generator, Tuple
 
 import discord
+import gspread
 from discord.ext import commands
 from sqlalchemy import create_engine, event, desc
 from sqlalchemy.engine import Engine
@@ -15,7 +16,7 @@ from cogs import interview_schema as schema
 from core.bot import Bot
 from utils import spreadsheet
 
-_DEBUG_FLAG = False  # TODO: toggle to off
+_DEBUG_FLAG = False  # Note: toggle to off when not testing
 
 DB_DIR = 'databases'
 DB_FILE = f'{DB_DIR}/interviews.db'
@@ -42,7 +43,7 @@ SCOPE = [
     'https://www.googleapis.com/auth/drive'
 ]
 SECRET = 'conf/google_creds.json'
-SHEET_NAME = 'eimm role templates & keywords'
+SHEET_NAME = ''
 
 SERVER_LEFT_MSG = '[Member Left]'
 ERROR_MSG = '[Bad User]'
@@ -124,7 +125,7 @@ class Question:
             message_id=row['Message ID'],
             # message=message,  # replaced the prev three rows
             answer=row['Answer'],
-            timestamp=datetime.utcfromtimestamp(row['POSIX Timestamp']),  # TODO: need to test this conversion
+            timestamp=datetime.utcfromtimestamp(row['POSIX Timestamp']),
         )
 
     def to_row(self, ctx: commands.Context) -> list:
@@ -211,13 +212,11 @@ class InterviewEmbed(discord.Embed):
             title=f"**{interviewee}**'s interview",
             description=' ',
             color=interviewee.color,
-            url='',  # TODO: fill in
         )
         em.set_thumbnail(url=avatar_url)
         em.set_author(
             name=f'Asked by {asker}',
             icon_url=asker.avatar_url,
-            url='',  # TODO: fill in
         )
         # +100 length as a buffer for the metadata fields
         em.length = len(f"**{interviewee}**'s interview" + ' ' + f'Asked by {asker}') + len(asker.avatar_url) + 100
@@ -400,7 +399,21 @@ class Interview(commands.Cog):
     """
     Runs member interviews, interfaced with Google Sheets as a GUI.
 
-    # TODO: Write actual instructions and info for this module here.
+    Instructions:
+
+    1. Clone this sheet and rename it for your server:
+    https://docs.google.com/spreadsheets/d/1cC3YtXrXlykd6vfI5Q6y1sw8EGH9walpidZB4BJKTbw/edit?usp=sharing
+
+    2. Share it with this bot's credentialed email (ask the bot owner for it, I'm not uploading it to github).
+    (You can query this with the command `iv` if it's been set up in the configuration file.)
+
+    3. Run the command `iv setup #answer_channel #question_channel sheet_name`.
+
+    4. Run the command `iv enable` to open voting.
+
+    5. Once you decide voting is ended, run the command `iv next @vote_winner`.
+
+    6. Share the sheet with the winner, hide old sheet pages, and let them get to answering.
 
     Note: Most commands are not displayed unless your server is set up for interviews.
     """
@@ -421,11 +434,6 @@ class Interview(commands.Cog):
         session_maker = sessionmaker(bind=engine)
 
         schema.Base.metadata.create_all(engine)
-
-    def new_interview(self):
-        # TODO: yes.
-        #  i don't actually think this is useful?
-        pass
 
     # == Helper methods ==
 
@@ -457,8 +465,11 @@ class Interview(commands.Cog):
                 em = InterviewEmbed.blank(interviewee, question.asker,
                                           avatar_url=avatar_url)  # TODO: update avatar url?
                 length = 0
-            # TODO: add question/answer fields
+
+            # Add question/answer fields and count additional length.
             added_length = add_question(em, question, length)
+
+            # Update answered questions per asker
             n_answered += 1
             if added_length == -1:
                 # question wasn't added, yield and retry
@@ -470,19 +481,11 @@ class Interview(commands.Cog):
                 # question cannot be added, yield an error
                 yield question
             length += added_length
-            # TODO: update answered questions per asker? or whatever it is?
             last_asker = question.asker
         if em is not None:
             # yield the final embed
             if len(em.fields) > 0:
                 yield finalize(em)
-
-    def _reset_meta(self, server: discord.Guild):
-        """
-        Set up the meta entry for a new interview.
-        """
-        # TODO: yes. also this probably needs more arguments. it may not even want to exist.
-        pass
 
     # == Setup ==
 
@@ -490,17 +493,17 @@ class Interview(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def iv(self, ctx: commands.Context):
         """
-        # TODO: Write actual instructions and info for this group here.
+        Interview management commandgroup.
         """
-        # TODO: yes.
-        #  document command group
-        #  TODO: write instructions on setting up on a new server
         if _server_active(ctx):
-            await ctx.send(f'Interviews are currently set up for {ctx.guild}; use '
-                           f'`{ctx.bot.default_command_prefix}help Interview` for more info.')
+            reply = f'Interviews are currently set up for {ctx.guild}; use `{ctx.bot.default_command_prefix}' \
+                    f'help Interview` for more info.'
         else:
-            await ctx.send(f'Interviews are not currently set up for {ctx.guild}; use '
-                           f'`{ctx.bot.default_command_prefix}help iv setup` for more info.')
+            reply = f'Interviews are not currently set up for {ctx.guild}; use `{ctx.bot.default_command_prefix}' \
+                    f'help iv setup` for more info.\n' \
+                    f'The Google service account email is `{ctx.bot.conf.google_email}`.\n' \
+                    f'Use `{ctx.bot.default_command_prefix}help Interview` for setup instructions.'
+        await ctx.send(reply)
 
     async def _check_sheet(self, ctx: commands.Context, sheet_name: str):
         """
@@ -514,14 +517,22 @@ class Interview(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return False
 
-        try:
-            sheet = self.connection.get_sheet(sheet_name)
-        except SpreadsheetNotFound:
-            # TODO: Figure out a way to publicize and pass on the bot account email.
+        client = gspread.authorize(self.connection.creds)
+        sheet_names = [sheet['name'] for sheet in client.list_spreadsheet_files()]
+        # try:
+        #     sheet = self.connection.get_sheet(sheet_name)
+        # except SpreadsheetNotFound:
+        #     await ctx.send(f"Spreadsheet `{sheet_name}` cannot be found, make sure it's been shared with the bot "
+        #                    f"account (`{ctx.bot.conf.google_email}`) and try again.")
+        #     await ctx.message.add_reaction(ctx.bot.redtick)
+        #     return False
+
+        if sheet_name not in sheet_names:
             await ctx.send(f"Spreadsheet `{sheet_name}` cannot be found, make sure it's been shared with the bot "
-                           "account and try again.")
+                           f"account (`{ctx.bot.conf.google_email}`) and try again.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return False
+
         return True
 
     @iv.command(name='setup')
@@ -538,11 +549,12 @@ class Interview(commands.Cog):
         If your sheet name is multiple words, enclose it in double quotes, e.g., "sheet name".
         Sheet names must be unique, first-come-first-served.
 
-        Copy the sheet template from TODO: add a link here.
+        Copy the sheet template from:
+        https://docs.google.com/spreadsheets/d/1cC3YtXrXlykd6vfI5Q6y1sw8EGH9walpidZB4BJKTbw/edit?usp=sharing
+
+        This command doesn't set up permissions, etc. for your channels, figure out how you want those to look
+        on your own.
         """
-        # TODO: yes.
-        #  setup server + channels for interview
-        #  update all databases
 
         session = session_maker()
 
@@ -552,7 +564,7 @@ class Interview(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        if self._check_sheet(ctx, sheet_name) is False:
+        if await self._check_sheet(ctx, sheet_name) is False:
             return
 
         server = schema.Server(
@@ -581,13 +593,6 @@ class Interview(commands.Cog):
         Creates a new interview sheet for the next interviewee. If the optional <email> parameter is provided,
         shares the document with them. Old emails must still be cleared out manually.
         """
-
-        # TODO: yes.
-        #  setup a new interview
-        #  set the old interview row to be not-current
-        #  upload the interviewee's current avatar to make it not break in the future?
-        #  do we want the email to be private? not sure yet
-        #  add new metadata row (maybe other databases?)
 
         # set the old interview row to be not-current
         session = session_maker()
@@ -618,7 +623,8 @@ class Interview(commands.Cog):
 
         # Make & clear a new sheet page
 
-        old_sheet = self.connection.get_sheet(server.sheet_name).sheet1
+        interview_sheet = self.connection.get_sheet(server.sheet_name)
+        old_sheet = interview_sheet.sheet1
         new_sheet = old_sheet.duplicate(
             insert_sheet_index=0,
             new_sheet_name=sheet_name
@@ -630,7 +636,7 @@ class Interview(commands.Cog):
                 str(ctx.bot.user),
                 str(ctx.bot.user.id),
                 1,
-                server.default_question,  # TODO: replace this with something else
+                server.default_question,
                 '',
                 False,
                 str(ctx.guild.id),
@@ -641,21 +647,17 @@ class Interview(commands.Cog):
         )
         new_sheet.resize(rows=2)
 
-        # TODO: share sheet with new person? maybe
-        #  unsure if this is wanted
-        ...
+        if email is not None:
+            interview_sheet.share(email, perm_type='user', role='writer')
 
-        # TODO: post the votals, etc. info to stage
         channel = ctx.guild.get_channel(server.answer_channel)
         await self._votals_in_channel(ctx, flag=None, channel=channel)
 
-        # TODO: clear votes
         session.query(schema.Vote).filter_by(server_id=ctx.guild.id).delete()
 
         # Only commit after the new page is up and old votes are deleted.
         session.commit()
 
-        # TODO: reply to message and/or greentick
         await ctx.message.add_reaction(ctx.bot.greentick)
         await asyncio.sleep(2)
         await ctx.send(f'{ctx.author.mention}, make sure to update the table of contents!')
@@ -713,7 +715,7 @@ class Interview(commands.Cog):
         """
         Change saved sheet name.
         """
-        if self._check_sheet(ctx, sheet_name) is False:
+        if await self._check_sheet(ctx, sheet_name) is False:
             return
 
         session = session_maker()
@@ -841,15 +843,6 @@ class Interview(commands.Cog):
         """
         Ask a bunch of questions at once. Or just one. Either way, use the batch upload command rather than
         doing it one at a time.
-
-        TODO:
-         split up questions
-         create a bunch of Questions
-         upload all questions to sheet
-         upload question to sheet
-         update Asker
-         update Interview
-        Note: I think these are all done?
         """
         session = session_maker()
         interview = session.query(schema.Interview).filter_by(current=True,
@@ -894,20 +887,17 @@ class Interview(commands.Cog):
         desc = '\n'.join(question_strs)[:1900] + '...' if len('\n'.join(question_strs)) > 1900 else '\n'.join(
             question_strs)[0:1900]
         em = discord.Embed(
-            # TODO: fill in image
             title=f"**{interviewee}**'s interview",
             description=desc,
             color=ctx.bot.user.color,
-            url='',  # TODO: fill in
         )
         em.set_author(
             name=f'New question from {ctx.author}',
             icon_url=ctx.author.avatar_url,
-            url='',  # TODO: fill in
         )
         backstage = ctx.guild.get_channel(interview.server.back_channel)
         if backstage is None:
-            await ctx.send(f'Backstage channel `{interview.server.back_channel}` not found for this server')
+            await ctx.send(f'Backstage channel `{interview.server.back_channel}` not found for this server.')
         await backstage.send(embed=em)
 
         await ctx.message.add_reaction(ctx.bot.greentick)
@@ -962,11 +952,11 @@ class Interview(commands.Cog):
                     'values': [[True]]
                 })
 
-        # TODO: remove on release
-        print('\n=== raw rows ===\n')
-        pprint.pprint(len(rows))
-        print(f'\n=== filtered ({len(filtered_rows)}) ===\n')
-        pprint.pprint(filtered_rows)
+        # Note: Useful debug output, not convinced this is perfect yet.
+        # print('\n=== raw rows ===\n')
+        # pprint.pprint(len(rows))
+        # print(f'\n=== filtered ({len(filtered_rows)}) ===\n')
+        # pprint.pprint(filtered_rows)
 
         questions = [await Question.from_row(ctx, row) for row in filtered_rows]
 
@@ -982,7 +972,6 @@ class Interview(commands.Cog):
             else:
                 pprint.pprint(embed.to_dict())
                 await channel.send(embed=embed)
-            # TODO check if answer too long
 
         if preview_flag is True:
             return
@@ -1001,7 +990,6 @@ class Interview(commands.Cog):
 
         Questions posted in chronological order, grouped by asker. If an answer is too long to be posted,
         the interviewee may have to post it manually.
-        # TODO: Add a flag to post strictly chronologically?
         """
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
@@ -1103,8 +1091,7 @@ class Interview(commands.Cog):
         iv_meta = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
 
-        # TODO: check votes for legality oh no
-        #  like, lots to do.
+        # Note: Not completely confident in vote legality checking, so these checks are a living document.
 
         class VoteError:
             def __init__(self):
@@ -1355,7 +1342,7 @@ class Interview(commands.Cog):
     @_ck_server_active()
     async def opt_list(self, ctx: commands.Context):
         """
-        TODO: Check who's opted out of interview voting.
+        Check who's opted out of interview voting.
         """
         session = session_maker()
         opts = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id).all()
@@ -1371,67 +1358,5 @@ class Interview(commands.Cog):
         await ctx.send(reply)
 
 
-# ===
-# TODO: begin eliminate before release
-# ===
-
-@commands.command()
-@commands.is_owner()
-async def ivembed(ctx: commands.Context):
-    me = ctx.guild.get_member(100165629373337600)
-    charmander = ctx.bot.get_user(129700693329051648)
-    link = 'https://discord.com/channels/328399532368855041/328399532368855041/773778440208908298'
-    question = 'you have a magic the gathering bot, but the interview bot is broke. seems legit'
-    answer = 'every time u complain about it i delay release another day :ok_hand:'
-
-    em = InterviewEmbed.blank(me, charmander)
-    q_title = 'Question #1'
-    q_a = (
-        f'[> {question}]({link})\n'
-        f'{answer}'
-    )
-    em.add_field(name=q_title, value=q_a, inline=False)
-    await ctx.send(embed=em)
-
-
-def fail_check(ctx: commands.Context):
-    raise commands.CommandError('lol fail')
-
-
-@commands.command()
-@commands.check(fail_check)
-async def failme(ctx: commands.Context):
-    await ctx.send('you should never see this')
-
-
-@failme.error
-async def failme_error(ctx: commands.Context, error: Exception):
-    await ctx.send(str(error))
-
-
-def fail_check2():
-    async def predicate(ctx: commands.Context):
-        if not ctx.message.content.startswith(ctx.prefix + 'help'):
-            await ctx.send('still failing')
-        return False
-
-    return commands.check(predicate)
-
-
-@commands.command()
-@fail_check2()
-async def failme2(ctx: commands.Context):
-    await ctx.send('you should also never see this')
-
-
-# ===
-# TODO: end eliminate before release
-# ===
-
-
 def setup(bot: commands.Bot):
     bot.add_cog(Interview(bot))
-
-    bot.add_command(ivembed)
-    bot.add_command(failme)
-    bot.add_command(failme2)
