@@ -6,6 +6,7 @@ ipython
 oauth2client
 pillow
 pycountry
+python-Levenshtein
 pytz
 pyyaml
 sqlalchemy
