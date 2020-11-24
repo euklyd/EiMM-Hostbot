@@ -258,8 +258,8 @@ class HostBot(commands.Cog):
         host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='host').one_or_none()
         host_role = ctx.guild.get_role(host_role_id.id)
 
-        player_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').one_or_none()
-        player_role = ctx.guild.get_role(player_role_id.id)
+        player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
+        player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
 
         print(f'spec_role_id: {spec_role_id}')
         print(f'host_role_id: {spec_role_id}')
@@ -281,22 +281,26 @@ class HostBot(commands.Cog):
         error += '```_(Created channels without permissions instead.)_'
 
         players = sorted(players, key=lambda p: p.name.lower())
-        category = await ctx.guild.create_category('Role PMs', overwrites={
+        overwrites = {
             ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
             ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
             host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
-            player_role: discord.PermissionOverwrite(manage_messages=True),
-        })  # type: discord.CategoryChannel
+        }
+        for player_role in player_roles:
+            overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
+        category = await ctx.guild.create_category('Role PMs', overwrites=overwrites)  # type: discord.CategoryChannel
 
         for player in players:
             overwrites = {
                 ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
                 host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
-                player_role: discord.PermissionOverwrite(manage_messages=True),
             }
+            for player_role in player_roles:
+                overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
             if type(player) is discord.Member:
-                await player.edit(roles=player.roles + [player_role])
+                if len(player_roles) == 1:
+                    await player.edit(roles=player.roles + [player_roles[0]])
                 # manage needed for pins
                 overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
             topic = f"{player}'s Role PM"
