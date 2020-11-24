@@ -14,7 +14,7 @@ from gspread.exceptions import SpreadsheetNotFound
 
 from cogs import interview_schema as schema
 from core.bot import Bot
-from utils import spreadsheet
+from utils import spreadsheet, utils
 
 _DEBUG_FLAG = False  # Note: toggle to off when not testing
 
@@ -651,7 +651,9 @@ class Interview(commands.Cog):
             interview_sheet.share(email, perm_type='user', role='writer')
 
         channel = ctx.guild.get_channel(server.answer_channel)
-        await self._votals_in_channel(ctx, flag=None, channel=channel)
+        op_msg = await self._votals_in_channel(ctx, flag=None, channel=channel)
+        new_interview.op_channel_id = op_msg.channel.id
+        new_interview.op_message_id = op_msg.id
 
         session.query(schema.Vote).filter_by(server_id=ctx.guild.id).delete()
 
@@ -794,10 +796,14 @@ class Interview(commands.Cog):
         session = session_maker()
         interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id,
                                                               current=True).one_or_none()  # type: schema.Interview
-        interviewee = ctx.guild.get_member(interview.interviewee_id)
-        past_interviews = session.query(schema.Interview).filter_by(
-            server_id=ctx.guild.id, interviewee_id=interview.interviewee_id).all()  # type: List[schema.Interview]
         if member is None:
+            if interview is None:
+                await ctx.send('There is no currently ongoing interview.')
+                return
+            interviewee = ctx.guild.get_member(interview.interviewee_id)
+            past_interviews = session.query(schema.Interview).filter_by(
+                server_id=ctx.guild.id, interviewee_id=interview.interviewee_id).all()  # type: List[schema.Interview]
+
             # view general stats
             em = discord.Embed(
                 title=f"{interviewee}'s interview",
@@ -807,7 +813,8 @@ class Interview(commands.Cog):
             if len(past_interviews) > 1:
                 description = f"{interviewee}'s past interviews were:\n"
                 for iv in past_interviews:
-                    description += f'• {iv.start_time}: {iv.questions_asked} out of {iv.questions_asked}\n'
+                    url = utils.jump_url(iv.server_id, iv.op_channel_id, iv.op_message_id)
+                    description += f'• [{iv.start_time}]({url}): {iv.questions_answered} out of {iv.questions_asked}\n'
             else:
                 description = f"This is {interviewee}'s first interview!"
             em.description = description
@@ -817,11 +824,24 @@ class Interview(commands.Cog):
             await ctx.send(embed=em)
             return
 
+        past_interviews = session.query(schema.Interview).filter_by(
+            server_id=ctx.guild.id, interviewee_id=member.id).all()  # type: List[schema.Interview]
+
         em = discord.Embed(
             title=f'Interview stats for {member}',
             color=member.color,
         )
+        if len(past_interviews) > 0:
+            description = f"{member}'s past interviews were:\n"
+            for iv in past_interviews:
+                url = utils.jump_url(iv.server_id, iv.op_channel_id, iv.op_message_id)
+                description += f'• [{iv.start_time}]({url}): {iv.questions_asked} out of {iv.questions_asked}\n'
+            em.description = description
         em.set_thumbnail(url=member.avatar_url)
+        if interview is None:
+            # No questions could have been asked if there's no current interview
+            await ctx.send(embed=em)
+            return
         current_qs = session.query(schema.Asker).filter_by(interview_id=interview.id, asker_id=member.id).one_or_none()
         if current_qs is None:
             # hasn't asked questions
@@ -1168,7 +1188,7 @@ class Interview(commands.Cog):
             mentions.remove(mention)
 
         # 5. Cannot vote if you've joined the server since the start of the last interview.  (return immediately)
-        if ctx.author.joined_at > iv_meta.start_time:
+        if iv_meta is not None and ctx.author.joined_at > iv_meta.start_time:
             await ctx.send(f"Don't just rejoin servers only to vote, {ctx.author}, have some respect.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -1228,7 +1248,7 @@ class Interview(commands.Cog):
         await ctx.send(response)
 
     async def _votals_in_channel(self, ctx: commands.Context, flag: Optional[str] = None,
-                                 channel: Optional[discord.TextChannel] = None):
+                                 channel: Optional[discord.TextChannel] = None) -> discord.Message:
         """
         The only reason this isn't votals() is because it also gets called by iv_next(), but that wants to place
         the votals reply in a different channel.
@@ -1275,7 +1295,7 @@ class Interview(commands.Cog):
 
         reply = f'**__Votals__**```ini\n{block_text}```{footer}\n'
 
-        await channel.send(reply)
+        return await channel.send(reply)
 
     @commands.command()
     @_ck_server_active()
@@ -1358,5 +1378,53 @@ class Interview(commands.Cog):
         await ctx.send(reply)
 
 
+# TODO: Remove before release.
+@commands.command()
+@commands.is_owner()
+async def populate(ctx: commands.Context, filename: str):
+    """
+    Populate Interview table from an existing JSON.
+
+    'filename' should be located in the bot's base directory. Format is a list of dicts with the following fields:
+    "interviewee_id": int,
+    "start_time": posix timestamp,
+    "server_id": int,
+    "channel_id": int,
+    "message_id": int,
+    "sheet_name": "str",
+    "current": bool,
+    "questions_asked": int,
+    "questions_answered": int
+    """
+    import json
+    from datetime import timezone
+
+    with open(filename, 'r') as fp:
+        rows = json.load(fp)
+
+    session = session_maker()
+    ivs = []
+    for row in rows:
+        ts = row['start_time']
+        timestamp = datetime.utcfromtimestamp(ts).replace(tzinfo=timezone.utc)
+        iv = schema.Interview(
+            server_id=row['server_id'],
+            interviewee_id=row['interviewee_id'],
+            start_time=timestamp,
+            sheet_name=row['sheet_name'],
+            questions_asked=row['questions_asked'],
+            questions_answered=row['questions_answered'],
+            current=False,
+            op_channel_id=row['channel_id'],
+            op_message_id=row['message_id'],
+        )
+        ivs.append(iv)
+    session.add_all(ivs)
+    session.commit()
+
+    await ctx.message.add_reaction(ctx.bot.greentick)
+
+
 def setup(bot: commands.Bot):
     bot.add_cog(Interview(bot))
+    bot.add_command(populate)  # TODO: Remove before release.

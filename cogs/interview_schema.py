@@ -47,6 +47,8 @@ class Interview(Base):
     questions_answered = Column(Integer)
     # NOTE: the "current" column could probably be removed in favor of just using the most recent timestamp
     current = Column(Boolean)  # "True" indicates the current interview
+    op_channel_id = Column(Integer)
+    op_message_id = Column(Integer)
     # TODO: oh god there's so much more
     #  later edit: is there??? i think it may be good now
 
