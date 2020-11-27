@@ -53,86 +53,97 @@ def scryfall_search(expr: str) -> ScryfallResponse:
     return ScryfallResponse(cards, cardnames, card_map)
 
 
-@commands.command()
-async def oracle(ctx: commands.Context, *, expr: str):
+class Cards(commands.Cog):
     """
-    Search Scryfall for Magic: The Gathering cards.
-
-    Full search syntax guide online: https://scryfall.com/docs/syntax
+    Card games, on motorcycles.
     """
-    response = scryfall_search(expr)
 
-    if len(response.cards) > 1:
-        await ctx.send(f"There were {len(response.cards)} that matched your search parameters. "
-                       "Select the one you're looking for:")
-        try:
-            card = await utils.menu.menu_list(ctx, response.names)
-        except asyncio.TimeoutError:
+    def __init__(self, bot: Bot):
+        self.bot = bot
+
+    @commands.command()
+    async def oracle(self, ctx: commands.Context, *, expr: str):
+        """
+        Search Scryfall for Magic: The Gathering cards.
+
+        Full search syntax guide online: https://scryfall.com/docs/syntax
+        Also available inline as [[expr]].
+        """
+        response = scryfall_search(expr)
+
+        if len(response.cards) > 1:
+            await ctx.send(f"There were {len(response.cards)} that matched your search parameters. "
+                           "Select the one you're looking for:")
+            try:
+                card = await utils.menu.menu_list(ctx, response.names)
+            except asyncio.TimeoutError:
+                return
+            except RuntimeError:
+                await ctx.send('You already have a menu going in this channel.')
+                return
+            if card is None:
+                return
+            # card = Card(card)
+            # reply = (
+            #     f'{card.name} - {card.mana_cost}\n'
+            #     f'{card.type_line}\n'
+            #     f'{card.oracle_text}\n'
+            # )
+            card = response.map[card]
+        else:
+            card = response.cards[0]
+
+        if 'image_uris' in card:
+            await ctx.send(card['image_uris']['normal'])
+        else:
+            await ctx.send(f"`'image_uris'` not present ( `{card['uri']}` ). Try: {card['scryfall_uri']}")
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if message.author.id == self.bot.user.id:
             return
-        except RuntimeError:
-            await ctx.send('You already have a menu going in this channel.')
+        img_regex = r'\[\[([^\[\]]*)]]'
+        match = re.search(img_regex, message.content)
+        if type(message.channel) == discord.TextChannel:
+            for member in message.channel.members:  # type: discord.Member
+                if member.id == 558508371821723670:
+                    if member.status == discord.Status.offline:
+                        # karn exists and is online
+                        pass  # we can just answer queries instead of karn :)
+                    else:
+                        # karn exists and is online
+                        return
+        if match is not None:
+            expr = match.group(1)
+        else:
             return
-        if card is None:
+        resp = scryfall_search(expr)
+        if len(resp.cards) == 0:
             return
-        # card = Card(card)
-        # reply = (
-        #     f'{card.name} - {card.mana_cost}\n'
-        #     f'{card.type_line}\n'
-        #     f'{card.oracle_text}\n'
-        # )
-        card = response.map[card]
-    else:
-        card = response.cards[0]
+        card = resp.closest(message.content)
+        for c in resp.cards:
+            if c['name'].lower() == expr.lower():
+                card = c
+        if 'image_uris' in card:
+            await message.channel.send(card['image_uris']['normal'])
+        else:
+            await message.channel.send(f"`'image_uris'` not present ( `{card['uri']}` ). Try: {card['scryfall_uri']}")
 
-    if 'image_uris' in card:
-        await ctx.send(card['image_uris']['normal'])
-    else:
-        await ctx.send(f"`'image_uris'` not present ( `{card['uri']}` ). Try: {card['scryfall_uri']}")
+    @commands.command()
+    async def ygo(self, ctx: commands.Context, *, query):
+        """
+        Search YGOPro for Yu-Gi-Oh cards.
+        """
+        ygo = ygoprodeck.YGOPro()
+        result = ygo.get_cards(fname=query)
+        # top level: dict key: data
+        # second level: list of matches
 
-
-async def oracle_inline(message: discord.Message):
-    img_regex = r'\[\[([^\[\]]*)]]'
-    match = re.search(img_regex, message.content)
-    if type(message.channel) == discord.TextChannel:
-        for member in message.channel.members:  # type: discord.Member
-            if member.id == 558508371821723670:
-                if member.status == discord.Status.offline:
-                    # karn exists and is online
-                    pass  # we can just answer queries instead of karn :)
-                else:
-                    # karn exists and is online
-                    return
-    if match is not None:
-        expr = match.group(1)
-    else:
-        return
-    resp = scryfall_search(expr)
-    if len(resp.cards) == 0:
-        return
-    card = resp.closest(message.content)
-    for c in resp.cards:
-        if c['name'].lower() == expr.lower():
-            card = c
-    if 'image_uris' in card:
-        await message.channel.send(card['image_uris']['normal'])
-    else:
-        await message.channel.send(f"`'image_uris'` not present ( `{card['uri']}` ). Try: {card['scryfall_uri']}")
-
-
-@commands.command()
-async def ygo(ctx: commands.Context, *, query):
-    ygo = ygoprodeck.YGOPro()
-    result = ygo.get_cards(fname=query)
-    # top level: dict key: data
-    # second level: list of matches
-
-    intermediate_keys = {card['name']: card for card in result['data']}
-    matches = process.extractBests(query, intermediate_keys.keys(), limit=10)
-    card = intermediate_keys[matches[0][0]]
-    await ctx.send(card['card_images'][0]['image_url'])
+        intermediate_keys = {card['name']: card for card in result['data']}
+        matches = process.extractBests(query, intermediate_keys.keys(), limit=10)
+        card = intermediate_keys[matches[0][0]]
+        await ctx.send(card['card_images'][0]['image_url'])
 
 
 def setup(bot: Bot):
-    bot.add_command(oracle)
-    bot.add_listener(oracle_inline, 'on_message')
-    bot.add_command(ygo)
+    bot.add_cog(Cards(bot))
