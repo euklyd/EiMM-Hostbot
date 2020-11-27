@@ -23,6 +23,14 @@ from discord.ext import commands
 #     await ctx.send(outline_url)
 
 
+class Utility(commands.Cog):
+    pass
+
+
+class Moderation(commands.Cog):
+    pass
+
+
 @commands.command()
 async def bidoof(ctx: commands.Context, key: Optional[str]):
     """
@@ -37,7 +45,7 @@ async def bidoof(ctx: commands.Context, key: Optional[str]):
             bidoofs += ctx.bot.imgur.get_album_images(album)
     else:
         bidoofs = ctx.bot.imgur.get_album_images(BIDOOF_ALBUM)
-    bidoof_img = random.choice(bidoofs)  # Image
+    bidoof_img = random.choice(bidoofs)  # type: Image
     if key is not None:
         # if a key is specified, attempt to override the randomly selected image
         for img in bidoofs:
@@ -114,6 +122,13 @@ async def pin(ctx: commands.Context, msg_id: int, channel: Optional[discord.Text
     await ctx.message.add_reaction(ctx.bot.greentick)
 
 
+@commands.command()
+async def avatar(ctx: commands.Context, user: Optional[discord.User]):
+    if user is None:
+        user = ctx.author
+    await ctx.send(str(user.avatar_url_as(static_format="png")))
+
+
 def setup(bot: commands.Bot):
     bot.add_command(bidoof)
     bot.add_command(msg)
@@ -121,3 +136,4 @@ def setup(bot: commands.Bot):
     bot.add_command(trunc)
     bot.add_command(clear)
     bot.add_command(pin)
+    bot.add_command(avatar)
