@@ -1,11 +1,13 @@
 from typing import Optional, List
 
 import random
-# import requests
 import discord
 import requests
+import dice
 from imgurpython.imgur.models.image import Image
 from discord.ext import commands
+
+from core.bot import Bot
 
 
 # from selenium import webdriver
@@ -24,11 +26,118 @@ from discord.ext import commands
 
 
 class Utility(commands.Cog):
-    pass
+    """
+    Utility commands, usable by everyone.
+    """
+
+    def __init__(self, bot: Bot):
+        self.bot = bot
+
+    @commands.command()
+    async def avatar(self, ctx: commands.Context, user: Optional[discord.User]):
+        """
+        Fetch the avatar URL for a user.
+
+        If no user mentioned, fetches your own avatar URL.
+        """
+        if user is None:
+            user = ctx.author
+        await ctx.send(str(user.avatar_url_as(static_format="png")))
+
+    @commands.command()
+    async def trunc(self, ctx: commands.Context, size: int, *, message: str):
+        """
+        Truncate a message to <size> characters.
+        """
+        await ctx.send(f'`{message[:size]}`')
+
+    @commands.command()
+    async def roll(self, ctx: commands.Context, expr: str):
+        """
+        Roll dice.
+
+        e.g., "roll 1d4+2d8". Evaluates expressions using the syntax found at https://pypi.org/project/dice/.
+        """
+        result = dice.roll(expr)
+        await ctx.send(result)
 
 
 class Moderation(commands.Cog):
-    pass
+    """
+    Server management and moderation, usable by admins.
+    """
+
+    def __init__(self, bot: Bot):
+        self.bot = bot
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def clear(self, ctx: commands.Context, num: int):
+        """
+        Clear messages en masse.
+        """
+        assert type(ctx.channel) is discord.TextChannel
+        deleted = await ctx.channel.purge(limit=num + 1)  # num+1 because the trigger message is counted too
+        deletion_message = await ctx.send(f'*Cleared {len(deleted)} messages.*')
+        await deletion_message.delete(delay=5)
+
+
+class Management(commands.Cog):
+    """
+    Bot management, usable only by the bot owner.
+    """
+
+    def __init__(self, bot: Bot):
+        self.bot = bot
+
+    @commands.command()
+    @commands.is_owner()
+    async def msg(self, ctx: commands.Context, channel_id: int, *, message: str):
+        """
+        Send a message to the specified channel.
+
+        Also works for whispering to users. Please don't abuse this!
+        """
+        channel = ctx.bot.get_channel(channel_id)  # type: discord.TextChannel
+        if channel is None:
+            channel = ctx.bot.get_user(channel_id)  # type: discord.User
+        if channel is None:
+            # Not a text channel or a user.
+            await ctx.send('No matching channel found.')
+        await channel.send(message)
+
+    @commands.command()
+    @commands.is_owner()
+    async def chavi(self, ctx: commands.Context, *, url: str):
+        """
+        Change the bot's avatar.
+        """
+        try:
+            response = requests.get(url)
+            await ctx.bot.user.edit(avatar=response.content)
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        except Exception as e:
+            await ctx.send(f'`Error: {e}`')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+
+    @commands.command()
+    @commands.is_owner()
+    async def pin(self, ctx: commands.Context, msg_id: int, channel: Optional[discord.TextChannel]):
+        """
+        Pin a message.
+
+        msg_id must be for a message in the current channel, unless a channel is specified.
+        """
+        if channel is not None:
+            message = await channel.fetch_message(msg_id)
+        else:
+            message = await ctx.channel.fetch_message(msg_id)
+        if message is None:
+            await ctx.send(f'Message `{msg_id}` not found.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        await message.pin()
+        await ctx.message.add_reaction(ctx.bot.greentick)
 
 
 @commands.command()
@@ -56,84 +165,9 @@ async def bidoof(ctx: commands.Context, key: Optional[str]):
     await ctx.send(embed=em)
 
 
-@commands.command()
-@commands.is_owner()
-async def msg(ctx: commands.Context, channel_id: int, *, message: str):
-    """
-    Send a message to the specified channel.
-
-    Also works for whispering to users. Please don't abuse this!
-    """
-    channel = ctx.bot.get_channel(channel_id)  # type: discord.TextChannel
-    if channel is None:
-        channel = ctx.bot.get_user(channel_id)  # type: discord.User
-    if channel is None:
-        # Not a text channel or a user.
-        await ctx.send('No matching channel found.')
-    await channel.send(message)
-
-
-@commands.command()
-@commands.is_owner()
-async def chavi(ctx: commands.Context, *, url: str):
-    try:
-        response = requests.get(url)
-        await ctx.bot.user.edit(avatar=response.content)
-        await ctx.message.add_reaction(ctx.bot.greentick)
-    except Exception as e:
-        await ctx.send(f'`Error: {e}`')
-        await ctx.message.add_reaction(ctx.bot.redtick)
-
-
-@commands.command()
-async def trunc(ctx: commands.Context, size: int, *, msg: str):
-    await ctx.send(f'`{msg[:size]}`')
-
-
-@commands.command()
-@commands.has_permissions(administrator=True)
-async def clear(ctx: commands.Context, num: int):
-    """
-    Clear messages en masse.
-    """
-    assert type(ctx.channel) is discord.TextChannel
-    deleted = await ctx.channel.purge(limit=num+1)  # num+1 because the trigger message is counted too
-    deletion_message = await ctx.send(f'*Cleared {len(deleted)} messages.*')
-    await deletion_message.delete(delay=5)
-
-
-@commands.command()
-@commands.is_owner()
-async def pin(ctx: commands.Context, msg_id: int, channel: Optional[discord.TextChannel]):
-    """
-    Pin a message.
-
-    msg_id must be for a message in the current channel, unless a channel is specified.
-    """
-    if channel is not None:
-        message = await channel.fetch_message(msg_id)
-    else:
-        message = await ctx.channel.fetch_message(msg_id)
-    if message is None:
-        await ctx.send(f'Message `{msg_id}` not found.')
-        await ctx.message.add_reaction(ctx.bot.redtick)
-        return
-    await message.pin()
-    await ctx.message.add_reaction(ctx.bot.greentick)
-
-
-@commands.command()
-async def avatar(ctx: commands.Context, user: Optional[discord.User]):
-    if user is None:
-        user = ctx.author
-    await ctx.send(str(user.avatar_url_as(static_format="png")))
-
-
 def setup(bot: commands.Bot):
     bot.add_command(bidoof)
-    bot.add_command(msg)
-    bot.add_command(chavi)
-    bot.add_command(trunc)
-    bot.add_command(clear)
-    bot.add_command(pin)
-    bot.add_command(avatar)
+
+    bot.add_cog(Utility(bot))
+    bot.add_cog(Moderation(bot))
+    bot.add_cog(Management(bot))

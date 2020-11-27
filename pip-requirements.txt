@@ -1,3 +1,4 @@
+dice
 discord.py[voice]
 fuzzywuzzy
 gspread
