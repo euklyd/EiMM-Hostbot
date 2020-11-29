@@ -1024,15 +1024,11 @@ class Interview(commands.Cog):
         """
         await self._channel_answer(ctx, ctx.channel)
 
-    @commands.command()
-    @_ck_server_active()
-    @_ck_is_interviewee()
-    async def imganswer(self, ctx: commands.Context, row_num: int, url: str):
-        """
-        Answer a single question row with an added image.
+    async def _imganswer(self, ctx: commands.Context, row_num: int, url: str, channel: discord.TextChannel):
+        preview_flag = False
+        if channel == ctx.channel:
+            preview_flag = True
 
-        Use the row as indicated on the sheet sidebar.
-        """
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
         interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id,
@@ -1057,11 +1053,27 @@ class Interview(commands.Cog):
                            f'(of {n_asked + n_answered})')
         em.set_image(url=url)
 
-        interview.questions_answered += 1
-        sheet.update_acell(f'H{row_num}', True)
-        session.commit()
+        if not preview_flag:
+            interview.questions_answered += 1
+            sheet.update_acell(f'H{row_num}', True)
+            session.commit()
 
-        await ctx.send(embed=em)
+        await channel.send(embed=em)
+
+    @commands.command()
+    @_ck_server_active()
+    @_ck_is_interviewee()
+    async def imganswer(self, ctx: commands.Context, row_num: int, url: str):
+        """
+        Answer a single question row with an added image.
+
+        Use the row as indicated on the sheet sidebar.
+        """
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        channel = ctx.guild.get_channel(server.answer_channel)
+        await self._imganswer(ctx, row_num, url, channel)
+
 
     # == Votes ==
 
