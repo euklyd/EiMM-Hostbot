@@ -45,11 +45,11 @@ class Utility(commands.Cog):
         await ctx.send(str(user.avatar_url_as(static_format="png")))
 
     @commands.command()
-    async def trunc(self, ctx: commands.Context, size: int, *, message: str):
+    async def ping(self, ctx: commands.Context):
         """
-        Truncate a message to <size> characters.
+        Call-and-response to check if the bot is alive.
         """
-        await ctx.send(f'`{message[:size]}`')
+        await ctx.send("pong")
 
     @commands.command()
     async def roll(self, ctx: commands.Context, expr: str):
@@ -60,6 +60,13 @@ class Utility(commands.Cog):
         """
         result = dice.roll(expr)
         await ctx.send(result)
+
+    @commands.command()
+    async def trunc(self, ctx: commands.Context, size: int, *, message: str):
+        """
+        Truncate a message to <size> characters.
+        """
+        await ctx.send(f'`{message[:size]}`')
 
 
 class Moderation(commands.Cog):
