@@ -1024,6 +1024,45 @@ class Interview(commands.Cog):
         """
         await self._channel_answer(ctx, ctx.channel)
 
+    @commands.command()
+    @_ck_server_active()
+    @_ck_is_interviewee()
+    async def imganswer(self, ctx: commands.Context, row_num: int, url: str):
+        """
+        Answer a single question row with an added image.
+
+        Use the row as indicated on the sheet sidebar.
+        """
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id,
+                                                              current=True).one_or_none()  # type: schema.Interview
+        interviewee = ctx.guild.get_member(interview.interviewee_id)
+        sheet = self.connection.get_sheet(server.sheet_name).sheet1
+
+        row = sheet.row_values(row_num)  # List[Any]
+
+        asker = ctx.guild.get_member(row[3])
+        if asker is None:
+            asker = await ctx.bot.fetch_user(row[3])
+        em = InterviewEmbed.blank(interviewee, asker)
+
+        n_answered = 1
+        n_asked = interview.questions_asked
+
+        question = Question(interviewee=interviewee, asker=asker, question=row[5], question_num=row[4],
+                            server_id=row[8], channel_id=row[9], message_id=row[10], answer=row[6], timestamp=row[1])
+        add_question(em, question, 0)  # we're not checking length here
+        em.set_footer(text=f'{n_answered + interview.questions_answered} questions answered '
+                           f'(of {n_asked + n_answered})')
+        em.set_image(url=url)
+
+        interview.questions_answered += 1
+        sheet.update_acell(f'H{row_num}', True)
+        session.commit()
+
+        await ctx.send(embed=em)
+
     # == Votes ==
 
     @staticmethod
