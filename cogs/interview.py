@@ -780,7 +780,6 @@ class Interview(commands.Cog):
         """
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
-        print(datetime.strptime(date, '%Y/%m/%d'))
         server.limit = datetime.strptime(date, '%Y/%m/%d')
         session.commit()
         await ctx.message.add_reaction(ctx.bot.greentick)
@@ -990,7 +989,6 @@ class Interview(commands.Cog):
                 await channel.send(f"Question #{embed.question_num} or its answer from {embed.asker} was too long "
                                    f"to embed, please split it up and answer it manually.")
             else:
-                pprint.pprint(embed.to_dict())
                 await channel.send(embed=embed)
 
         if preview_flag is True:
