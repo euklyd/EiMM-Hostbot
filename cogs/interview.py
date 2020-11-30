@@ -718,7 +718,7 @@ class Interview(commands.Cog):
         interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
         old_count = interview.questions_answered
 
-        sheet = self.connection.get_sheet(interview.sheet_name).sheet1
+        sheet = self.connection.get_sheet(interview.server.sheet_name).sheet1
         count = 0
         for record in sheet.get_all_records():
             if record['Posted?'] == 'TRUE':
