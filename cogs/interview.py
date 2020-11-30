@@ -113,7 +113,7 @@ class Question:
         Translates a row from the Google sheet to an object.
         """
         channel = ctx.bot.get_channel(row['Channel ID'])  # type: discord.TextChannel
-        message = await channel.fetch_message(row['Message ID'])
+        # message = await channel.fetch_message(row['Message ID'])
         return Question(
             # This is a bit dangerous, but should be fine! only the interviewee will be calling the answer method:
             interviewee=ctx.author,
@@ -439,9 +439,9 @@ class Interview(commands.Cog):
 
     @staticmethod
     def _generate_embeds(interviewee: discord.Member, interview: schema.Interview, questions: List[Question],
-                         avatar_url: str = None) -> Generator[Union[discord.Embed, Question], None, None]:
+                         avatar_url: str = None) -> List[Union[discord.Embed, Question]]:
         """
-        Generate discord.Embeds to be posted from a list of Questions.
+        Generate a list of discord.Embeds to be posted from a list of Questions.
         """
         if avatar_url is None:
             avatar_url = interviewee.avatar_url
@@ -453,17 +453,29 @@ class Interview(commands.Cog):
             final_em.set_footer(text=f'{n_answered + interview.questions_answered} questions answered (of {n_asked})')
             return final_em
 
-        last_asker = None  # type: Optional[discord.Member]
         length = 0
+
+        def new_em(asker: discord.Member):
+            if _DEBUG_FLAG:
+                print('new blank em')
+            nonlocal length
+            length = 0
+            return InterviewEmbed.blank(interviewee, asker, avatar_url=avatar_url)  # TODO: update avatar url?
+
+        last_asker = None  # type: Optional[discord.Member]
+
+        ls_embeds = []
+
         em = None  # type: Optional[discord.Embed]
         for question in questions:
+            if _DEBUG_FLAG:
+                print(f'generating {question.asker}-{question.question_num}')
             if last_asker != question.asker:
+                # new asker, append old embed and make a new one
                 if em is not None and len(em.fields) > 0:
-                    yield finalize(em)
+                    ls_embeds.append(finalize(em))
                 # make a new embed
-                em = InterviewEmbed.blank(interviewee, question.asker,
-                                          avatar_url=avatar_url)  # TODO: update avatar url?
-                length = 0
+                em = new_em(question.asker)
 
             # Add question/answer fields and count additional length.
             added_length = add_question(em, question, length)
@@ -471,20 +483,23 @@ class Interview(commands.Cog):
             # Update answered questions per asker
             n_answered += 1
             if added_length == -1:
-                # question wasn't added, yield and retry
+                # question wasn't added, append to list and retry
                 if len(em.fields) > 0:
-                    yield finalize(em)
-                em = InterviewEmbed.blank(interviewee, question.asker,
-                                          avatar_url=avatar_url)  # TODO: update avatar url?
+                    ls_embeds.append(finalize(em))
+                em = new_em(question.asker)
+                added_length = add_question(em, question, length)
+
             if added_length == -2:
-                # question cannot be added, yield an error
-                yield question
+                # question cannot be added, add an error
+                ls_embeds.append(question)
             length += added_length
             last_asker = question.asker
         if em is not None:
             # yield the final embed
             if len(em.fields) > 0:
-                yield finalize(em)
+                ls_embeds.append(finalize(em))
+
+        return ls_embeds
 
     # == Setup ==
 
@@ -987,7 +1002,12 @@ class Interview(commands.Cog):
         interviewee = ctx.guild.get_member(interview.interviewee_id)
         sheet = self.connection.get_sheet(server.sheet_name).sheet1
 
+        if _DEBUG_FLAG:
+            print('fetching records')
         rows = sheet.get_all_records()
+        if _DEBUG_FLAG:
+            print('records fetched')
+
         filtered_rows = []
         filtered_cells = []
         for i, row in enumerate(rows):
@@ -998,6 +1018,9 @@ class Interview(commands.Cog):
                     'values': [[True]]
                 })
 
+        if _DEBUG_FLAG:
+            print('filtered cells')
+
         # Note: Useful debug output, not convinced this is perfect yet.
         # print('\n=== raw rows ===\n')
         # pprint.pprint(len(rows))
@@ -1005,13 +1028,23 @@ class Interview(commands.Cog):
         # pprint.pprint(filtered_rows)
 
         questions = [await Question.from_row(ctx, row) for row in filtered_rows]
+        if _DEBUG_FLAG:
+            print('converted to questions')
+
+        for q in questions:
+            print(q.asker, q.question_num)
 
         if len(questions) == 0:
             await ctx.send('No new questions to be answered.')
             return
 
         n_sent = 0
-        for embed in Interview._generate_embeds(interviewee=interviewee, interview=interview, questions=questions):
+        embeds = Interview._generate_embeds(interviewee=interviewee, interview=interview, questions=questions)
+        if _DEBUG_FLAG:
+            print(len(embeds))
+            for e in embeds:
+                print(type(e))
+        for embed in embeds:
             if type(embed) is Question:
                 # question was too long
                 await channel.send(f"Question #{embed.question_num} or its answer from {embed.asker} was too long "
@@ -1019,8 +1052,10 @@ class Interview(commands.Cog):
             else:
                 await channel.send(embed=embed)
                 n_sent += 1
-                print(f'sent {n_sent} answers')
-        print('done sending answers')
+                if _DEBUG_FLAG:
+                    print(f'sent {n_sent} answer embeds')
+        if _DEBUG_FLAG:
+            print('done sending answers')
 
         if preview_flag is True:
             return
