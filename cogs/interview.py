@@ -717,17 +717,21 @@ class Interview(commands.Cog):
         session = session_maker()
         interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
         old_count = interview.questions_answered
+        old_total = interview.questions_asked
 
         sheet = self.connection.get_sheet(interview.server.sheet_name).sheet1
         count = 0
-        for record in sheet.get_all_records():
+        records = sheet.get_all_records()
+        for record in records:
             if record['Posted?'] == 'TRUE':
                 count += 1
         interview.questions_answered = count
+        interview.questions_asked = len(records)
         session.commit()
 
         await ctx.message.add_reaction(ctx.bot.greentick)
         await ctx.send(f'Old count: {old_count}\nNew count: {count}')
+        await ctx.send(f'Old total: {old_total}\nNew total: {len(records)}')
 
     @iv.command(name='channel')
     @commands.has_permissions(administrator=True)
