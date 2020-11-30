@@ -269,11 +269,7 @@ class HostBot(commands.Cog):
         player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
         player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
 
-        print(f'spec_role_id: {spec_role_id}')
-        print(f'host_role_id: {spec_role_id}')
-
         ls_usernames = playerlist.strip('```').strip('\n').split('\n')
-        print(ls_usernames)
 
         players = []
         error_names = []
