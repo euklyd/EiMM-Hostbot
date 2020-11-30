@@ -165,6 +165,8 @@ class EiMM(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
+        if message.author.id == self.bot.user.id:
+            return
         ability_regex = r'<<([^<>]*)>>'
         match = re.search(ability_regex, message.content)
         if match is not None:
