@@ -716,6 +716,7 @@ class Interview(commands.Cog):
         """
         session = session_maker()
         interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
+        old_count = interview.questions_answered
 
         sheet = self.connection.get_sheet(interview.sheet_name).sheet1
         count = 0
@@ -725,6 +726,8 @@ class Interview(commands.Cog):
         interview.questions_answered = count
         session.commit()
 
+        await ctx.message.add_reaction(ctx.bot.greentick)
+        await ctx.send(f'Old count: {old_count}\nNew count: {count}')
 
     @iv.command(name='channel')
     @commands.has_permissions(administrator=True)
@@ -1138,7 +1141,6 @@ class Interview(commands.Cog):
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
         channel = ctx.guild.get_channel(server.answer_channel)
         await self._imganswer(ctx, row_num, url, channel)
-
 
     # == Votes ==
 
