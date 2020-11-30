@@ -449,10 +449,9 @@ class Interview(commands.Cog):
         n_answered = 0
         n_asked = interview.questions_asked
 
-        def finalize(final_embed: discord.Embed):
-            final_embed.set_footer(text=f'{n_answered + interview.questions_answered} questions answered '
-                                        f'(of {n_asked + n_answered})')
-            return final_embed
+        def finalize(final_em: discord.Embed):
+            final_em.set_footer(text=f'{n_answered + interview.questions_answered} questions answered (of {n_asked})')
+            return final_em
 
         last_asker = None  # type: Optional[discord.Member]
         length = 0
@@ -615,7 +614,7 @@ class Interview(commands.Cog):
             interviewee_id=interviewee.id,
             start_time=timestamp,
             sheet_name=sheet_name,
-            questions_asked=0,
+            questions_asked=1,  # Starts at 1 for the default question
             questions_answered=0,
             current=True,
         )
@@ -683,6 +682,34 @@ class Interview(commands.Cog):
         em.add_field(name='Default question', value=f'{server.default_question}')
         em.add_field(name='Reinterview limit', value=f'{server.limit}')
         await ctx.send(embed=em)
+
+    @iv.command(name='overwrite')
+    @commands.is_owner()
+    @_ck_server_active()
+    async def iv_overwrite(self, ctx: commands.Context):
+        """
+        TODO: Manually overwrite certain parts of the database.
+        """
+        pass
+
+    @iv.command(name='recount')
+    @commands.is_owner()
+    @_ck_server_active()
+    async def iv_recount(self, ctx: commands.Context):
+        """
+        TODO: Update metadata for the current interview as possible from the sheet.
+        """
+        session = session_maker()
+        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
+
+        sheet = self.connection.get_sheet(interview.sheet_name).sheet1
+        count = 0
+        for record in sheet.get_all_records():
+            if record['Posted?'] == 'TRUE':
+                count += 1
+        interview.questions_answered = count
+        session.commit()
+
 
     @iv.command(name='channel')
     @commands.has_permissions(administrator=True)
@@ -983,6 +1010,7 @@ class Interview(commands.Cog):
             await ctx.send('No new questions to be answered.')
             return
 
+        n_sent = 0
         for embed in Interview._generate_embeds(interviewee=interviewee, interview=interview, questions=questions):
             if type(embed) is Question:
                 # question was too long
@@ -990,6 +1018,9 @@ class Interview(commands.Cog):
                                    f"to embed, please split it up and answer it manually.")
             else:
                 await channel.send(embed=embed)
+                n_sent += 1
+                print(f'sent {n_sent} answers')
+        print('done sending answers')
 
         if preview_flag is True:
             return
@@ -1049,8 +1080,7 @@ class Interview(commands.Cog):
         question = Question(interviewee=interviewee, asker=asker, question=row[5], question_num=row[4],
                             server_id=row[8], channel_id=row[9], message_id=row[10], answer=row[6], timestamp=row[1])
         add_question(em, question, 0)  # we're not checking length here
-        em.set_footer(text=f'{n_answered + interview.questions_answered} questions answered '
-                           f'(of {n_asked + n_answered})')
+        em.set_footer(text=f'{n_answered + interview.questions_answered} questions answered (of {n_asked})')
         em.set_image(url=url)
 
         if not preview_flag:
