@@ -92,7 +92,8 @@ class HostBot(commands.Cog):
         server = hbs.Server(
             id=ctx.guild.id,
             name=yml_config['name'],
-            sheet=yml_config['sheet']
+            sheet=yml_config['sheet'],
+            addspec_on=False,
         )
         roles = []
         channels = []
@@ -495,17 +496,158 @@ class HostBot(commands.Cog):
         """
         Add members to a role en masse.
         """
-        # NOTE: This is unnecessary as a discord.User mention will never be parsed as a discord.Member.
-        # bad = False
-        # for member in mentions:
-        #     if type(member) is not discord.Member:
-        #         await ctx.send(f'{member} is of type `{type(member)}`, not `discord.Member`.')
-        #         bad = True
-        # if bad:
-        #     await ctx.message.add_reaction(ctx.bot.redtick)
-        #     return
         for member in mentions:
             await member.edit(roles=member.roles + [role])
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @commands.group(invoke_without_command=True)
+    async def addspec(self, ctx: commands.Context, spec: discord.Member):
+        """
+        Add a spectator to your Role PM.
+
+        Usable by players and hosts, and only from your Role PM channel.
+        """
+        session = session_maker()
+
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if not server:
+            await ctx.send("This server isn't a game server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        elif server.addspec_on is False:
+            await ctx.send("Adding specs to channels isn't enabled on this server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        elif ctx.channel.category.id != server.rolepms_id:
+            await ctx.send("This isn't a Role PM channel.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        # player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
+        allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id and
+                                                          (hbs.Role.type == 'player' or hbs.Role.type == 'host')).all()
+        allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
+
+        # check if author has any of the player/host roles
+        if set(allowed_roles).isdisjoint(set(ctx.author.roles)):
+            await ctx.send('Only players and hosts can add spectators to a role PM.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='spec').one_or_none()
+        spec_role = ctx.guild.get_role(spec_role_id.id)
+
+        if spec_role not in spec.roles:
+            await ctx.send('Only spectators can be added to a role PM!')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        # now we can do the actual function:
+        # await ctx.channel.edit(overwrites={spec: discord.PermissionOverwrite(read_messages=True)})
+        await ctx.channel.set_permissions(spec, read_messages=True)
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @addspec.command(name='all')
+    async def addspec_all(self, ctx: commands.Context):
+        """
+        Add all spectators to your Role PM.
+
+        Usable by players and hosts, and only from your Role PM channel.
+        """
+        session = session_maker()
+
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if not server:
+            await ctx.send("This server isn't a game server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        elif server.addspec_on is False:
+            await ctx.send("Adding specs to channels isn't enabled on this server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        elif ctx.channel.category.id != server.rolepms_id:
+            await ctx.send("This isn't a Role PM channel.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        # player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
+        # player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
+        #
+        # # check if author has any of the player roles
+        # if set(player_roles).isdisjoint(set(ctx.author.roles)):
+        #     await ctx.send()  # TODO: error message
+        #     return
+
+        allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id and
+                                                          (hbs.Role.type == 'player' or hbs.Role.type == 'host')).all()
+        allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
+
+        # check if author has any of the player/host roles
+        if set(allowed_roles).isdisjoint(set(ctx.author.roles)):
+            await ctx.send('Only players and hosts can add spectators to a role PM.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='spec').one_or_none()
+        spec_role = ctx.guild.get_role(spec_role_id.id)
+
+        # now we can do the actual function:
+        # await ctx.channel.edit(overwrites={spec_role: discord.PermissionOverwrite(read_messages=True)})
+        await ctx.channel.set_permissions(spec_role, read_messages=True)
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @addspec.command(name='off')
+    async def addspec_off(self, ctx: commands.Context):
+        """
+        Disables players from being able to add spectators to their Role PMs.
+
+        Usable by hosts only.
+        """
+        session = session_maker()
+
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if not server:
+            await ctx.send("This server isn't a game server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='host').one_or_none()
+        host_role = ctx.guild.get_role(host_role_id.id)
+        if host_role not in ctx.author.roles:
+            await ctx.send('Only hosts can toggle this setting.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        server.addspec_on = False
+        session.commit()
+
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @addspec.command(name='on')
+    async def addspec_on(self, ctx: commands.Context):
+        """
+        Enables players to add spectators to their Role PMs.
+
+        Usable by hosts only.
+        """
+        session = session_maker()
+
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if not server:
+            await ctx.send("This server isn't a game server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='host').one_or_none()
+        host_role = ctx.guild.get_role(host_role_id.id)
+        if host_role not in ctx.author.roles:
+            await ctx.send('Only hosts can toggle this setting.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        server.addspec_on = True
+        session.commit()
+
         await ctx.message.add_reaction(ctx.bot.greentick)
 
 

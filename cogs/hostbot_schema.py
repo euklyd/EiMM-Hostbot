@@ -1,5 +1,5 @@
 from sqlalchemy import ForeignKey
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Boolean, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from typing import Iterable
@@ -13,6 +13,7 @@ class Server(Base):
     name = Column(String)
     sheet = Column(String)
     rolepms_id = Column(Integer)
+    addspec_on = Column(Boolean)  # allows players to add specs to their own role pm
     roles = relationship('Role', back_populates='server')  # type: Iterable[Role]
     channels = relationship('Channel', back_populates='server')  # type: Iterable[Channel]
 
