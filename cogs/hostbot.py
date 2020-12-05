@@ -529,7 +529,7 @@ class HostBot(commands.Cog):
         allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
 
         # check if author has any of the player/host roles
-        if set(role.id for role in allowed_roles).isdisjoint(set(role.id for role in ctx.author.roles)):
+        if set(allowed_roles).isdisjoint(set(ctx.author.roles)):
             await ctx.send('Only players and hosts can add spectators to a role PM.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
