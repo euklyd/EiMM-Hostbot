@@ -7,7 +7,7 @@ from typing import Callable, Union, Optional, Dict, List
 import discord
 import yaml
 from discord.ext import commands
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, or_
 from sqlalchemy.orm import sessionmaker, Session
 
 import cogs.hostbot_schema as hbs
@@ -524,12 +524,12 @@ class HostBot(commands.Cog):
             return
 
         # player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
-        allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id and
-                                                          (hbs.Role.type == 'player' or hbs.Role.type == 'host')).all()
+        allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id,
+                                                          or_(hbs.Role.type == 'player', hbs.Role.type == 'host')).all()
         allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
 
         # check if author has any of the player/host roles
-        if set(allowed_roles).isdisjoint(set(ctx.author.roles)):
+        if set(role.id for role in allowed_roles).isdisjoint(set(role.id for role in ctx.author.roles)):
             await ctx.send('Only players and hosts can add spectators to a role PM.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
