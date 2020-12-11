@@ -768,7 +768,7 @@ class Interview(commands.Cog):
 
         If no sheet name specified, prints the current name.
         """
-        if await self._check_sheet(ctx, sheet_name) is False:
+        if sheet_name is not None and await self._check_sheet(ctx, sheet_name) is False:
             return
 
         session = session_maker()
