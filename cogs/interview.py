@@ -762,15 +762,20 @@ class Interview(commands.Cog):
     @iv.command(name='sheet')
     @commands.has_permissions(administrator=True)
     @_ck_server_active()
-    async def iv_sheet(self, ctx: commands.Context, sheet_name: str):
+    async def iv_sheet(self, ctx: commands.Context, sheet_name: str = None):
         """
         Change saved sheet name.
+
+        If no sheet name specified, prints the current name.
         """
         if await self._check_sheet(ctx, sheet_name) is False:
             return
 
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if sheet_name is None:
+            await ctx.send(f'The current interview sheet name is `{server.sheet_name}`.')
+            return
         server.sheet_name = sheet_name
         session.commit()
         await ctx.message.add_reaction(ctx.bot.greentick)
@@ -820,15 +825,20 @@ class Interview(commands.Cog):
     @iv.command(name='limit')
     @commands.has_permissions(administrator=True)
     @_ck_server_active()
-    async def iv_limit(self, ctx: commands.Context, date: str):
+    async def iv_limit(self, ctx: commands.Context, date: str = None):
         """
         Set the new reinterview limit (YYYY/MM/DD).
 
         Only reinterviews whose most recent interview is before the specified date will be allowed.
         (I'm lazy, if you want to disable reinterviews, just set it to like, the year 2000.)
+
+        If no date specified, prints the current limit.
         """
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if date is None:
+            await ctx.send(f'The current reinterview limit is `{server.limit.strftime("%Y/%m/%d")}`.')
+            return
         server.limit = datetime.strptime(date, '%Y/%m/%d')
         session.commit()
         await ctx.message.add_reaction(ctx.bot.greentick)
