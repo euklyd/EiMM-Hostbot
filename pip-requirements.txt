@@ -4,6 +4,7 @@ fuzzywuzzy
 gspread
 imgurpython
 ipython
+munkres
 oauth2client
 pillow
 pycountry
