@@ -5,7 +5,7 @@ import json
 import pprint
 import random
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Tuple
 
 import discord
 import yaml
@@ -101,8 +101,8 @@ class Host:
             else:
                 self.prefs.append(int(pref))
 
-        self.name   = name
-        self.prio   = prio
+        self.name = name
+        self.prio = prio
 
     def __repr__(self):
         prefs = [None if pref == DISALLOWED else pref for pref in self.prefs]
@@ -221,7 +221,8 @@ class EiMM(commands.Cog):
                 return
 
     @staticmethod
-    def _mod_bias_queue_algorithm(hosts, priority=2, total=6):
+    def _mod_bias_queue_algorithm(hosts: Dict[str, dict], priority: int = 2, total: int = 6) \
+            -> Tuple[List[Host], List[Host]]:
         """
         Inputs:
         - dict of hosts, in the format specified at the top of this file.
@@ -231,13 +232,15 @@ class EiMM(commands.Cog):
         Returns:
         - Ordered list of assigned hosts (first in the list gets slot 1, etc.)
         - Ordered list of selected hosts, in case manual assignment is needed
+
+        NOTE: This and following methods were lifted straight from the original PenguinBot.
         """
         picks = EiMM._mod_bias_host_selection(hosts, priority=priority)
         assignments = EiMM._mod_bias_hungarian_algorithm(picks[:total])
         return assignments, picks
 
     @staticmethod
-    def _mod_bias_host_selection(hosts, priority=2):
+    def _mod_bias_host_selection(hosts: Dict[str, dict], priority: int = 2) -> List[Host]:
         hosts = [
             Host(
                 name, prefs['prefs'], prefs['priority']
@@ -278,7 +281,7 @@ class EiMM(commands.Cog):
         return picks
 
     @staticmethod
-    def _mod_bias_hungarian_algorithm(picks, total=6):
+    def _mod_bias_hungarian_algorithm(picks: List[Host], total: int = 6) -> List[Host]:
         """
         tl;dr Numbers go in, numbers come out.
 
@@ -288,13 +291,13 @@ class EiMM(commands.Cog):
         """
         random.shuffle(picks)
 
-        matrix = []
+        matrix = []  # type: List[List[int]]
         for pick in picks:
             matrix.append(pick.prefs)
         m = Munkres()
         indices = m.compute(matrix)
 
-        assignments = [None] * total
+        assignments = [None] * total  # type: List[Optional[Host]]
         for row, col in indices:
             assignments[col] = picks[row]
 
@@ -340,7 +343,7 @@ class EiMM(commands.Cog):
             '*The full list of selected hosts, in priority order, is:*\n'
             f'```{pprint.pformat(picks)}```'
             '*("but euklyd, that\'s ugly code formatting", you may say: '
-            'i\'ll fix it later u nerd)*'
+            'i\'ll fix it later u nerd - update one whole bot later: this isn\'t getting fixed)*'
             # f"```{[str(pick) + '\n' for pick in picks]}```"
         )
         await ctx.send(reply)
