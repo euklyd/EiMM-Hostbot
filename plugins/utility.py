@@ -112,6 +112,7 @@ class Management(commands.Cog):
             # Not a text channel or a user.
             await ctx.send('No matching channel found.')
         await channel.send(message)
+        await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.command()
     @commands.is_owner()
