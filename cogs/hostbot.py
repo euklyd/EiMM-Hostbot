@@ -78,7 +78,8 @@ class HostBot(commands.Cog):
         """
         Initialize a game server with channels and roles.
 
-        For an example configuration, see: https://hastebin.com/cukamuveru.yml
+        For instructions and examples, see:
+        https://github.com/euklyd/EiMM-Hostbot/blob/master/cogs/hostbot_readme.md
         """
         session = session_maker()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
@@ -152,6 +153,12 @@ class HostBot(commands.Cog):
             channels.append(hbs.Channel(id=new_channel.id, type=key))
             print(f'created {channel_name} `[{key}]` with overwrites:\n{pprint.pformat(overwrites)}\n')
         server.channels = channels
+
+        # Turn off @everyone ping
+        default_role = ctx.guild.default_role
+        perms = default_role.permissions
+        perms.mention_everyone = False
+        await default_role.edit(permissions=perms)
 
         session.add(server)
         session.commit()
@@ -523,7 +530,6 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        # player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
         allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id,
                                                           or_(hbs.Role.type == 'player', hbs.Role.type == 'host')).all()
         allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
@@ -543,7 +549,6 @@ class HostBot(commands.Cog):
             return
 
         # now we can do the actual function:
-        # await ctx.channel.edit(overwrites={spec: discord.PermissionOverwrite(read_messages=True)})
         await ctx.channel.set_permissions(spec, read_messages=True)
         await ctx.message.add_reaction(ctx.bot.greentick)
 
@@ -594,6 +599,51 @@ class HostBot(commands.Cog):
         # now we can do the actual function:
         # await ctx.channel.edit(overwrites={spec_role: discord.PermissionOverwrite(read_messages=True)})
         await ctx.channel.set_permissions(spec_role, read_messages=True)
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @addspec.command(name='rm')
+    async def addspec_rm(self, ctx: commands.Context, spec: discord.Member):
+        """
+        Remove a spectator from your role PM.
+
+        Usable by players and hosts, and only from your Role PM channel.
+        """
+        session = session_maker()
+
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if not server:
+            await ctx.send("This server isn't a game server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        elif server.addspec_on is False:
+            await ctx.send("Adding specs to channels isn't enabled on this server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        elif ctx.channel.category.id != server.rolepms_id:
+            await ctx.send("This isn't a Role PM channel.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id,
+                                                          or_(hbs.Role.type == 'player', hbs.Role.type == 'host')).all()
+        allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
+
+        # check if author has any of the player/host roles
+        if set(allowed_roles).isdisjoint(set(ctx.author.roles)):
+            await ctx.send('Only players and hosts can remove spectators from a role PM.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='spec').one_or_none()
+        spec_role = ctx.guild.get_role(spec_role_id.id)
+
+        if spec_role not in spec.roles:
+            await ctx.send('Only spectators can be removed from a role PM!')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        # now we can do the actual function:
+        await ctx.channel.set_permissions(spec, read_messages=False)
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @addspec.command(name='off')
@@ -649,6 +699,37 @@ class HostBot(commands.Cog):
         session.commit()
 
         await ctx.message.add_reaction(ctx.bot.greentick)
+
+    # TODO: all of these
+    # @commands.group(invoke_without_command=True)
+    # @commands.has_permissions(administrator=True)
+    # async def phase(self, ctx: commands.Context):
+    #     """
+    #     Pause/unpause phase.
+    #     """
+    #     pass
+    #
+    # @phase.command(name='pause')
+    # @commands.has_permissions(administrator=True)
+    # async def phase_pause(self, ctx: commands.Context):
+    #     """
+    #     Lock the gamechat channel.
+    #
+    #     Only works in a single gamechat channel.
+    #     """
+    #     ...
+    #
+    # @phase.command(name='unpause')
+    # @commands.has_permissions(administrator=True)
+    # async def phase_unpause(self, ctx: commands.Context):
+    #     """
+    #     Unlock the gamechat channel.
+    #     """
+    #     session = session_maker()
+    #     gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
+    #     gamechat = ctx.guild.get_channel(gamechat_channel.id)
+    #
+    #     ...
 
 
 # @init.command(name='updaterole')
