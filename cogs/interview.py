@@ -1096,7 +1096,15 @@ class Interview(commands.Cog):
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
         channel = ctx.guild.get_channel(server.answer_channel)
 
-        await self._channel_answer(ctx, channel)
+        try:
+            await self._channel_answer(ctx, channel)
+        except Exception as e:
+            # this is bad practice but i don't know what the error is; it'll be removed later
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            print(f"hey here's that error you're looking for at {datetime.utcnow()}")
+            print(type(e))
+            raise e
+        await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.command()
     @_ck_server_active()
@@ -1106,6 +1114,7 @@ class Interview(commands.Cog):
         Preview answers, visible in the backstage channel.
         """
         await self._channel_answer(ctx, ctx.channel)
+        await ctx.message.add_reaction(ctx.bot.greentick)
 
     async def _imganswer(self, ctx: commands.Context, row_num: int, url: str, channel: discord.TextChannel):
         preview_flag = False
