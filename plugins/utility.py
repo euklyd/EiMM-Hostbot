@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Optional, List, Union
 
 import random
 import discord
@@ -43,6 +43,12 @@ class Utility(commands.Cog):
         if user is None:
             user = ctx.author
         await ctx.send(str(user.avatar_url_as(static_format="png")))
+
+    @commands.command()
+    @commands.has_permissions(manage_messages=True)
+    async def bigmoji(self, ctx: commands.Context, emoji: Union[discord.PartialEmoji, discord.Emoji]):
+        await ctx.send(emoji.url)
+        await ctx.message.delete()
 
     @commands.command()
     async def ping(self, ctx: commands.Context):
