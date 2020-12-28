@@ -1,3 +1,5 @@
+import faulthandler
+
 import discord
 from discord.ext import commands
 
@@ -58,6 +60,8 @@ async def shutdown(ctx: commands.Context):
 
 
 if __name__ == '__main__':
+    faulthandler.enable()
+
     # At least, needs: members=True, emojis=True, invites=True, messages=True, reactions=True
     # All of these but members are defaults.
     intents = discord.Intents.default()
