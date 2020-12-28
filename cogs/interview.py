@@ -671,6 +671,9 @@ class Interview(commands.Cog):
 
         session.query(schema.Vote).filter_by(server_id=ctx.guild.id).delete()
 
+        # Open the interview up for votes, questions, etc.
+        server.active = True
+
         # Only commit after the new page is up and old votes are deleted.
         session.commit()
 
