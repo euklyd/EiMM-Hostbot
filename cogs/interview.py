@@ -86,13 +86,11 @@ class Candidate:
 class Question:
     def __init__(self, interviewee: discord.Member, asker: Union[discord.Member, discord.User],
                  question: str, question_num: int, server_id: int, channel_id: int, message_id: int,
-                 # question: str, question_num: int, message: discord.Message,
                  answer: str = None, timestamp: datetime = None):
         self.interviewee = interviewee
         self.asker = asker
         self.question = question
         self.question_num = question_num
-        # self.message = message
         self.server_id = server_id
         self.channel_id = channel_id
         self.message_id = message_id
@@ -113,18 +111,23 @@ class Question:
         Translates a row from the Google sheet to an object.
         """
         channel = ctx.bot.get_channel(row['Channel ID'])  # type: discord.TextChannel
-        # message = await channel.fetch_message(row['Message ID'])
+
+        asker = ctx.guild.get_member(row['ID'])
+        if asker is None:
+            asker = await ctx.bot.fetch_user(row['ID'])
+            if _DEBUG_FLAG:
+                print(f"couldn't find member with ID {row['ID']}, instead fetched user {asker}")
+
         return Question(
             # This is a bit dangerous, but should be fine! only the interviewee will be calling the answer method:
             interviewee=ctx.author,
-            asker=ctx.guild.get_member(row['ID']),
+            asker=asker,
             question=row['Question'],
             question_num=row['#'],
             server_id=row['Server ID'],
             channel_id=row['Channel ID'],
             message_id=row['Message ID'],
-            # message=message,  # replaced the prev three rows
-            answer=row['Answer'],
+            answer=str(row['Answer']),
             timestamp=datetime.utcfromtimestamp(row['POSIX Timestamp']),
         )
 
@@ -1050,9 +1053,8 @@ class Interview(commands.Cog):
         questions = [await Question.from_row(ctx, row) for row in filtered_rows]
         if _DEBUG_FLAG:
             print('converted to questions')
-
-        for q in questions:
-            print(q.asker, q.question_num)
+            for q in questions:
+                print(q.asker, q.question_num)
 
         if len(questions) == 0:
             await ctx.send('No new questions to be answered.')
