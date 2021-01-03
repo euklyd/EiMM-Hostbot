@@ -47,6 +47,9 @@ class Utility(commands.Cog):
     @commands.command()
     @commands.has_permissions(manage_messages=True)
     async def bigmoji(self, ctx: commands.Context, emoji: Union[discord.PartialEmoji, discord.Emoji]):
+        """
+        Send an emoji, but big.
+        """
         await ctx.send(emoji.url)
         await ctx.message.delete()
 
