@@ -31,6 +31,29 @@ def default_val(val):
         return str(val)
 
 
+def ability_text(row):
+    limitations = 'Unlimited'
+    if 'cycling' in row['Categories'].lower():
+        limitations += ' - Cycling'
+    targets = row['Targets']
+    priority = row['Priority(s)']
+    if row['B'] and row['H']:
+        hb = 'B/H'
+    elif row['B']:
+        hb = 'B'
+    elif row['H']:
+        hb = 'H'
+    else:
+        hb = 'N'
+    text = row['Rules Text']
+    template = (
+        f'**Ability Name (Active, {limitations}, {targets}, {priority}, {hb}):**\n'
+        '_Flavor_\n'
+        f'{text}'
+    )
+    return template
+
+
 def ability_embed(row):
     em = discord.Embed(title=row['Ability Name'])
     em.add_field(name='Priority', value=default_val(row['Priority(s)']))
@@ -46,8 +69,11 @@ def ability_embed(row):
     em.add_field(name='B/H', value=bh_val)
     em.add_field(name='Categories', value=default_val(row['Categories']))
     em.add_field(name='Rules Text', value=default_val(row['Rules Text']), inline=False)
+
+    # If I ever want to trim this down in the future, will just strip these out to be optional.
     em.add_field(name='Resolution Details', value=default_val(row['Resolution Details']), inline=False)
     em.add_field(name='Design Notes', value=default_val(row['Design Notes']), inline=False)
+    em.add_field(name='Template', value=f'```md\n{ability_text(row)}```', inline=False)
 
     return em
 
@@ -164,7 +190,7 @@ class EiMM(commands.Cog):
         await ctx.send(f'Use `{self.bot.default_command_prefix}help eimm` for more info.')
 
     @eimm.group(name='rebuild')
-    async def rebuild(self, ctx: commands.Context):
+    async def eimm_rebuild(self, ctx: commands.Context):
         """
         Rebuild the sheet cache.
         """
@@ -174,7 +200,7 @@ class EiMM(commands.Cog):
         await ctx.send('Rebuilt cache.', file=discord.File(f, f'template diffs {datetime.datetime.utcnow()}'))
 
     @eimm.group(name='q')
-    async def q(self, ctx: commands.Context, *, term: str):
+    async def eimm_q(self, ctx: commands.Context, *, term: str):
         """
         Search the template sheet for an ability.
 
