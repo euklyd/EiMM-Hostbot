@@ -1,3 +1,4 @@
+from collections import Counter
 from typing import Optional, List, Union
 
 import random
@@ -155,6 +156,62 @@ class Management(commands.Cog):
             return
         await message.pin()
         await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @commands.Cog.listener()
+    async def on_guild_update(self, before: discord.Guild, after: discord.Guild):
+        print(f"that's a guild update! oldsubs: {before.premium_subscription_count}, newsubs: {after.premium_subscription_count}")
+        if before.id != 0:
+            # TODO this should be removed and replaced w/ an actual opt-in db
+            return
+
+        # TODO: replace with a db channel entry
+        chan = after.get_channel(0)  # type: discord.TextChannel
+
+        if before.premium_subscription_count != after.premium_subscription_count:
+            print(f'change in nitro boosters! {before.premium_subscription_count} -> {after.premium_subscription_count}')
+            # nitro boost change
+            before_subs = set(before.premium_subscribers)
+            after_subs = set(after.premium_subscribers)
+            ls_boosters = ''
+            for booster in sorted(list(after_subs), key=lambda x: str(x).lower()):
+                ls_boosters += f'{booster}\n'
+
+            # NOTE: You can't determine the number of times a single member has boosted so
+            #  this is useless until that functionality is added to the API.
+            #
+            # before_subs = Counter(before.premium_subscribers)
+            # after_subs = Counter(after.premium_subscribers)
+            # maxlen = 0
+            # for booster in after_subs:
+            #     if len(str(booster)) > maxlen:
+            #         maxlen = len(str(booster))
+            # for booster, count in after_subs.items():
+            #     ls_boosters += f'{str(booster) + ":" : <{maxlen + 1}}: {count}\n'
+
+            if before.premium_subscription_count < after.premium_subscription_count:
+                # someone boosted
+                newsub = list(after_subs - before_subs)
+                ls_change = ', '.join(newsub)
+
+                if ls_change is None:
+                    msg = f"{self.bot.boostemoji} Someone who was already boosting added another boost! We can't tell who! _(This is a Discord API problem)_\n"
+                else:
+                    msg = f'{self.bot.boostemoji} `{ls_change}` just boosted the server!\n'
+
+            else:
+                # someone unboosted
+                formersub = list(set(after.premium_subscribers) - set(before.premium_subscribers))
+                ls_change = ', '.join(formersub)
+                if ls_change is None:
+                    msg = f"{self.bot.boostemoji} Someone removed one but not both of their boosts! We can't tell who! _(This is a Discord API problem)_\n"
+                else:
+                    msg = f'{self.bot.boostemoji} `{ls_change}` just unboosted the server :(\n'
+
+            msg += f'New boosters ({after.premium_subscription_count}): ```ini\n{ls_boosters}```'
+
+            await chan.send(msg)
+
+            return
 
 
 @commands.command()
