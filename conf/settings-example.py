@@ -36,6 +36,7 @@ conf = Conf(
     #  https://cdn.discordapp.com/emojis/596576672149667840.png?v=1
     greentick_id=632481525325103114,  # change these to reflect your own emoji ID
     redtick_id=632481525979676712,  # change these to reflect your own emoji ID
+    boostemoji_id=797974971137654845,  # change these to reflect your own emoji ID
     plugins=plugins,
     imgur_keys=imgur_keys,
     google_email='your-bot-here@your-bot-here.iam.gserviceaccount.com',

@@ -23,6 +23,7 @@ class Bot(commands.Bot):
         self.conf = conf  # type: Conf
         self._greentick = self.get_emoji(conf.greentick_id)  # type: discord.Emoji
         self._redtick = self.get_emoji(conf.redtick_id)  # type: discord.Emoji
+        self._boostemoji = self.get_emoji(conf.boostemoji_id)  # type: discord.Emoji
 
         if Path('conf/google_creds.json').exists():
             self.google_creds = 'conf/google_creds.json'
@@ -56,6 +57,12 @@ class Bot(commands.Bot):
         return self._redtick
 
     @property
+    def boostemoji(self) -> discord.Emoji:
+        if self._boostemoji is None:
+            self._boostemoji = self.get_emoji(self.conf.boostemoji_id)  # type: discord.Emoji
+        return self._boostemoji
+
+    @property
     def default_command_prefix(self) -> str:
         return self.command_prefix[0]
 
@@ -86,7 +93,7 @@ class Bot(commands.Bot):
         await super().on_message(message)
 
     async def wait_for_first(self, events: List[str], *, checks: Optional[List[Callable[..., bool]]] = None,
-                             timeout=None) -> Tuple[Any, str]:
+                             timeout: float = None) -> Tuple[Any, str]:
         """|coro|
 
         Waits for the first of multiple WebSocket events to be dispatched.
