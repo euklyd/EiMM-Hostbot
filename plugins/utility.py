@@ -193,19 +193,19 @@ class Management(commands.Cog):
                 newsub = list(after_subs - before_subs)
                 ls_change = ', '.join(newsub)
 
-                if ls_change is None:
-                    msg = f"{self.bot.boostemoji} Someone who was already boosting added another boost! We can't tell who! _(This is a Discord API problem)_\n"
-                else:
+                if newsub:
                     msg = f'{self.bot.boostemoji} `{ls_change}` just boosted the server!\n'
+                else:
+                    msg = f"{self.bot.boostemoji} Someone who was already boosting added another boost! We can't tell who! _(This is a Discord API problem)_\n"
 
             else:
                 # someone unboosted
                 formersub = list(set(after.premium_subscribers) - set(before.premium_subscribers))
                 ls_change = ', '.join(formersub)
-                if ls_change is None:
-                    msg = f"{self.bot.boostemoji} Someone removed one but not both of their boosts! We can't tell who! _(This is a Discord API problem)_\n"
-                else:
+                if formersub:
                     msg = f'{self.bot.boostemoji} `{ls_change}` just unboosted the server :(\n'
+                else:
+                    msg = f"{self.bot.boostemoji} Someone removed one but not both of their boosts! We can't tell who! _(This is a Discord API problem)_\n"
 
             msg += f'New boosters ({after.premium_subscription_count}): ```ini\n{ls_boosters}```'
 
