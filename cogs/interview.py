@@ -265,8 +265,9 @@ def add_question(em: discord.Embed, question: Question, current_length: int) -> 
     # When splitting up questions, assume 85 (round to 100) characters for the message link markdown, so you get 900
     # chars rather than 1000.
     if sum([len(line) for line in question_lines]) + len(question_lines) * 3 + len(question.answer) <= 900:
-        # formatted_question_text = f'[> {"> ".join(question_lines)}]({question.message.jump_url})'
-        formatted_question_text = f'[> {"> ".join(question_lines)}]({question.jump_url})'
+        question_block = '\n> '.join(question_lines)
+        formatted_question_text = f'[> {question_block}]({question.jump_url})'
+
         text_length = len(f'Question #{question.question_num}') + len(f'{formatted_question_text}\n{question.answer}')
         if text_length > 4800:
             return -2
@@ -1002,8 +1003,8 @@ class Interview(commands.Cog):
         """
         Submit multiple questions for the current interview.
 
-        Each question must be a single line, separated by linebreaks. If you want multi-line single questions,
-        use the 'ask' command.
+        Each question must be a single line, separated by linebreaks.
+        If you want multi-line single questions, use the 'ask' command.
         """
         await self._ask_many(ctx, questions_str.split('\n'))
 
@@ -1011,8 +1012,8 @@ class Interview(commands.Cog):
 
     async def _channel_answer(self, ctx: commands.Context, channel: discord.TextChannel):
         """
-        Command wrapped by Interview.answer() and Interview.preview(). Greedily dumps as many answered questions
-        into embeds as possible, and posts them to the specified channel.
+        Command wrapped by Interview.answer() and Interview.preview().
+        Greedily dumps as many answered questions into embeds as possible, and posts them to the specified channel.
         """
         preview_flag = False
         if channel == ctx.channel:
@@ -1094,8 +1095,8 @@ class Interview(commands.Cog):
         """
         Post all answers to questions that have not yet been posted.
 
-        Questions posted in chronological order, grouped by asker. If an answer is too long to be posted,
-        the interviewee may have to post it manually.
+        Questions posted in chronological order, grouped by asker.
+        If an answer is too long to be posted, the interviewee may have to post it manually.
         """
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
