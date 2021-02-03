@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re
+import urllib
 from pprint import pprint
 from typing import Optional, List, Dict
 
@@ -134,6 +135,9 @@ class Cards(commands.Cog):
         """
         Search YGOPro for Yu-Gi-Oh cards.
         """
+        base_set_url = 'https://db.ygoprodeck.com/set/?search='
+
+
         ygo = ygoprodeck.YGOPro()
         result = ygo.get_cards(fname=query)
         # top level: dict key: data
@@ -142,7 +146,25 @@ class Cards(commands.Cog):
         intermediate_keys = {card['name']: card for card in result['data']}
         matches = process.extractBests(query, intermediate_keys.keys(), limit=10)
         card = intermediate_keys[matches[0][0]]
-        await ctx.send(card['card_images'][0]['image_url'])
+
+        sets = []
+        for s in card['card_sets']:
+            url = base_set_url + urllib.parse.quote(s['set_name'])
+            text = '[{} {}]({})'.format(s['set_name'], s['set_rarity_code'], url)
+            sets.append(text)
+        sets_text = '\n'.join(sets)
+        print(sets_text)
+
+        description = f'_Other possible matches: {", ".join([match[0] for match in matches[1:]])}_'
+        if len(matches) == 10:
+            description += ' ...'
+        elif len(matches) <= 1:
+            description += ' _None_'
+        em = discord.Embed(description=description)
+        em.add_field(name='Sets', value=sets_text, inline=False)
+        em.set_image(url=card['card_images'][0]['image_url'])
+
+        await ctx.send(embed=em)
 
 
 def setup(bot: Bot):
