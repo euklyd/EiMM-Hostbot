@@ -135,8 +135,8 @@ class Cards(commands.Cog):
         """
         Search YGOPro for Yu-Gi-Oh cards.
         """
+        base_card_url = 'https://db.ygoprodeck.com/card/?search='
         base_set_url = 'https://db.ygoprodeck.com/set/?search='
-
 
         ygo = ygoprodeck.YGOPro()
         result = ygo.get_cards(fname=query)
@@ -149,18 +149,19 @@ class Cards(commands.Cog):
 
         sets = []
         for s in card['card_sets']:
-            url = base_set_url + urllib.parse.quote(s['set_name'])
-            text = '[{} {}]({})'.format(s['set_name'], s['set_rarity_code'], url)
+            set_url = base_set_url + urllib.parse.quote(s['set_name'])
+            text = '[{} {}]({})'.format(s['set_name'], s['set_rarity_code'], set_url)
             sets.append(text)
         sets_text = '\n'.join(sets)
-        print(sets_text)
-
+        card_url = base_card_url + urllib.parse.quote(card['name'])
         description = f'_Other possible matches: {", ".join([match[0] for match in matches[1:]])}_'
         if len(matches) == 10:
             description += ' ...'
         elif len(matches) <= 1:
             description += ' _None_'
+
         em = discord.Embed(description=description)
+        em.set_author(name=card['name'], url=card_url)
         em.add_field(name='Sets', value=sets_text, inline=False)
         em.set_image(url=card['card_images'][0]['image_url'])
 
