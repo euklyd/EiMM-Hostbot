@@ -152,7 +152,8 @@ class Cards(commands.Cog):
             set_url = base_set_url + urllib.parse.quote(s['set_name'])
             text = '[{} {}]({})'.format(s['set_name'], s['set_rarity_code'], set_url)
             sets.append(text)
-        sets_text = '\n'.join(sets)
+        # sets_text = '\n'.join(sets)
+        sets_text = ', '.join(sets)
         card_url = base_card_url + urllib.parse.quote(card['name'])
         description = f'_Other possible matches: {", ".join([match[0] for match in matches[1:]])}_'
         if len(matches) == 10:
