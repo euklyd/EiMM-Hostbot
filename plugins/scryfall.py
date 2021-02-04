@@ -147,13 +147,6 @@ class Cards(commands.Cog):
         matches = process.extractBests(query, intermediate_keys.keys(), limit=10)
         card = intermediate_keys[matches[0][0]]
 
-        sets = []
-        for s in card['card_sets']:
-            set_url = base_set_url + urllib.parse.quote(s['set_name'])
-            text = '[{} {}]({})'.format(s['set_name'], s['set_rarity_code'], set_url)
-            sets.append(text)
-        # sets_text = '\n'.join(sets)
-        sets_text = ', '.join(sets)
         card_url = base_card_url + urllib.parse.quote(card['name'])
         description = f'_Other possible matches: {", ".join([match[0] for match in matches[1:]])}_'
         if len(matches) == 10:
@@ -163,7 +156,32 @@ class Cards(commands.Cog):
 
         em = discord.Embed(description=description)
         em.set_author(name=card['name'], url=card_url)
-        em.add_field(name='Sets', value=sets_text, inline=False)
+
+        sets = []
+        for s in card['card_sets']:
+            set_url = base_set_url + urllib.parse.quote(s['set_name'])
+            text = '[{} {}]({})'.format(s['set_name'], s['set_rarity_code'], set_url)
+            sets.append(text)
+        # sets_text = '\n'.join(sets)
+        sets_text = ' | '.join(sets)
+        if len(sets_text) <= 1000:
+            em.add_field(name='Sets', value=sets_text, inline=False)
+        else:
+            sets = sets_text.split(' | ')
+            subsets = []
+            length = 0
+            n = 1
+            for s in sets:
+                if length + len(s) + 3 > 1000:
+                    em.add_field(name=f'Sets ({n})', value=' | '.join(subsets), inline=False)
+                    n += 1
+                    subsets = []
+                    length = 0
+                subsets.append(s)
+                length += len(s) + 3  # the separator is 3 chars long
+            if len(subsets) > 0:
+                em.add_field(name=f'Sets ({n})', value=' | '.join(subsets), inline=False)
+
         em.set_image(url=card['card_images'][0]['image_url'])
 
         await ctx.send(embed=em)
