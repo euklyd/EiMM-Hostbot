@@ -167,7 +167,6 @@ class Cards(commands.Cog):
         if len(sets_text) <= 1000:
             em.add_field(name='Sets', value=sets_text, inline=False)
         else:
-            sets = sets_text.split(' | ')
             subsets = []
             length = 0
             n = 1
