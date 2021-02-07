@@ -37,11 +37,11 @@ def ability_text(row):
         limitations += ' - Cycling'
     targets = row['Targets']
     priority = row['Priority(s)']
-    if row['B'] and row['H']:
+    if row['B'] == 'TRUE' and row['H'] == 'TRUE':
         hb = 'B/H'
-    elif row['B']:
+    elif row['B'] == 'TRUE':
         hb = 'B'
-    elif row['H']:
+    elif row['H'] == 'TRUE':
         hb = 'H'
     else:
         hb = 'N'
