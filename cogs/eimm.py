@@ -47,7 +47,7 @@ def ability_text(row):
         hb = 'N'
     text = row['Rules Text']
     template = (
-        f'**Ability Name (Active, {limitations}, {targets}, {priority}, {hb}):**\n'
+        f'**Ability Name (Active, {limitations}, Targeted {targets}, {priority}, {hb}):**\n'
         '_Flavor_\n'
         f'{text}'
     )
