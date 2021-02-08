@@ -1179,7 +1179,12 @@ class Interview(commands.Cog):
             return f'_You are not currently voting; vote with `{prefix}vote`._'
 
         votes = sorted(votes, key=lambda x: _name_or_default(x).lower())
-        return '_You are currently voting for: ' + ', '.join([f'`{_name_or_default(vote)}`' for vote in votes]) + '._'
+        response = 'You are currently voting for: ' + ', '.join([f'`{_name_or_default(vote)}`' for vote in votes]) + '.'
+
+        # It's impossible to style this text correctly every time but this will catch most issues:
+        if '_' in response and '*' not in response:
+            return f'*{response}*'
+        return f'_{response}_'
 
     @staticmethod
     def _preprocess_votals(ctx: commands.Context, votes: List[schema.Vote]) -> List[Candidate]:
