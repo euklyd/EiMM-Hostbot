@@ -378,7 +378,7 @@ class HostBot(commands.Cog):
 
         await ctx.send('Deleted, like, everything.')
 
-    @init.command()
+    @init.command(name='status')
     async def init_status(self, ctx: commands.Context):
         """
         List game server info and number of people in each game-related role.
