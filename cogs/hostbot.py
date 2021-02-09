@@ -17,8 +17,8 @@ from utils import spreadsheet
 session_maker = None  # type: Union[None, Callable[[], Session]]
 # connection = None  # type: Optional[spreadsheet.SheetConnection]
 
-cooldown_delta = timedelta(hours=1)
-cooldown_max = 2
+cooldown_delta = timedelta(minutes=30)
+cooldown_max = 3
 
 
 class NotFoundMember:
@@ -377,6 +377,36 @@ class HostBot(commands.Cog):
         session.commit()
 
         await ctx.send('Deleted, like, everything.')
+
+    @init.command()
+    async def init_status(self, ctx: commands.Context):
+        """
+        List game server info and number of people in each game-related role.
+        """
+        session = session_maker()
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+
+        spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='spec').one_or_none()
+        spec_role = ctx.guild.get_role(spec_role_id.id)
+
+        host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='host').one_or_none()
+        host_role = ctx.guild.get_role(host_role_id.id)
+
+        player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
+        player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
+
+        dead_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='dead').one_or_none()
+        dead_role = ctx.guild.get_role(dead_role_id)
+
+        em = discord.Embed(title=server.name, color=host_role.color)
+        em.set_thumbnail(url=ctx.guild.icon_url)
+        em.add_field(name=host_role.mention, value=f'{len(host_role.members)}', inline=False)
+        for player_role in player_roles:
+            em.add_field(name=player_role.mention, value=f'{len(player_role.members)}')
+        em.add_field(name=spec_role.mention, value=f'{len(spec_role.members)}', inline=False)
+        em.add_field(name=dead_role.mention, value=f'{len(dead_role.members)}', inline=False)
+
+        await ctx.send(embed=em)
 
     def _inc_cooldown(self, user: discord.Member):
         if user.id not in self.confessional_cooldowns:
