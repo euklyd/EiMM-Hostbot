@@ -387,24 +387,27 @@ class HostBot(commands.Cog):
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
 
         spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='spec').one_or_none()
-        spec_role = ctx.guild.get_role(spec_role_id.id)
-
         host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='host').one_or_none()
-        host_role = ctx.guild.get_role(host_role_id.id)
-
         player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
-        player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
-
         dead_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='dead').one_or_none()
-        dead_role = ctx.guild.get_role(dead_role_id)
+
+        print('spec_role_id:', spec_role_id)
+        print('host_role_id:', host_role_id)
+        print('player_role_ids:', player_role_ids)
+        print('dead_role_id:', dead_role_id)
+
+        spec_role = ctx.guild.get_role(spec_role_id.id)
+        host_role = ctx.guild.get_role(host_role_id.id)
+        player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
+        dead_role = ctx.guild.get_role(dead_role_id.id)
 
         em = discord.Embed(title=server.name, color=host_role.color)
         em.set_thumbnail(url=ctx.guild.icon_url)
-        em.add_field(name=host_role.mention, value=f'{len(host_role.members)}', inline=False)
+        em.add_field(name=f'{host_role} (Hosts)', value=f'{len(host_role.members)}', inline=False)
         for player_role in player_roles:
-            em.add_field(name=player_role.mention, value=f'{len(player_role.members)}')
-        em.add_field(name=spec_role.mention, value=f'{len(spec_role.members)}', inline=False)
-        em.add_field(name=dead_role.mention, value=f'{len(dead_role.members)}', inline=False)
+            em.add_field(name=f'{player_role} (Players)', value=f'{len(player_role.members)}')
+        em.add_field(name=f'{spec_role} (Specs)', value=f'{len(spec_role.members)}', inline=False)
+        em.add_field(name=f'{dead_role} (Dead)', value=f'{len(dead_role.members)}', inline=False)
 
         await ctx.send(embed=em)
 
