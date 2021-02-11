@@ -159,19 +159,20 @@ class Cards(commands.Cog):
         em.set_image(url=card['card_images'][0]['image_url'])
 
         if 'banlist_info' in card:
-
             if 'ban_tcg' in card['banlist_info']:
-                baninfo = f"TCG: {card['banlist_info']['ban_tcg']} | "
+                tcg = card['banlist_info']['ban_tcg']
             else:
-                baninfo = f"TCG: Unlimited | "
+                tcg = 'Unlimited'
             if 'ban_ocg' in card['banlist_info']:
-                baninfo += f"OCG: {card['banlist_info']['ban_ocg']} | "
+                ocg = card['banlist_info']['ban_ocg']
             else:
-                baninfo += f"OCG: Unlimited | "
+                ocg = 'Unlimited'
             if 'ban_goat' in card['banlist_info']:
-                baninfo += f"Goat: {card['banlist_info']['ban_goat']}"
+                goat = card['banlist_info']['ban_goat']
             else:
-                baninfo += f"Goat: Unlimited"
+                goat = 'Unlimited'
+
+            baninfo = f'TCG: {tcg} | OCG: {ocg} | Goat: {goat}'
 
             em.add_field(name='Banlist', value=baninfo)
 
