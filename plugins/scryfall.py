@@ -158,6 +158,23 @@ class Cards(commands.Cog):
         em.set_author(name=card['name'], url=card_url)
         em.set_image(url=card['card_images'][0]['image_url'])
 
+        if 'banlist_info' in card:
+
+            if 'ban_tcg' in card['banlist_info']:
+                baninfo = f"TCG: {card['banlist_info']['ban_tcg']} | "
+            else:
+                baninfo = f"TCG: Unlimited | "
+            if 'ban_ocg' in card['banlist_info']:
+                baninfo += f"OCG: {card['banlist_info']['ban_ocg']} | "
+            else:
+                baninfo += f"OCG: Unlimited | "
+            if 'ban_goat' in card['banlist_info']:
+                baninfo += f"Goat: {card['banlist_info']['ban_goat']}"
+            else:
+                baninfo += f"Goat: Unlimited"
+
+            em.add_field(name='Banlist', value=baninfo)
+
         sets = []
         for s in card['card_sets']:
             set_url = base_set_url + urllib.parse.quote(s['set_name'])
@@ -165,8 +182,9 @@ class Cards(commands.Cog):
             sets.append(text)
         # sets_text = '\n'.join(sets)
         sets_text = ' | '.join(sets)
-        if len(sets_text) > 4500:
-            em.add_field(name='Sets', value=f'Listing all the sets this card has appeared in would overflow the embed, check [its ygoprodeck page]({card_url}).')
+        if len(sets_text) > 4000:
+            em.add_field(name='Sets',
+                         value=f'Listing all the sets this card has appeared in would overflow the embed, check [its ygoprodeck page]({card_url}).')
         else:
             if len(sets_text) <= 1000:
                 em.add_field(name='Sets', value=sets_text, inline=False)
