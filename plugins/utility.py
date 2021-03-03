@@ -68,8 +68,8 @@ class Utility(commands.Cog):
 
         e.g., "roll 1d4+2d8". Evaluates expressions using the syntax found at https://pypi.org/project/dice/.
         """
-        result = dice.roll(expr)
-        await ctx.send(result)
+        result = list(dice.roll(expr))
+        await ctx.send(f'{sum(result)} = `{result}`')
 
     @commands.command()
     async def trunc(self, ctx: commands.Context, size: int, *, message: str):
