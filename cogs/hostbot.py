@@ -590,7 +590,7 @@ class HostBot(commands.Cog):
         """
         Add all spectators to your Role PM.
 
-        Usable by players and hosts, and only from your Role PM channel.
+        Usable by players and hosts, and only from your Role PM channel. @mention a user, or provide their full Discord username or server nick exactly (case-sensitive). If it's multiple words, "use quotes".
         """
         session = session_maker()
 
