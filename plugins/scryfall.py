@@ -359,8 +359,8 @@ class Cards(commands.Cog):
             'tuner monster': 0xc26727,
             'union effect monster': 0xc26727,
 
-            'synchro monster': 0xffffff,
-            'synchro tuner monster': 0xffffff,
+            'synchro monster': 0xfefefe,
+            'synchro tuner monster': 0xfefefe,
 
             'ritual monster': 0x446ec7,
             'fusion monster': 0x9051a6,
