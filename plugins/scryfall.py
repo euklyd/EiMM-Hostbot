@@ -142,7 +142,7 @@ class Cards(commands.Cog):
         # second level: list of matches
 
         intermediate_keys = {card['name']: card for card in result['data']}
-        matches = process.extractBests(query, intermediate_keys.keys(), limit=10)
+        matches = process.extractBests(query, intermediate_keys.keys(), limit=100)
 
         if text_only:
             cards = [intermediate_keys[match[0]] for match in matches]
