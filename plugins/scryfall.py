@@ -243,15 +243,30 @@ class Cards(commands.Cog):
 
         supertype = Cards._ygo_supertype(card)
         if supertype == 'Monster':
-            em.add_field(name='Attribute', value=card['attribute'])
-            em.add_field(name='Type', value=f'[{card["race"]} / {card["type"]}]')
+            # TODO: Once Discord figures out a way to do embed fields as double columns rather than only options of
+            #  single / triple / overflow, update this to be:
+            #       level, attribute
+            #       type,  atk/def
+
+            if 'level' in card:
+                if 'xyz' in card['type'].lower():
+                    em.add_field(name='Rank', value=str(card['level']), inline=False)
+                else:
+                    em.add_field(name='Level', value=str(card['level']), inline=False)
+
+            em.add_field(name='Attribute', value=card['attribute'], inline=False)
+            em.add_field(name='Type', value=f'[{card["race"]} / {card["type"]}]', inline=False)
 
             if 'def' in card:
                 em.add_field(name='ATK/DEF', value=f'ATK/{card["atk"]},  DEF/{card["def"]}', inline=False)
             elif 'linkval' in card:
                 em.add_field(name='ATK/LINK', value=f'ATK/{card["atk"]},  LINK-{card["linkval"]}', inline=False)
 
+            if 'scale' in card:
+                # for pendulum monsters
+                em.add_field(name='Pendulum Scale', value=f'{card["scale"]} / {card["scale"]}', inline=False)
             if 'linkmarkers' in card:
+                # for link monsters
                 em.add_field(name='Link Markers', value=card['linkmarkers'], inline=False)
         elif supertype == 'Spell':
             em.add_field(name='Type', value=card['race'], inline=False)
@@ -261,6 +276,11 @@ class Cards(commands.Cog):
             # something went wrong
             em.description = f'Type info could not be found for `{card["name"]}`.'
             return em
+
+        if 'archetype' in card:
+            archetype_url = Cards._ygo_archetype_url(card)
+            if archetype_url:
+                em.add_field(name='Archetype', value=f'[{card["archetype"]}]({archetype_url})')
 
         baninfo = Cards._ygo_baninfo(card)
         if baninfo is not None:
@@ -314,6 +334,13 @@ class Cards(commands.Cog):
         """
         base_set_url = 'https://db.ygoprodeck.com/set/?search='
         return base_set_url + urllib.parse.quote(set_info['set_name'])
+
+    @staticmethod
+    def _ygo_archetype_url(card: dict) -> Optional[str]:
+        if 'archetype' not in card:
+            return None
+        base_archetype_url = 'https://db.ygoprodeck.com/search/?&archetype='
+        return base_archetype_url + urllib.parse.quote(card['archetype'])
 
     @staticmethod
     def _ygo_supertype(card: dict) -> Optional[str]:
