@@ -130,43 +130,9 @@ class Cards(commands.Cog):
         else:
             await message.channel.send(f"`'image_uris'` not present ( `{card['uri']}` ). Try: {card['scryfall_uri']}")
 
-    @commands.command()
-    async def ygo(self, ctx: commands.Context, *, query):
+    async def _ygo(self, ctx: commands.Context, query: str, text_only: bool = False):
         """
-        Search YGOPro for Yu-Gi-Oh cards, as images.
-        """
-        ygo = ygoprodeck.YGOPro()
-        result = ygo.get_cards(fname=query)
-        # top level: dict key: data
-        # second level: list of matches
-
-        intermediate_keys = {card['name']: card for card in result['data']}
-        matches = process.extractBests(query, intermediate_keys.keys(), limit=10)
-        card = intermediate_keys[matches[0][0]]
-
-        card_url = self._ygo_url(card)
-        description = f'_Other possible matches: {", ".join([match[0] for match in matches[1:]])}_'
-        if len(matches) == 10:
-            description += ' ...'
-        elif len(matches) <= 1:
-            description += ' _None_'
-
-        em = discord.Embed(description=description)
-        em.set_author(name=card['name'], url=card_url)
-        em.set_image(url=card['card_images'][0]['image_url'])
-
-        baninfo = self._ygo_baninfo(card)
-        if baninfo is not None:
-            em.add_field(name='Banlist', value=baninfo)
-
-        self._ygo_embed_field_sets(em, card, maxlen=4000)
-
-        await ctx.send(embed=em)
-
-    @commands.command()
-    async def ygot(self, ctx: commands.Context, *, query):
-        """
-        Search YGOPro for Yu-Gi-Oh cards, as text.
+        Displays Yu-Gi-Oh cards in a scrollable list.
         """
         ARROW_LEFT, ARROW_RIGHT = '◀', '▶'
 
@@ -176,13 +142,32 @@ class Cards(commands.Cog):
         # second level: list of matches
 
         intermediate_keys = {card['name']: card for card in result['data']}
-        matches = process.extractBests(query, intermediate_keys.keys(), limit=100)
-        # card = intermediate_keys[matches[0][0]]
+        matches = process.extractBests(query, intermediate_keys.keys(), limit=10)
 
-        cards = [intermediate_keys[match[0]] for match in matches]
-        card_embeds = [self._ygoembed(card) for card in cards]
+        if text_only:
+            cards = [intermediate_keys[match[0]] for match in matches]
+            card_embeds = [self._ygo_textembed(card) for card in cards]
+
+        else:
+            card_embeds = []
+
+            for match in matches:
+                card = intermediate_keys[match[0]]
+                card_url = self._ygo_url(card)
+
+                em = discord.Embed()
+                em.set_author(name=card['name'], url=card_url)
+                em.set_image(url=card['card_images'][0]['image_url'])
+
+                baninfo = self._ygo_baninfo(card)
+                if baninfo is not None:
+                    em.add_field(name='Banlist', value=baninfo)
+                self._ygo_embed_field_sets(em, card, maxlen=4000)
+
+                card_embeds.append(em)
+
         for i, em in enumerate(card_embeds):
-            em.set_footer(text=f'{i+1} of {len(card_embeds)}')
+            em.set_footer(text=f'{i + 1} of {len(card_embeds)}')
 
         msg = await ctx.send(embed=card_embeds[0])
 
@@ -198,6 +183,7 @@ class Cards(commands.Cog):
             if rxn.emoji in [ARROW_RIGHT, ARROW_LEFT]:
                 return True
             return False
+
         events = ['reaction_add', 'reaction_remove']
         checks = [check, check]
 
@@ -210,7 +196,8 @@ class Cards(commands.Cog):
                 break
 
             reaction = result[0]
-            assert type(reaction) is discord.Reaction, f'result type was {type(reaction)}, expected discord.Reaction'
+            assert type(
+                reaction) is discord.Reaction, f'result type was {type(reaction)}, expected discord.Reaction'
             if reaction.emoji == ARROW_LEFT:
                 i = (i - 1) % len(card_embeds)
             else:
@@ -224,8 +211,22 @@ class Cards(commands.Cog):
             await msg.remove_reaction(ARROW_LEFT, member=ctx.bot.user)
             await msg.remove_reaction(ARROW_RIGHT, member=ctx.bot.user)
 
+    @commands.command()
+    async def ygo(self, ctx: commands.Context, *, query):
+        """
+        Search YGOPro for Yu-Gi-Oh cards, as images.
+        """
+        await self._ygo(ctx, query, text_only=False)
+
+    @commands.command()
+    async def ygot(self, ctx: commands.Context, *, query):
+        """
+        Search YGOPro for Yu-Gi-Oh cards, as text.
+        """
+        await self._ygo(ctx, query, text_only=True)
+
     @staticmethod
-    def _ygoembed(card: dict) -> discord.Embed:
+    def _ygo_textembed(card: dict) -> discord.Embed:
         """
         Returns a text embed for a YGOProDeck card dictionary.
         """
