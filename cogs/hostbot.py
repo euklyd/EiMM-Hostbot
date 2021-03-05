@@ -172,8 +172,9 @@ class HostBot(commands.Cog):
         name = re.sub(r' ', '-', name)
         return f'{name}-{player.discriminator:>04}'
 
-    @init.command(name='rolepms')
-    @commands.has_permissions(administrator=True)
+    # NOTE: This command is essentially deprecated and people keep trying to use it. Don't use it.
+    # @init.command(name='rolepms')
+    # @commands.has_permissions(administrator=True)
     async def init_rolepms(self, ctx: commands.Context, page: str = 'Rolesheet', column: str = 'Account'):
         """
         Create Role PM channels for players and enrole each.
@@ -239,7 +240,8 @@ class HostBot(commands.Cog):
                 overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
             if type(player) is discord.Member:
                 if len(player_roles) == 1:
-                    await player.edit(roles=player.roles + [player_roles[0]])
+                    if player_roles[0] not in player.roles:
+                        await player.edit(roles=player.roles + [player_roles[0]])
                 # manage needed for pins
                 overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
             topic = f"{player}'s Role PM"
@@ -312,7 +314,8 @@ class HostBot(commands.Cog):
                 overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
             if type(player) is discord.Member:
                 if len(player_roles) == 1:
-                    await player.edit(roles=player.roles + [player_roles[0]])
+                    if player_roles[0] not in player.roles:
+                        await player.edit(roles=player.roles + [player_roles[0]])
                 # manage needed for pins
                 overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
             topic = f"{player}'s Role PM"
@@ -391,11 +394,6 @@ class HostBot(commands.Cog):
         player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
         dead_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='dead').one_or_none()
 
-        print('spec_role_id:', spec_role_id)
-        print('host_role_id:', host_role_id)
-        print('player_role_ids:', player_role_ids)
-        print('dead_role_id:', dead_role_id)
-
         spec_role = ctx.guild.get_role(spec_role_id.id)
         host_role = ctx.guild.get_role(host_role_id.id)
         player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
@@ -408,6 +406,17 @@ class HostBot(commands.Cog):
             em.add_field(name=f'{player_role} (Players)', value=f'{len(player_role.members)}')
         em.add_field(name=f'{spec_role} (Specs)', value=f'{len(spec_role.members)}', inline=False)
         em.add_field(name=f'{dead_role} (Dead)', value=f'{len(dead_role.members)}', inline=False)
+
+        announcements_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='announcements').one_or_none()
+        flips_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='flips').one_or_none()
+        gamechat_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='gamechat').one_or_none()
+        graveyard_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='gamechat').one_or_none()
+
+        em.add_field(name='Announcements', value=f'{ctx.guild.get_channel(announcements_chan.id)}')
+        em.add_field(name='Flips', value=f'{ctx.guild.get_channel(flips_chan.id)}')
+        em.add_field(name='Gamechat', value=f'{ctx.guild.get_channel(gamechat_chan.id)}')
+        em.add_field(name='Graveyard', value=f'{ctx.guild.get_channel(graveyard_chan.id)}')
+        em.add_field(name='Role PMs category', value=f'{ctx.guild.get_channel(server.rolepms_id)}')
 
         await ctx.send(embed=em)
 
