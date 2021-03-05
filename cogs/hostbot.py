@@ -242,7 +242,7 @@ class HostBot(commands.Cog):
                 if len(player_roles) == 1:
                     if player_roles[0] not in player.roles:
                         await player.edit(roles=player.roles + [player_roles[0]])
-                # manage needed for pins
+                # manage needed so players can pin messages
                 overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
             topic = f"{player}'s Role PM"
             await category.create_text_channel(HostBot._player_channel_name(player), overwrites=overwrites, topic=topic)
@@ -381,6 +381,39 @@ class HostBot(commands.Cog):
 
         await ctx.send('Deleted, like, everything.')
 
+    @init.command(name='setchan')
+    @commands.has_permissions(administrator=True)
+    async def init_setchan(self, ctx: commands.Context, channel_type: str,
+                           channel: Union[discord.CategoryChannel, discord.TextChannel]):
+        valid_types = {'announcements', 'flips', 'gamechat', 'graveyard', 'rolepms'}
+
+        session = session_maker()
+
+        channel_type = channel_type.lower()
+        if channel_type not in valid_types:
+            await ctx.send(f'{channel_type} is not a valid channel type.')
+            return
+
+        if channel_type == 'rolepms':
+            if channel.type is not discord.ChannelType.category:
+                await ctx.send(f'{channel} is not a valid category channel.')
+                return
+            server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+            server.rolepms_id = channel.id
+        else:
+            if channel.type is not discord.ChannelType.text:
+                await ctx.send(f'{channel} is not a valid text channel.')
+                return
+            channel_row = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type=channel_type).one_or_none()
+            channel_row.id = channel.id
+
+        session.commit()
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    # @init.command(name='setrole')
+    # async def init_setchan(self, ctx: commands.Context, role_type: str, role: discord.Role):
+    #     ...
+
     @init.command(name='status')
     async def init_status(self, ctx: commands.Context):
         """
@@ -407,7 +440,8 @@ class HostBot(commands.Cog):
         em.add_field(name=f'{spec_role} (Specs)', value=f'{len(spec_role.members)}', inline=False)
         em.add_field(name=f'{dead_role} (Dead)', value=f'{len(dead_role.members)}', inline=False)
 
-        announcements_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='announcements').one_or_none()
+        announcements_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id,
+                                                                  type='announcements').one_or_none()
         flips_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='flips').one_or_none()
         gamechat_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='gamechat').one_or_none()
         graveyard_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='gamechat').one_or_none()
