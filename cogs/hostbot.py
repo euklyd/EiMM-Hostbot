@@ -385,6 +385,18 @@ class HostBot(commands.Cog):
     @commands.has_permissions(administrator=True)
     async def init_setchan(self, ctx: commands.Context, channel_type: str,
                            channel: Union[discord.CategoryChannel, discord.TextChannel]):
+        """
+        Set the channels hostbot associates with each type.
+
+        Valid channel types are:
+        - announcements
+        - flips
+        - gamechat
+        - graveyard
+        - rolepms
+
+        As rolepms is a category channel, it must be specified either through exact text name (case-sensitive) or channel ID snowflake.
+       """
         valid_types = {'announcements', 'flips', 'gamechat', 'graveyard', 'rolepms'}
 
         session = session_maker()
