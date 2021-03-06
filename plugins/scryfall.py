@@ -3,6 +3,7 @@ import json
 import re
 import urllib
 from pprint import pprint
+import random
 from typing import Optional, List, Dict
 
 import discord
@@ -401,6 +402,87 @@ class Cards(commands.Cog):
         if card['type'].lower() in color_dict:
             return discord.Colour(color_dict[card['type'].lower()])
         return None
+
+    @commands.command(name='dt')
+    async def duel_terminal(self, ctx: commands.Context, dt_num: str, num_cards: int = 1):
+        """
+        Pull Duel Terminal cards.
+
+        Pull ratios are assumed to be identical to those in Dark Legends, etc (11:1, 1:1, 1:5, 1:12).
+        """
+        dt_nums = ['1', '2', '3', '4', '5a', '5b', '6a', '6b', '7a', '7b']
+        if dt_num.lower() not in dt_nums:
+            await ctx.send(f'{dt_num} not a valid Duel Terminal (1-7).')
+            return
+
+        dt_name = f'Duel Terminal {dt_num}'
+
+        ygo = ygoprodeck.YGOPro()
+        cards = ygo.get_cards(cardset=dt_name)['data']
+
+        # This isn't actually used, but it's useful to keep track of how I arrived at these numbers
+        # pull_ratios = {
+        #     '(DNPR)': 660,  # 11:1
+        #     '(DRPR)': 60,   # 1:1
+        #     '(DSPR)': 12,   # 1:5
+        #     '(DUPR)': 5,    # 1:12
+        # }
+
+        rarity_dict = {
+            '(DNPR)': [],  # C
+            '(DRPR)': [],  # R
+            '(DSPR)': [],  # SR
+            '(DUPR)': [],  # UR
+            # '': []  # duel terminal secret rare doesn't exist in the TCG (yet?)
+        }
+
+        for card in cards:
+            for card_set in card['card_sets']:
+                if card_set['set_name'].lower() == dt_name.lower():
+                    rarity_dict[card_set['set_rarity_code']].append(card)
+
+        pulls = {}
+        for i in range(num_cards):
+            rand = random.randint(0, 737)
+
+            if rand < 660:
+                # common
+                rarity = '(DNPR)'
+            elif rand < 660 + 60:
+                # rare
+                rarity = '(DRPR)'
+            elif rand < 660 + 60 + 12:
+                # super rare
+                rarity = '(DSPR)'
+            else:
+                # ultra rare
+                rarity = '(DUPR)'
+
+            pull = random.choice(rarity_dict[rarity])
+            pull['num'] = 1
+            pull['rarity'] = rarity
+
+            if pull['name'] in pulls:
+                pulls[pull['name']]['num'] += 1
+            else:
+                pulls[pull['name']] = pull
+
+        pulls = [card for card in pulls.values()]
+        print([pull['name'] for pull in pulls])
+        pulls = sorted(pulls, key=lambda x: x['name'].lower())
+        print([pull['name'] for pull in pulls])
+        result = ''
+        for card in pulls:
+            # I don't want to use the awful rarity symbols
+            rarity = {
+                '(DNPR)': 'C',
+                '(DRPR)': 'R',
+                '(DSPR)': 'SR',
+                '(DUPR)': 'UR',
+            }[card['rarity']]
+            result += f'{card["num"]}x {card["name"]} ({rarity})\n'
+
+        await ctx.send(result)
 
 
 def setup(bot: Bot):
