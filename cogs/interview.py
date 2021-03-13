@@ -89,7 +89,7 @@ class Question:
                  answer: str = None, timestamp: datetime = None):
         self.interviewee = interviewee
         self.asker = asker
-        self.question = question
+        self.question = str(question)
         self.question_num = question_num
         self.server_id = server_id
         self.channel_id = channel_id
@@ -1160,15 +1160,18 @@ class Interview(commands.Cog):
     @commands.command()
     @_ck_server_active()
     @_ck_is_interviewee()
-    async def imganswer(self, ctx: commands.Context, row_num: int, url: str):
+    async def imganswer(self, ctx: commands.Context, row_num: int, url: str, preview: Optional[bool]):
         """
         Answer a single question row with an added image.
 
-        Use the row as indicated on the sheet sidebar.
+        Use the row as indicated on the sheet sidebar. If the preview flag is set to true, will post in the current channel.
         """
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
-        channel = ctx.guild.get_channel(server.answer_channel)
+        if preview is True:
+            channel = ctx.channel
+        else:
+            channel = ctx.guild.get_channel(server.answer_channel)
         await self._imganswer(ctx, row_num, url, channel)
 
     # == Votes ==
