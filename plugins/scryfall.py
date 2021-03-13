@@ -387,11 +387,13 @@ class Cards(commands.Cog):
             'effect monster': 0xc26727,
             'tuner monster': 0xc26727,
             'union effect monster': 0xc26727,
+            'gemini monster': 0xc26727,
 
             'synchro monster': 0xfefefe,
             'synchro tuner monster': 0xfefefe,
 
             'ritual monster': 0x446ec7,
+            'ritual effect monster': 0x446ec7,  # yu-gi-oh drives me nuts with how it codifies typelines
             'fusion monster': 0x9051a6,
             'xyz monster': 0x000000,
             'link monster': 0x2652ab,
@@ -410,6 +412,8 @@ class Cards(commands.Cog):
 
         Pull ratios are assumed to be identical to those in Dark Legends, etc (11:1, 1:1, 1:5, 1:12).
         """
+        COMMONS_PER_PACK = 6  # we're deciding there's 10 cards per pack so that's 9 common slots
+
         dt_nums = ['1', '2', '3', '4', '5a', '5b', '6a', '6b', '7a', '7b']
         if dt_num.lower() not in dt_nums:
             await ctx.send(f'{dt_num} not a valid Duel Terminal (1-7).')
@@ -442,16 +446,20 @@ class Cards(commands.Cog):
                     rarity_dict[card_set['set_rarity_code']].append(card)
 
         pulls = {}
+        c_odds = COMMONS_PER_PACK * 1 * 5 * 12
+        r_odds = 5*12
+        sr_odds = 12
+        ur_odds = 5
         for i in range(num_cards):
-            rand = random.randint(0, 737)
+            rand = random.randint(0, c_odds + r_odds + sr_odds + ur_odds)
 
-            if rand < 660:
+            if rand < c_odds:
                 # common
                 rarity = '(DNPR)'
-            elif rand < 660 + 60:
+            elif rand < c_odds + r_odds:
                 # rare
                 rarity = '(DRPR)'
-            elif rand < 660 + 60 + 12:
+            elif rand < c_odds + r_odds + sr_odds:
                 # super rare
                 rarity = '(DSPR)'
             else:
@@ -468,9 +476,7 @@ class Cards(commands.Cog):
                 pulls[pull['name']] = pull
 
         pulls = [card for card in pulls.values()]
-        print([pull['name'] for pull in pulls])
         pulls = sorted(pulls, key=lambda x: x['name'].lower())
-        print([pull['name'] for pull in pulls])
         result = ''
         for card in pulls:
             # I don't want to use the awful rarity symbols
