@@ -900,7 +900,7 @@ class Interview(commands.Cog):
             description = f"{member}'s past interviews were:\n"
             for iv in past_interviews:
                 url = utils.jump_url(iv.server_id, iv.op_channel_id, iv.op_message_id)
-                description += f'• [{iv.start_time}]({url}): {iv.questions_asked} out of {iv.questions_asked}\n'
+                description += f'• [{iv.start_time}]({url}): {iv.questions_answered} out of {iv.questions_asked}\n'
             em.description = description
         em.set_thumbnail(url=member.avatar_url)
         if interview is None:
