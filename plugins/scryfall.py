@@ -385,6 +385,7 @@ class Cards(commands.Cog):
             'normal tuner monster': 0xc9b175,
 
             'effect monster': 0xc26727,
+            'flip effect monster': 0xc26727,
             'tuner monster': 0xc26727,
             'union effect monster': 0xc26727,
             'gemini monster': 0xc26727,
@@ -412,6 +413,12 @@ class Cards(commands.Cog):
 
         Pull ratios are assumed to be identical to those in Dark Legends, etc (11:1, 1:1, 1:5, 1:12).
         """
+        if num_cards > 100:
+            await ctx.send('Pick a lower number of cards.')
+            return
+        elif num_cards < 1:
+            num_cards = 1
+
         COMMONS_PER_PACK = 6  # we're deciding there's 10 cards per pack so that's 9 common slots
 
         dt_nums = ['1', '2', '3', '4', '5a', '5b', '6a', '6b', '7a', '7b']
