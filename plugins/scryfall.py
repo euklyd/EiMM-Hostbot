@@ -450,6 +450,9 @@ class Cards(commands.Cog):
         for card in cards:
             for card_set in card['card_sets']:
                 if card_set['set_name'].lower() == dt_name.lower():
+                    if card_set['set_rarity_code'] not in rarity_dict:
+                        # When rarities are missing, treat them as commons:
+                        card_set['set_rarity_code'] = '(DNPR)'
                     rarity_dict[card_set['set_rarity_code']].append(card)
 
         pulls = {}
