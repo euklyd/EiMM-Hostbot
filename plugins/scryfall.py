@@ -1,4 +1,6 @@
 import asyncio
+import csv
+import io
 import json
 import re
 import urllib
@@ -457,7 +459,7 @@ class Cards(commands.Cog):
 
         pulls = {}
         c_odds = COMMONS_PER_PACK * 1 * 5 * 12
-        r_odds = 5*12
+        r_odds = 5 * 12
         sr_odds = 12
         ur_odds = 5
         for i in range(num_cards):
@@ -499,6 +501,64 @@ class Cards(commands.Cog):
             result += f'{card["num"]}x {card["name"]} ({rarity})\n'
 
         await ctx.send(result)
+
+    @commands.command(name='ygocsv')
+    async def ydk_to_csv(self, ctx: commands.Context):
+        ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardinfo.php'
+
+        if len(ctx.message.attachments) != 1:
+            await ctx.send(f'Attach exactly one (1) item! ({len(ctx.message.attachments)} found.)')
+            return
+
+        ls_cards = requests.get(ENDPOINT).json()['data']
+        cards = {}
+
+        for card in ls_cards:
+            cards[card['id']] = card
+
+        attachment = ctx.message.attachments[0]
+        with io.BytesIO() as buffer:
+            await attachment.save(buffer)
+            csv_contents = [line.decode('utf-8') for line in buffer.readlines()]
+
+        collection = {}
+        reader = csv.DictReader(csv_contents)
+        for card_row in reader:
+            card = cards[int(card_row['cardid'])]
+
+            key = f"{card['id']}-{card_row['cardcode']}"
+            if card_row['card_edition'] == '1st Edition':
+                key += '-1st'
+
+            collection[key] = {
+                'quantity': int(card_row['cardq']),
+                'id': card['id'],
+                'name': card['name'],
+                'type': self._ygo_supertype(card),
+                'subtype': card['type'],
+                'atk': card['atk'] if 'atk' in card else None,
+                'def': card['def'] if 'def' in card else None,
+                'level': card['level'] if 'level' in card else None,
+                'race': card['race'],
+                'attribute': card['attribute'] if 'attribute' in card else None,
+                'desc': card['desc'],
+                'archetype': card['archetype'] if 'archetype' in card else '',
+                'set': card_row['cardset'],
+                'rarity': card_row['cardrarity'],
+                'set code': card_row['cardcode'],
+            }
+
+        ls_collection = list(collection.values())
+        ls_collection = sorted(ls_collection, key=lambda x: x['name'])
+        keys = ls_collection[0].keys()
+
+        with io.StringIO() as csv_out:
+            writer = csv.DictWriter(csv_out, keys)
+            writer.writeheader()
+            writer.writerows(ls_collection)
+            csv_out.seek(0)
+            await ctx.send(f'Processed your collection.',
+                           file=discord.File(csv_out, filename=f'{ctx.author} collection.csv'))
 
 
 def setup(bot: Bot):
