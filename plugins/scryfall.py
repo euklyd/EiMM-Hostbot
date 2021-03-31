@@ -503,7 +503,12 @@ class Cards(commands.Cog):
         await ctx.send(result)
 
     @commands.command(name='ygocsv')
-    async def ydk_to_csv(self, ctx: commands.Context):
+    async def collection_to_csv(self, ctx: commands.Context):
+        """
+        Exports a YGOProDeck collection CSV to something more detailed.
+
+        I suggest importing the output CSV to Google sheets / MS Excel so you can easily filter it.
+        """
         ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardinfo.php'
 
         if len(ctx.message.attachments) != 1:
