@@ -60,6 +60,8 @@ def scryfall_search(expr: str) -> ScryfallResponse:
 class Cards(commands.Cog):
     """
     Card games, on motorcycles.
+
+    Use [[MtG card name]] or {{Yu-Gi-Oh card name}} to search for cards inline.
     """
 
     def __init__(self, bot: Bot):
@@ -102,12 +104,12 @@ class Cards(commands.Cog):
         else:
             await ctx.send(f"`'image_uris'` not present ( `{card['uri']}` ). Try: {card['scryfall_uri']}")
 
-    @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
-        if message.author.id == self.bot.user.id:
-            return
-        img_regex = r'\[\[([^\[\]]*)]]'
-        match = re.search(img_regex, message.content)
+    async def _mtg_inline(self, message: discord.Message) -> bool:
+        """
+        Returns True if it found cards matching the MtG inline.
+        """
+        mtg_regex = r'\[\[([^\[\]]*)]]'
+        match = re.search(mtg_regex, message.content)
         if type(message.channel) == discord.TextChannel:
             for member in message.channel.members:  # type: discord.Member
                 if member.id == 558508371821723670:
@@ -116,14 +118,14 @@ class Cards(commands.Cog):
                         pass  # we can just answer queries instead of karn :)
                     else:
                         # karn exists and is online
-                        return
+                        return False
         if match is not None:
             expr = match.group(1)
         else:
-            return
+            return False
         resp = scryfall_search(expr)
         if len(resp.cards) == 0:
-            return
+            return False
         card = resp.closest(message.content)
         for c in resp.cards:
             if c['name'].lower() == expr.lower():
@@ -133,9 +135,33 @@ class Cards(commands.Cog):
         else:
             await message.channel.send(f"`'image_uris'` not present ( `{card['uri']}` ). Try: {card['scryfall_uri']}")
 
-    async def _ygo(self, ctx: commands.Context, query: str, text_only: bool = False):
+    async def _ygo_inline(self, message: discord.Message) -> bool:
+        """
+        Returns True if it found cards matching the Yu-Gi-Oh inline.
+        """
+        ygo_regex = r'{{([^{}]*)}}'
+        match = re.search(ygo_regex, message.content)
+        if not match:
+            return False
+        ctx = await self.bot.get_context(message)
+        return await self._ygo(ctx, match.group(1), text_only=True)
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        if message.author.id == self.bot.user.id:
+            return
+
+        if await self._mtg_inline(message):
+            return
+
+        if await self._ygo_inline(message):
+            return
+
+    async def _ygo(self, ctx: commands.Context, query: str, text_only: bool = False) -> bool:
         """
         Displays Yu-Gi-Oh cards in a scrollable list.
+
+        Returns True if card(s) found, else False.
         """
         ARROW_LEFT, ARROW_RIGHT = '◀', '▶'
 
@@ -214,10 +240,14 @@ class Cards(commands.Cog):
             await msg.remove_reaction(ARROW_LEFT, member=ctx.bot.user)
             await msg.remove_reaction(ARROW_RIGHT, member=ctx.bot.user)
 
+        return len(card_embeds) > 0
+
     @commands.command()
     async def ygo(self, ctx: commands.Context, *, query):
         """
         Search YGOPro for Yu-Gi-Oh cards, as images.
+
+        Also available inline as {{card name}}.
         """
         await self._ygo(ctx, query, text_only=False)
 
@@ -225,6 +255,8 @@ class Cards(commands.Cog):
     async def ygot(self, ctx: commands.Context, *, query):
         """
         Search YGOPro for Yu-Gi-Oh cards, as text.
+
+        Also available inline as {{card name}}.
         """
         await self._ygo(ctx, query, text_only=True)
 
