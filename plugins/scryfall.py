@@ -220,7 +220,7 @@ class Cards(commands.Cog):
 
         while True:
             try:
-                result, event_type = await ctx.bot.wait_for_first(events=events, checks=checks, timeout=60)
+                result, event_type = await ctx.bot.wait_for_first(events=events, checks=checks, timeout=180)
             except asyncio.TimeoutError:
                 break
 
