@@ -1010,15 +1010,11 @@ class Interview(commands.Cog):
 
     # == Answers ==
 
-    async def _channel_answer(self, ctx: commands.Context, channel: discord.TextChannel):
+    async def _channel_answer(self, ctx: commands.Context, channel: discord.TextChannel, preview_flag=False):
         """
         Command wrapped by Interview.answer() and Interview.preview().
         Greedily dumps as many answered questions into embeds as possible, and posts them to the specified channel.
         """
-        preview_flag = False
-        if channel == ctx.channel:
-            preview_flag = True
-
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
         interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id,
@@ -1117,9 +1113,9 @@ class Interview(commands.Cog):
     @_ck_is_interviewee()
     async def preview(self, ctx: commands.Context):
         """
-        Preview answers, visible in the backstage channel.
+        Preview answers, visible in the current channel.
         """
-        await self._channel_answer(ctx, ctx.channel)
+        await self._channel_answer(ctx, ctx.channel, preview_flag=True)
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     async def _imganswer(self, ctx: commands.Context, row_num: int, url: str, channel: discord.TextChannel):
