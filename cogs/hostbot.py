@@ -596,7 +596,7 @@ class HostBot(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.group(invoke_without_command=True)
-    async def addspec(self, ctx: commands.Context, spec: discord.Member):
+    async def addspec(self, ctx: commands.Context, specs: commands.Greedy[discord.Member]):
         """
         Add a spectator to your Role PM.
 
@@ -631,14 +631,20 @@ class HostBot(commands.Cog):
         spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='spec').one_or_none()
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
-        if spec_role not in spec.roles:
-            await ctx.send('Only spectators can be added to a role PM!')
-            await ctx.message.add_reaction(ctx.bot.redtick)
-            return
+        badspecs = []
+        for spec in specs:
+            if spec_role not in spec.roles:
+                badspecs.append(spec)
+                await ctx.message.add_reaction(ctx.bot.redtick)
+                continue
 
-        # now we can do the actual function:
-        await ctx.channel.set_permissions(spec, read_messages=True)
-        await ctx.message.add_reaction(ctx.bot.greentick)
+            # now we can do the actual function:
+            await ctx.channel.set_permissions(spec, read_messages=True)
+            await ctx.message.add_reaction(ctx.bot.greentick)
+
+        if badspecs:
+            badspec_msg = ', '.join([str(spec) for spec in badspecs])
+            await ctx.send(f'Failed to add {badspec_msg}: only spectators can be added to a role PM!')
 
     @addspec.command(name='all')
     async def addspec_all(self, ctx: commands.Context):
