@@ -391,20 +391,15 @@ class Cards(commands.Cog):
     @staticmethod
     def _ygo_baninfo(card: dict) -> Optional[str]:
         if 'banlist_info' in card:
+            bans = []
             if 'ban_tcg' in card['banlist_info']:
-                tcg = card['banlist_info']['ban_tcg']
-            else:
-                tcg = 'Unlimited'
+                bans.append(f"TCG: {card['banlist_info']['ban_tcg']}")
             if 'ban_ocg' in card['banlist_info']:
-                ocg = card['banlist_info']['ban_ocg']
-            else:
-                ocg = 'Unlimited'
+                bans.append(f"OCG: {card['banlist_info']['ban_ocg']}")
             if 'ban_goat' in card['banlist_info']:
-                goat = card['banlist_info']['ban_goat']
-            else:
-                goat = 'Unlimited'
+                bans.append(f"Goat: {card['banlist_info']['ban_goat']}")
 
-            return f'TCG: {tcg} | OCG: {ocg} | Goat: {goat}'
+            return ' | '.join(bans)
         return None
 
     @staticmethod
