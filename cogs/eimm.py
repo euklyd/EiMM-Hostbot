@@ -212,9 +212,13 @@ class EiMM(commands.Cog):
             match = matches[0][0]
         else:
             matches = [match[0] for match in matches]  # type: List[str]
-            await ctx.send('Which ability did you mean?')
-            match = await menu.menu_list(ctx, matches)
+            try:
+                match = await menu.menu_list(ctx, matches)
+            except RuntimeError:
+                await ctx.send('Finish with your preview menu first.')
+                return
         em = ability_embed(self.abilities[match])
+        await ctx.send('Which ability did you mean?')
         await ctx.send(embed=em)
 
     @commands.Cog.listener()
