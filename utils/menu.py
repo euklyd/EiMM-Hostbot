@@ -58,7 +58,7 @@ async def menu_wrapper(ctx: commands.Context, keys: List, elements: List, timeou
                        select_max: Union[int, None] = 1, repeats: bool = False):
     lock = (ctx.author.id, ctx.channel.id)
     if lock in _locks:
-        raise RuntimeError("you already have a menu instance in this channel")
+        raise RuntimeError("A menu instance in this channel already exists for this user.")
     _locks.add(lock)
     with ExitStack() as stack:
         stack.callback(_locks.remove, lock)
