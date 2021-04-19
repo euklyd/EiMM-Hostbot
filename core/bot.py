@@ -24,6 +24,7 @@ class Bot(commands.Bot):
         self._greentick = self.get_emoji(conf.greentick_id)  # type: discord.Emoji
         self._redtick = self.get_emoji(conf.redtick_id)  # type: discord.Emoji
         self._boostemoji = self.get_emoji(conf.boostemoji_id)  # type: discord.Emoji
+        self._waitemoji = self.get_emoji(conf.waitemoji_id)  # type: discord.Emoji
 
         if Path('conf/google_creds.json').exists():
             self.google_creds = 'conf/google_creds.json'
@@ -61,6 +62,12 @@ class Bot(commands.Bot):
         if self._boostemoji is None:
             self._boostemoji = self.get_emoji(self.conf.boostemoji_id)  # type: discord.Emoji
         return self._boostemoji
+
+    @property
+    def waitemoji(self) -> discord.Emoji:
+        if self._waitemoji is None:
+            self._waitemoji = self.get_emoji(self.conf.waitemoji_id)
+        return self._waitemoji
 
     @property
     def default_command_prefix(self) -> str:
