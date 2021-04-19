@@ -876,8 +876,8 @@ class Interview(commands.Cog):
             else:
                 await ctx.send('Invalid <user> argument. Mention a member or "all".')
                 return
-        await stage.set_permissions(user, send_messages=True)
         await ctx.message.add_reaction(ctx.bot.waitemoji)
+        await stage.set_permissions(user, send_messages=True)
 
         if minutes > 24*60:  # max at 24 hours
             await ctx.send("You can't add someone to the stage for more than 24 hours; if you want a longer duration, "
