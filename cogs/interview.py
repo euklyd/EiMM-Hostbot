@@ -850,6 +850,44 @@ class Interview(commands.Cog):
         session.commit()
         await ctx.message.add_reaction(ctx.bot.greentick)
 
+    @iv.command(name='invite')
+    @_ck_server_active()
+    async def iv_invite(self, ctx: commands.Context, user: Union[discord.Member, str], minutes=60):
+        """
+        Temporarily open the interview stage to other people.
+
+        Usable only by the current interviewee and administrators. Defaults to 60 minute invitation. Use 'all' for <user> to invite everyone.
+        """
+        session = session_maker()
+        interview = session.query(schema.Interview).filter_by(current=True,
+                                                              server_id=ctx.guild.id).one_or_none()  # type: Optional[schema.Interview]
+        interviewee = ctx.guild.get_member(interview.interviewee_id)
+        author_perms = ctx.channel.permissions_for(ctx.author)  # type: discord.Permissions
+        stage = ctx.guild.get_channel(interview.server.answer_channel)
+
+        if ctx.author.id is not interviewee.id and not author_perms.administrator:
+            # bad perms
+            await ctx.send('This command is usable only by the current interviewee and administrators.')
+            return
+
+        if type(user) is str:
+            if user.lower() == 'all':
+                user = ctx.guild.default_role
+            else:
+                await ctx.send('Invalid <user> argument. Mention a member or "all".')
+                return
+        await stage.set_permissions(user, send_messages=True)
+        await ctx.message.add_reaction(ctx.bot.waitemoji)
+
+        if minutes > 24*60:  # max at 24 hours
+            await ctx.send("You can't add someone to the stage for more than 24 hours; if you want a longer duration, "
+                           "ask a mod.")
+            return
+        await asyncio.sleep(60 * minutes)
+        await stage.set_permissions(user, send_messages=False)
+        await ctx.message.clear_reactions()
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
     @iv.command(name='stats')
     @_ck_server_active()
     async def iv_stats(self, ctx: commands.Context, member: Optional[discord.Member]):
