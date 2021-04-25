@@ -571,6 +571,8 @@ class Cards(commands.Cog):
                 'atk': card['atk'] if 'atk' in card else None,
                 'def': card['def'] if 'def' in card else None,
                 'level': card['level'] if 'level' in card else None,
+                'scale': card['scale'] if 'scale' in card else None,
+                'link': card['linkval'] if 'linkval' in card else None,
                 'race': card['race'],
                 'attribute': card['attribute'] if 'attribute' in card else None,
                 'desc': card['desc'],
