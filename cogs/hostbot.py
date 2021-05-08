@@ -532,8 +532,8 @@ class HostBot(commands.Cog):
             return
         gy_channel = session.query(hbs.Channel).filter_by(type='graveyard', server_id=ctx.guild.id).one_or_none()
         gy_channel = ctx.guild.get_channel(gy_channel.id)  # type: discord.TextChannel
-        msg = msg.replace('@everyone', '@\u200beveryone`').replace('@here',
-                                                                   '@\u200bhere')  # \u200b aka zero-width space
+        msg = msg.replace('@everyone', '@\u200beveryone').replace('@here',
+                                                                  '@\u200bhere')  # \u200b aka zero-width space
         conf = f'**Confessional from {ctx.author}:**\n>>> {msg}'
         await gy_channel.send(conf)
         await ctx.message.add_reaction(ctx.bot.greentick)
