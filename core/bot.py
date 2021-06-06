@@ -39,6 +39,8 @@ class Bot(commands.Bot):
 
         if conf.imgur_keys:
             self.imgur = Imgur(conf.imgur_keys)
+        else:
+            self.imgur = None
 
         # I don't like circular includes but there's a bunch of API methods that might need to be invoked
         # when checking commands.
