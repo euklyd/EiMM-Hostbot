@@ -163,7 +163,7 @@ class Cards(commands.Cog):
 
         Returns True if card(s) found, else False.
         """
-        ARROW_LEFT, ARROW_RIGHT = '◀', '▶'
+        ARROW_LEFT, ARROW_RIGHT = '\U000025c0', '\U000025b6'
 
         ygo = ygoprodeck.YGOPro()
         result = ygo.get_cards(fname=query)
