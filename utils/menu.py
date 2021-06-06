@@ -68,7 +68,7 @@ async def menu_wrapper(ctx: commands.Context, keys: List, elements: List, timeou
 async def menu_loop(ctx: commands.Context, keys: List, elements: List, timeout: int = 600,
                     select_max: Union[int, None] = 1, repeats: bool = False):
     NUM_ITEMS = 20
-    ARROW_LEFT, ARROW_RIGHT = '◀', '▶'
+    ARROW_LEFT, ARROW_RIGHT = '\U000025c0', '\U000025b6'
 
     def single_condition(s: str):
         return s in keys
