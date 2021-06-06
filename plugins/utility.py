@@ -221,6 +221,9 @@ async def bidoof(ctx: commands.Context, key: Optional[str]):
 
     God bless Mafia Bidoof.
     """
+    if not ctx.bot.imgur:
+        await ctx.send('Imgur not enabled.')
+        return
     BIDOOF_ALBUM = 'kn6ieEv'
     bidoofs = []  # type: List[Image]
     if type(BIDOOF_ALBUM) is list:
