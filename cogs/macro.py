@@ -10,25 +10,7 @@ from core.bot import Bot
 
 class Macro(commands.Cog):
     """
-    Runs member interviews, interfaced with Google Sheets as a GUI.
-
-    Instructions:
-
-    1. Clone this sheet and rename it for your server:
-    https://docs.google.com/spreadsheets/d/1cC3YtXrXlykd6vfI5Q6y1sw8EGH9walpidZB4BJKTbw/edit?usp=sharing
-
-    2. Share it with this bot's credentialed email (ask the bot owner for it, I'm not uploading it to github).
-    (You can query this with the command `iv` if it's been set up in the configuration file.)
-
-    3. Run the command `iv setup #answer_channel #question_channel sheet_name`.
-
-    4. Run the command `iv enable` to open voting.
-
-    5. Once you decide voting is ended, run the command `iv next @vote_winner`.
-
-    6. Share the sheet with the winner, hide old sheet pages, and let them get to answering.
-
-    Note: Most commands are not displayed unless your server is set up for interviews.
+    Macros of all sorts! Probably used for memes.
     """
 
     def __init__(self, bot: Bot):

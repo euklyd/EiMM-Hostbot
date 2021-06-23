@@ -109,7 +109,13 @@ class Management(commands.Cog):
 
     @commands.command()
     async def iam(self, ctx: commands.Context, user: Optional[discord.User]):
-        await ctx.send("Despite everything, you're still you.")
+        if ctx.author.id != ctx.bot.owner_id:
+            await ctx.send("Despite everything, you're still you.")
+            return
+        if user:
+            await ctx.send(f"If you really want to be {user}, you can! Just don't abuse it.")
+        else:
+            await ctx.send("If you really want to be someone else, you can! Just don't abuse it.")
 
     @commands.command()
     @commands.is_owner()
