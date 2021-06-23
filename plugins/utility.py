@@ -108,6 +108,10 @@ class Management(commands.Cog):
         self.bot = bot
 
     @commands.command()
+    async def iam(self, ctx: commands.Context, user: Optional[discord.User]):
+        await ctx.send("Despite everything, you're still you.")
+
+    @commands.command()
     @commands.is_owner()
     async def msg(self, ctx: commands.Context, channel_id: int, *, message: str):
         """
@@ -159,7 +163,8 @@ class Management(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_update(self, before: discord.Guild, after: discord.Guild):
-        print(f"that's a guild update! oldsubs: {before.premium_subscription_count}, newsubs: {after.premium_subscription_count}")
+        print(
+            f"that's a guild update! oldsubs: {before.premium_subscription_count}, newsubs: {after.premium_subscription_count}")
         if before.id != 0:
             # TODO this should be removed and replaced w/ an actual opt-in db
             return
@@ -168,7 +173,8 @@ class Management(commands.Cog):
         chan = after.get_channel(0)  # type: discord.TextChannel
 
         if before.premium_subscription_count != after.premium_subscription_count:
-            print(f'change in nitro boosters! {before.premium_subscription_count} -> {after.premium_subscription_count}')
+            print(
+                f'change in nitro boosters! {before.premium_subscription_count} -> {after.premium_subscription_count}')
             # nitro boost change
             before_subs = set(before.premium_subscribers)
             after_subs = set(after.premium_subscribers)
@@ -214,37 +220,7 @@ class Management(commands.Cog):
             return
 
 
-@commands.command()
-async def bidoof(ctx: commands.Context, key: Optional[str]):
-    """
-    I can't make a Mafia Bidoof bot *without* this command.
-
-    God bless Mafia Bidoof.
-    """
-    if not ctx.bot.imgur:
-        await ctx.send('Imgur not enabled.')
-        return
-    BIDOOF_ALBUM = 'kn6ieEv'
-    bidoofs = []  # type: List[Image]
-    if type(BIDOOF_ALBUM) is list:
-        for album in BIDOOF_ALBUM:
-            bidoofs += ctx.bot.imgur.get_album_images(album)
-    else:
-        bidoofs = ctx.bot.imgur.get_album_images(BIDOOF_ALBUM)
-    bidoof_img = random.choice(bidoofs)  # type: Image
-    if key is not None:
-        # if a key is specified, attempt to override the randomly selected image
-        for img in bidoofs:
-            if img.description is not None and img.description.lower() == key.lower():
-                bidoof_img = img
-                break
-    em = discord.Embed().set_image(url=bidoof_img.link)
-    await ctx.send(embed=em)
-
-
 def setup(bot: commands.Bot):
-    bot.add_command(bidoof)
-
     bot.add_cog(Utility(bot))
     bot.add_cog(Moderation(bot))
     bot.add_cog(Management(bot))
