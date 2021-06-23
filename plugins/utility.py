@@ -109,6 +109,9 @@ class Management(commands.Cog):
 
     @commands.command()
     async def iam(self, ctx: commands.Context, user: Optional[discord.User]):
+        """
+        Please don't abuse this command!
+        """
         if ctx.author.id != ctx.bot.owner_id:
             await ctx.send("Despite everything, you're still you.")
             return
