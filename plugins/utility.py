@@ -1,3 +1,4 @@
+import logging
 from collections import Counter
 from typing import Optional, List, Union
 
@@ -172,7 +173,7 @@ class Management(commands.Cog):
 
     @commands.Cog.listener()
     async def on_guild_update(self, before: discord.Guild, after: discord.Guild):
-        print(
+        logging.debug(
             f"that's a guild update! oldsubs: {before.premium_subscription_count}, newsubs: {after.premium_subscription_count}")
         if before.id != 0:
             # TODO this should be removed and replaced w/ an actual opt-in db
@@ -182,7 +183,7 @@ class Management(commands.Cog):
         chan = after.get_channel(0)  # type: discord.TextChannel
 
         if before.premium_subscription_count != after.premium_subscription_count:
-            print(
+            logging.debug(
                 f'change in nitro boosters! {before.premium_subscription_count} -> {after.premium_subscription_count}')
             # nitro boost change
             before_subs = set(before.premium_subscribers)

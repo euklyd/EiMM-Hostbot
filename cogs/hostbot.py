@@ -1,3 +1,4 @@
+import logging
 import pprint
 import re
 from datetime import datetime, timedelta
@@ -134,14 +135,14 @@ class HostBot(commands.Cog):
             }
             if key == 'gamechat':
                 overwrites[roles['player']['role']] = discord.PermissionOverwrite(send_messages=True)
-                print(f'gamechat: creating {channel_name} for {key}')
+                logging.info(f'gamechat: creating {channel_name} for {key}')
             if key == 'graveyard':
                 overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(read_messages=False,
                                                                                  send_messages=None)
                 overwrites[roles['dead']['role']] = discord.PermissionOverwrite(read_messages=True)
                 overwrites[roles['host']['role']] = discord.PermissionOverwrite(read_messages=True)
                 overwrites[roles['spec']['role']] = discord.PermissionOverwrite(read_messages=True)
-                print(f'graveyard: creating {channel_name} for {key}')
+                logging.info(f'graveyard: creating {channel_name} for {key}')
 
             if key == 'music':
                 overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(read_messages=False)
@@ -151,7 +152,7 @@ class HostBot(commands.Cog):
                 overwrites=overwrites,
             )
             channels.append(hbs.Channel(id=new_channel.id, type=key))
-            print(f'created {channel_name} `[{key}]` with overwrites:\n{pprint.pformat(overwrites)}\n')
+            logging.info(f'created {channel_name} `[{key}]` with overwrites:\n{pprint.pformat(overwrites)}\n')
         server.channels = channels
 
         # Turn off @everyone ping
@@ -195,15 +196,15 @@ class HostBot(commands.Cog):
         player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
         player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
 
-        print(f'spec_role_id: {spec_role_id}')
-        print(f'host_role_id: {spec_role_id}')
+        logging.debug(f'spec_role_id: {spec_role_id}')
+        logging.debug(f'host_role_id: {spec_role_id}')
 
         sheet_name = server.sheet
-        print(f'getting page {page} from sheet {sheet_name}')
+        logging.debug(f'getting page {page} from sheet {sheet_name}')
         ws = self.connection.get_page(sheet_name, page)
-        print(ws)
+        logging.debug(ws)
         ls_usernames = spreadsheet.get_column_values(ws, column)
-        print(ls_usernames)
+        logging.debug(ls_usernames)
 
         players = []
         error_names = []
@@ -504,9 +505,8 @@ class HostBot(commands.Cog):
                 found = True
                 break
         if not found:
-            # TODO: remove test prints probably, but these are so smol that it doesn't really matter.
-            print(player_roles)
-            print(ctx.author.roles)
+            logging.debug(player_roles)
+            logging.debug(ctx.author.roles)
             await ctx.send('This command is only usable by living players.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return

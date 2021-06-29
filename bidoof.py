@@ -1,4 +1,6 @@
+import argparse
 import faulthandler
+import logging
 
 import discord
 from discord.ext import commands
@@ -18,11 +20,11 @@ async def reload(ctx: commands.Context, plugin: str):
     if f'plugins.{plugin}' in ctx.bot.extensions:
         ctx.bot.reload_extension(f'plugins.{plugin}')
         await ctx.send(f'Reloaded plugin `{plugin}`.')
-        print(f'reloaded plugins.{plugin}')  # TODO: change to actual logging sometime
+        logging.warning(f'reloaded plugins.{plugin}')
     elif f'cogs.{plugin}' in ctx.bot.extensions:
         ctx.bot.reload_extension(f'cogs.{plugin}')
         await ctx.send(f'Reloaded cog `{plugin}`.')
-        print(f'reloaded cogs.{plugin}')  # TODO: change to actual logging sometime
+        logging.warning(f'reloaded cogs.{plugin}')
     else:
         try:
             ctx.bot.load_extension(f'plugins.{plugin}')
@@ -40,11 +42,11 @@ async def unload(ctx: commands.Context, plugin: str):
     if f'plugins.{plugin}' in ctx.bot.extensions:
         ctx.bot.unload_extension(f'plugins.{plugin}')
         await ctx.send(f'Unloaded plugin `{plugin}`.')
-        print(f'reloaded plugins.{plugin}')  # TODO: change to actual logging sometime
+        logging.warning(f'reloaded plugins.{plugin}')
     elif f'cogs.{plugin}' in ctx.bot.extensions:
         ctx.bot.unload_extension(f'cogs.{plugin}')
         await ctx.send(f'Unloaded cog `{plugin}`.')
-        print(f'reloaded cogs.{plugin}')  # TODO: change to actual logging sometime
+        logging.warning(f'reloaded cogs.{plugin}')
     else:
         await ctx.send(f'Plugin `{plugin}` not loaded.')
 
@@ -59,7 +61,15 @@ async def shutdown(ctx: commands.Context):
     await ctx.bot.logout()
 
 
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--loglevel', '-l', help='log level', default='INFO')
+    return parser.parse_args()
+
+
 if __name__ == '__main__':
+    args = parse_args()
+    logging.basicConfig(level=args.loglevel, format='[%(asctime)s] %(message)s', datefmt='%Y/%m/%d %T:%M:%S')
     faulthandler.enable()
 
     # At least, needs: members=True, emojis=True, invites=True, messages=True, reactions=True
@@ -78,15 +88,16 @@ if __name__ == '__main__':
 
     for cog in settings.cogs:
         bot.load_extension(f'cogs.{cog}')
-        print(f'loaded cogs.{cog}')
+        logging.warning(f'loaded cogs.{cog}')
 
     for plugin in settings.plugins:
         bot.load_extension(f'plugins.{plugin}')
-        print(f'loaded plugins.{plugin}')
+        logging.warning(f'loaded plugins.{plugin}')
 
     bot.add_command(shutdown)
     bot.add_command(reload)
     bot.add_command(unload)
 
-    print("starting bot")
+    print('doot')
+    logging.warning("starting bot")
     bot.run(settings.client_token)

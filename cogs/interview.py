@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import pprint
 from datetime import datetime
 from pathlib import Path
@@ -115,8 +116,7 @@ class Question:
         asker = ctx.guild.get_member(row['ID'])
         if asker is None:
             asker = await ctx.bot.fetch_user(row['ID'])
-            if _DEBUG_FLAG:
-                print(f"couldn't find member with ID {row['ID']}, instead fetched user {asker}")
+            logging.debug(f"couldn't find member with ID {row['ID']}, instead fetched user {asker}")
 
         return Question(
             # This is a bit dangerous, but should be fine! only the interviewee will be calling the answer method:
@@ -460,8 +460,7 @@ class Interview(commands.Cog):
         length = 0
 
         def new_em(asker: discord.Member):
-            if _DEBUG_FLAG:
-                print('new blank em')
+            logging.debug('new blank em')
             nonlocal length
             length = 0
             return InterviewEmbed.blank(interviewee, asker, avatar_url=avatar_url)  # TODO: update avatar url?
@@ -472,8 +471,7 @@ class Interview(commands.Cog):
 
         em = None  # type: Optional[discord.Embed]
         for question in questions:
-            if _DEBUG_FLAG:
-                print(f'generating {question.asker}-{question.question_num}')
+            logging.debug(f'generating {question.asker}-{question.question_num}')
             if last_asker != question.asker:
                 # new asker, append old embed and make a new one
                 if em is not None and len(em.fields) > 0:
@@ -1060,11 +1058,9 @@ class Interview(commands.Cog):
         interviewee = ctx.guild.get_member(interview.interviewee_id)
         sheet = self.connection.get_sheet(server.sheet_name).sheet1
 
-        if _DEBUG_FLAG:
-            print('fetching records')
+        logging.debug('fetching records')
         rows = sheet.get_all_records()
-        if _DEBUG_FLAG:
-            print('records fetched')
+        logging.debug('records fetched')
 
         filtered_rows = []
         filtered_cells = []
@@ -1076,8 +1072,7 @@ class Interview(commands.Cog):
                     'values': [[True]]
                 })
 
-        if _DEBUG_FLAG:
-            print('filtered cells')
+        logging.debug('filtered cells')
 
         # Note: Useful debug output, not convinced this is perfect yet.
         # print('\n=== raw rows ===\n')
@@ -1086,10 +1081,6 @@ class Interview(commands.Cog):
         # pprint.pprint(filtered_rows)
 
         questions = [await Question.from_row(ctx, row) for row in filtered_rows]
-        if _DEBUG_FLAG:
-            print('converted to questions')
-            for q in questions:
-                print(q.asker, q.question_num)
 
         if len(questions) == 0:
             await ctx.send('No new questions to be answered.')
@@ -1097,10 +1088,6 @@ class Interview(commands.Cog):
 
         n_sent = 0
         embeds = Interview._generate_embeds(interviewee=interviewee, interview=interview, questions=questions)
-        if _DEBUG_FLAG:
-            print(len(embeds))
-            for e in embeds:
-                print(type(e))
         for embed in embeds:
             if type(embed) is Question:
                 # question was too long
@@ -1109,10 +1096,8 @@ class Interview(commands.Cog):
             else:
                 await channel.send(embed=embed)
                 n_sent += 1
-                if _DEBUG_FLAG:
-                    print(f'sent {n_sent} answer embeds')
-        if _DEBUG_FLAG:
-            print('done sending answers')
+                logging.debug(f'sent {n_sent} answer embeds')
+        logging.debug('done sending answers')
 
         if preview_flag is True:
             return
@@ -1141,8 +1126,8 @@ class Interview(commands.Cog):
         except Exception as e:
             # this is bad practice but i don't know what the error is; it'll be removed later
             await ctx.message.add_reaction(ctx.bot.redtick)
-            print(f"hey here's that error you're looking for at {datetime.utcnow()}")
-            print(type(e))
+            logging.error(f"hey here's that error you're looking for at {datetime.utcnow()}")
+            logging.error(type(e))
             raise e
         await ctx.message.add_reaction(ctx.bot.greentick)
 
