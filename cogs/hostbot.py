@@ -590,9 +590,17 @@ class HostBot(commands.Cog):
     async def enrole(self, ctx: commands.Context, role: discord.Role, mentions: commands.Greedy[discord.Member]):
         """
         Add members to a role en masse.
+
+        Ping as many members as you want on a single line. This command sometimes takes a while, don't worry about it.
         """
-        for member in mentions:
-            await member.edit(roles=member.roles + [role])
+        await ctx.message.add_reaction(ctx.bot.waitemoji)
+        try:
+            for member in mentions:
+                await member.edit(roles=member.roles + [role])
+        except Exception as e:
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            raise e
+        await ctx.message.clear_reactions()
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.group(invoke_without_command=True)
