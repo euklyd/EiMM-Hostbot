@@ -166,6 +166,66 @@ class HostBot(commands.Cog):
 
         await ctx.send('Created channels and roles.')
 
+    @init.command(name='badly')
+    @commands.has_permissions(administrator=True)
+    async def init_badly(self, ctx: commands.Context):
+        session = session_maker()
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if server is not None:
+            await ctx.send("This server has already been set up; duplicates setups aren't going to work.")
+            return
+
+        await ctx.send("Since you don't know how to follow directions, I'm going to explain this very slowly for you.")
+        template = (
+            "Graveyard: \\_\\_\\_\\_\n"
+            "Host Role: \\_\\_\\_\\_\n"
+            "Player Role: \\_\\_\\_\\_\n"
+            "Dead Role: \\_\\_\\_\\_\n"
+            "Spec Role: \\_\\_\\_\\_\n"
+        )
+        await ctx.send(f'First, take this text block and fill in channels and roles with their '
+                       f'#channel mentions and @role mentions:\n```yml\n{template}```')
+        reply = await ctx.bot.wait_for('message',
+                                       check=lambda msg: msg.author == ctx.author and msg.channel == ctx.channel)
+        try:
+            settings = yaml.load(reply.content)
+        except Exception as e:
+            await ctx.send(f'You messed up the formatting, try again (exception: `{e}`).')
+            return
+
+        print(settings)
+
+        channel_regex = r'<#(\d+)>'
+        role_regex = r'<@&(\d+)>'
+        gy_channel_id = int(re.match(channel_regex, settings['Graveyard']).group(1))
+        host_role_id = int(re.match(role_regex, settings['Host Role']).group(1))
+        player_role_id = int(re.match(role_regex, settings['Player Role']).group(1))
+        dead_role_id = int(re.match(role_regex, settings['Dead Role']).group(1))
+        spec_role_id = int(re.match(role_regex, settings['Spec Role']).group(1))
+
+        server = hbs.Server(
+            id=ctx.guild.id,
+            name=ctx.guild.name,
+            sheet='',
+            addspec_on=False,
+        )
+        roles = [
+            hbs.Role(id=host_role_id, type='host'),
+            hbs.Role(id=player_role_id, type='player'),
+            hbs.Role(id=dead_role_id, type='dead'),
+            hbs.Role(id=spec_role_id, type='spec'),
+        ]
+        channels = [
+            hbs.Channel(id=gy_channel_id, type='graveyard')
+        ]
+        server.roles = roles
+        server.channels = channels
+
+        session.add(server)
+        session.commit()
+
+        await ctx.send('Registered channels and roles. Use `init setchan` to configure further channels.')
+
     @staticmethod
     def _player_channel_name(player: discord.Member):
         name = player.name
@@ -457,12 +517,13 @@ class HostBot(commands.Cog):
                                                                   type='announcements').one_or_none()
         flips_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='flips').one_or_none()
         gamechat_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='gamechat').one_or_none()
-        graveyard_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='gamechat').one_or_none()
+        graveyard_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='graveyard').one_or_none()
 
-        em.add_field(name='Announcements', value=f'{ctx.guild.get_channel(announcements_chan.id)}')
-        em.add_field(name='Flips', value=f'{ctx.guild.get_channel(flips_chan.id)}')
-        em.add_field(name='Gamechat', value=f'{ctx.guild.get_channel(gamechat_chan.id)}')
-        em.add_field(name='Graveyard', value=f'{ctx.guild.get_channel(graveyard_chan.id)}')
+        em.add_field(name='Announcements',
+                     value=f'{ctx.guild.get_channel(announcements_chan.id) if announcements_chan else "N/A"}')
+        em.add_field(name='Flips', value=f'{ctx.guild.get_channel(flips_chan.id) if flips_chan else "N/A"}')
+        em.add_field(name='Gamechat', value=f'{ctx.guild.get_channel(gamechat_chan.id) if gamechat_chan else "N/A"}')
+        em.add_field(name='Graveyard', value=f'{ctx.guild.get_channel(graveyard_chan.id) if graveyard_chan else "N/A"}')
         em.add_field(name='Role PMs category', value=f'{ctx.guild.get_channel(server.rolepms_id)}')
 
         await ctx.send(embed=em)
