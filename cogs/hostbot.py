@@ -88,7 +88,7 @@ class HostBot(commands.Cog):
             await ctx.send("This server has already been set up; duplicates setups aren't going to work.")
             return
 
-        yml_config = yaml.load(yml_config.strip('```yml\n'))
+        yml_config = yaml.safe_load(yml_config.strip('```yml\n'))
         # await ctx.send(f'parsed:```json\n{pprint.pformat(yml)}```')
 
         server = hbs.Server(
@@ -191,12 +191,14 @@ class HostBot(commands.Cog):
         reply = await ctx.bot.wait_for('message',
                                        check=lambda msg: msg.author == ctx.author and msg.channel == ctx.channel)
         try:
-            settings = yaml.load(reply.content)
+            settings = yaml.safe_load(reply.content)
         except Exception as e:
             await ctx.send(f'You messed up the formatting, try again (exception: `{e}`).')
             return
 
-        print(settings)
+        if type(settings) is not dict:
+            await ctx.send(f'You messed up the formatting, try copying more exactly.')
+            return
 
         channel_regex = r'<#(\d+)>'
         role_regex = r'<@&(\d+)>'
@@ -460,7 +462,7 @@ class HostBot(commands.Cog):
         - rolepms
 
         As rolepms is a category channel, it must be specified either through exact text name (case-sensitive) or channel ID snowflake.
-       """
+        """
         valid_types = {'announcements', 'flips', 'gamechat', 'graveyard', 'rolepms'}
 
         session = session_maker()
@@ -481,13 +483,17 @@ class HostBot(commands.Cog):
                 await ctx.send(f'{channel} is not a valid text channel.')
                 return
             channel_row = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type=channel_type).one_or_none()
-            channel_row.id = channel.id
+            if channel_row:
+                channel_row.id = channel.id
+            else:
+                channel_row = hbs.Channel(id=channel.id, type=channel_type, server_id=ctx.guild.id)
+                session.add(channel_row)
 
         session.commit()
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     # @init.command(name='setrole')
-    # async def init_setchan(self, ctx: commands.Context, role_type: str, role: discord.Role):
+    # async def init_setrole(self, ctx: commands.Context, role_type: str, role: discord.Role):
     #     ...
 
     @init.command(name='status')
