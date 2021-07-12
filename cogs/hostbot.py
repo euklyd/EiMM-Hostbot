@@ -169,6 +169,9 @@ class HostBot(commands.Cog):
     @init.command(name='badly')
     @commands.has_permissions(administrator=True)
     async def init_badly(self, ctx: commands.Context):
+        """
+        Provides a way to initialize a server late for people who don't read the manual.
+        """
         session = session_maker()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is not None:
