@@ -378,6 +378,32 @@ class EiMM(commands.Cog):
         )
         await ctx.send(reply)
 
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    async def queueslots(self, ctx: commands.Context, *, jsonstr: str):
+        """
+        Assigns selected hosts to optimal slots for the next EiMM season.
+
+        Takes a JSON argument, of the format:
+        {
+            "host1#1234": [1, 1, "", 1, 1, 1],  # if a slot is unworkable for that host, use ""
+            "host2#1234": ...,
+            ...,
+            "host6#1234": ...
+        }
+        """
+        try:
+            hosts = json.loads(jsonstr)
+        except json.JSONDecodeError as e:
+            await ctx.send(str(e))
+            return
+        hosts = [Host(name, prios, None) for name, prios in hosts.items()]
+        assignments = self._mod_bias_hungarian_algorithm(hosts)
+
+        reply = "The next season's slot assignments are:\n"
+        reply += '\n'.join([f'**Slot {i + 1}:** {host.name}' for i, host in enumerate(assignments)])
+        await ctx.send(reply)
+
 
 def setup(bot: commands.Bot):
     bot.add_cog(EiMM(bot))
