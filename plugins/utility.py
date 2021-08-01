@@ -79,6 +79,21 @@ class Utility(commands.Cog):
         """
         await ctx.send(f'`{message[:size]}`')
 
+    @commands.command()
+    async def choose(self, ctx: commands.Context, n: Optional[int] = 1, *, message: str):
+        """
+        Choose from a list of items.
+
+        Separate items with commas. If a number is provided before the list, instead select that many items.
+        """
+        ls = [s.strip() for s in message.split(',')]
+        if n > len(ls):
+            await ctx.send('Number of choices must be less than or equal to the size of the list.')
+            return
+        choices = random.sample(ls, k=n)
+        choices = ', '.join(sorted(choices))
+        await ctx.send(f'Selected: {choices}')
+
 
 class Moderation(commands.Cog):
     """
@@ -147,6 +162,16 @@ class Management(commands.Cog):
         try:
             response = requests.get(url)
             await ctx.bot.user.edit(avatar=response.content)
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        except Exception as e:
+            await ctx.send(f'`Error: {e}`')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+
+    @commands.command()
+    @commands.is_owner()
+    async def chnick(self, ctx: commands.Context, *, nick: str):
+        try:
+            await ctx.bot.user.edit(nick=nick)
             await ctx.message.add_reaction(ctx.bot.greentick)
         except Exception as e:
             await ctx.send(f'`Error: {e}`')
