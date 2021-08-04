@@ -554,7 +554,7 @@ class HostBot(commands.Cog):
         em.add_field(name='Gamechat', value=f'{ctx.guild.get_channel(gamechat_chan.id) if gamechat_chan else "N/A"}')
         em.add_field(name='Graveyard', value=f'{ctx.guild.get_channel(graveyard_chan.id) if graveyard_chan else "N/A"}')
         role_pms = [ctx.guild.get_channel(cid) for cid in rolepm_ids]
-        role_pms = ','.join(str(role_pms))
+        role_pms = ', '.join(str(channel) for channel in role_pms)
         em.add_field(name='Role PMs category(s)', value=f'{role_pms}')
 
         await ctx.send(embed=em)
