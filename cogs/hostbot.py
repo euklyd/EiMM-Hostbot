@@ -611,8 +611,7 @@ class HostBot(commands.Cog):
         #     await ctx.message.add_reaction(ctx.bot.redtick)
         #     return
 
-        if ctx.channel.category.id not in [server.rolepms_id] + [channel.id for channel in server.channels if
-                                                                 channel.type == 'rolepms']:
+        if not self.is_rolepm(ctx, server):
             await ctx.send('Confessionals belong in your role PM.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -703,6 +702,13 @@ class HostBot(commands.Cog):
         await ctx.message.clear_reactions()
         await ctx.message.add_reaction(ctx.bot.greentick)
 
+    @staticmethod
+    def is_rolepm(ctx: commands.Context, server: hbs.Server) -> bool:
+        if ctx.channel.category.id == server.rolepms_id:
+            # this maintains support for legacy servers
+            return True
+        return ctx.channel.category.id in [c.id for c in server.channels if c.type == 'rolepms']
+
     @commands.group(invoke_without_command=True)
     async def addspec(self, ctx: commands.Context, specs: commands.Greedy[discord.Member]):
         """
@@ -721,8 +727,7 @@ class HostBot(commands.Cog):
             await ctx.send("Adding specs to channels isn't enabled on this server.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        if ctx.channel.category.id not in [server.rolepms_id] + [channel.id for channel in server.channels if
-                                                                 channel.type == 'rolepms']:
+        if not self.is_rolepm(ctx, server):
             await ctx.send("This isn't a Role PM channel.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -778,7 +783,7 @@ class HostBot(commands.Cog):
             await ctx.send("Adding specs to channels isn't enabled on this server.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        elif ctx.channel.category.id != server.rolepms_id:
+        if not self.is_rolepm(ctx, server):
             await ctx.send("This isn't a Role PM channel.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -827,7 +832,7 @@ class HostBot(commands.Cog):
             await ctx.send("Adding specs to channels isn't enabled on this server.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        elif ctx.channel.category.id != server.rolepms_id:
+        if not self.is_rolepm(ctx, server):
             await ctx.send("This isn't a Role PM channel.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
