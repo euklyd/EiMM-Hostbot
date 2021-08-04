@@ -21,6 +21,8 @@ session_maker = None  # type: Union[None, Callable[[], Session]]
 cooldown_delta = timedelta(minutes=30)
 cooldown_max = 3
 
+MAX_CATEGORY_SIZE = 50
+
 
 class NotFoundMember:
     def __init__(self, name_and_discriminator: str):
@@ -241,84 +243,84 @@ class HostBot(commands.Cog):
     # NOTE: This command is essentially deprecated and people keep trying to use it. Don't use it.
     # @init.command(name='rolepms')
     # @commands.has_permissions(administrator=True)
-    async def init_rolepms(self, ctx: commands.Context, page: str = 'Rolesheet', column: str = 'Account'):
-        """
-        Create Role PM channels for players and enrole each.
-
-        Must be used after "init server".
-        If a player is not on the server, or their name is typo'd on the sheet, will create the channel without enroling the player in the player role.
-        """
-        session = session_maker()
-
-        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
-
-        spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='spec').one_or_none()
-        spec_role = ctx.guild.get_role(spec_role_id.id)
-
-        host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='host').one_or_none()
-        host_role = ctx.guild.get_role(host_role_id.id)
-
-        player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
-        player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
-
-        logging.debug(f'spec_role_id: {spec_role_id}')
-        logging.debug(f'host_role_id: {spec_role_id}')
-
-        sheet_name = server.sheet
-        logging.debug(f'getting page {page} from sheet {sheet_name}')
-        ws = self.connection.get_page(sheet_name, page)
-        logging.debug(ws)
-        ls_usernames = spreadsheet.get_column_values(ws, column)
-        logging.debug(ls_usernames)
-
-        players = []
-        error_names = []
-        error = 'Error finding players: ```\n'
-        for name in ls_usernames:
-            player = ctx.guild.get_member_named(name)
-            if player is None:
-                error_names.append(name)
-                error += f'{name}\n'
-                players.append(NotFoundMember(name))
-            else:
-                players.append(player)
-        error += '```_(Created channels without permissions instead.)_'
-
-        players = sorted(players, key=lambda p: p.name.lower())
-        overwrites = {
-            ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
-            host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
-            # spec_role: discord.PermissionOverwrite(read_messages=True),
-        }
-        for player_role in player_roles:
-            overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
-        category = await ctx.guild.create_category('Role PMs', overwrites=overwrites)  # type: discord.CategoryChannel
-
-        for player in players:
-            overwrites = {
-                ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
-                host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
-                # spec_role: discord.PermissionOverwrite(read_messages=True),
-            }
-            for player_role in player_roles:
-                overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
-            if type(player) is discord.Member:
-                if len(player_roles) == 1:
-                    if player_roles[0] not in player.roles:
-                        await player.edit(roles=player.roles + [player_roles[0]])
-                # manage needed so players can pin messages
-                overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
-            topic = f"{player}'s Role PM"
-            await category.create_text_channel(HostBot._player_channel_name(player), overwrites=overwrites, topic=topic)
-
-        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
-        server.rolepms_id = category.id
-        session.commit()
-
-        if len(error_names) > 0:
-            await ctx.send(error)
+    # async def init_rolepms(self, ctx: commands.Context, page: str = 'Rolesheet', column: str = 'Account'):
+    #     """
+    #     Create Role PM channels for players and enrole each.
+    #
+    #     Must be used after "init server".
+    #     If a player is not on the server, or their name is typo'd on the sheet, will create the channel without enroling the player in the player role.
+    #     """
+    #     session = session_maker()
+    #
+    #     server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+    #
+    #     spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='spec').one_or_none()
+    #     spec_role = ctx.guild.get_role(spec_role_id.id)
+    #
+    #     host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='host').one_or_none()
+    #     host_role = ctx.guild.get_role(host_role_id.id)
+    #
+    #     player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
+    #     player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
+    #
+    #     logging.debug(f'spec_role_id: {spec_role_id}')
+    #     logging.debug(f'host_role_id: {spec_role_id}')
+    #
+    #     sheet_name = server.sheet
+    #     logging.debug(f'getting page {page} from sheet {sheet_name}')
+    #     ws = self.connection.get_page(sheet_name, page)
+    #     logging.debug(ws)
+    #     ls_usernames = spreadsheet.get_column_values(ws, column)
+    #     logging.debug(ls_usernames)
+    #
+    #     players = []
+    #     error_names = []
+    #     error = 'Error finding players: ```\n'
+    #     for name in ls_usernames:
+    #         player = ctx.guild.get_member_named(name)
+    #         if player is None:
+    #             error_names.append(name)
+    #             error += f'{name}\n'
+    #             players.append(NotFoundMember(name))
+    #         else:
+    #             players.append(player)
+    #     error += '```_(Created channels without permissions instead.)_'
+    #
+    #     players = sorted(players, key=lambda p: p.name.lower())
+    #     overwrites = {
+    #         ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+    #         ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
+    #         host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
+    #         # spec_role: discord.PermissionOverwrite(read_messages=True),
+    #     }
+    #     for player_role in player_roles:
+    #         overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
+    #     category = await ctx.guild.create_category('Role PMs', overwrites=overwrites)  # type: discord.CategoryChannel
+    #
+    #     for player in players:
+    #         overwrites = {
+    #             ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+    #             ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
+    #             host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
+    #             # spec_role: discord.PermissionOverwrite(read_messages=True),
+    #         }
+    #         for player_role in player_roles:
+    #             overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
+    #         if type(player) is discord.Member:
+    #             if len(player_roles) == 1:
+    #                 if player_roles[0] not in player.roles:
+    #                     await player.edit(roles=player.roles + [player_roles[0]])
+    #             # manage needed so players can pin messages
+    #             overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
+    #         topic = f"{player}'s Role PM"
+    #         await category.create_text_channel(HostBot._player_channel_name(player), overwrites=overwrites, topic=topic)
+    #
+    #     server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+    #     server.rolepms_id = category.id
+    #     session.commit()
+    #
+    #     if len(error_names) > 0:
+    #         await ctx.send(error)
 
     @init.command(name='pmlist')
     @commands.has_permissions(administrator=True)
@@ -361,16 +363,14 @@ class HostBot(commands.Cog):
         error += '```_(Created channels without permissions instead.)_'
 
         players = sorted(players, key=lambda p: p.name.lower())
-        overwrites = {
-            ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
-            ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
-            host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
-        }
-        for player_role in player_roles:
-            overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
-        category = await ctx.guild.create_category('Role PMs', overwrites=overwrites)  # type: discord.CategoryChannel
 
-        for player in players:
+        chunked_players = [players[i:i + MAX_CATEGORY_SIZE] for i in
+                           range(0, len(players), MAX_CATEGORY_SIZE)]
+
+        category = None  # type: Optional[discord.CategoryChannel]
+        categories = []
+
+        for chunk in chunked_players:
             overwrites = {
                 ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
@@ -378,17 +378,33 @@ class HostBot(commands.Cog):
             }
             for player_role in player_roles:
                 overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
-            if type(player) is discord.Member:
-                if len(player_roles) == 1:
-                    if player_roles[0] not in player.roles:
-                        await player.edit(roles=player.roles + [player_roles[0]])
-                # manage needed for pins
-                overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
-            topic = f"{player}'s Role PM"
-            await category.create_text_channel(HostBot._player_channel_name(player), overwrites=overwrites, topic=topic)
+            category = await ctx.guild.create_category('Role PMs', overwrites=overwrites)
+
+            for player in chunk:
+                overwrites = {
+                    ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
+                    ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
+                    host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
+                }
+                for player_role in player_roles:
+                    overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
+                if type(player) is discord.Member:
+                    if len(player_roles) == 1:
+                        if player_roles[0] not in player.roles:
+                            await player.edit(roles=player.roles + [player_roles[0]])
+                    # manage needed for pins
+                    overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
+                topic = f"{player}'s Role PM"
+                await category.create_text_channel(HostBot._player_channel_name(player), overwrites=overwrites,
+                                                   topic=topic)
+
+            categories.append(hbs.Channel(id=category.id, type='rolepms', server_id=ctx.guild.id))
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
-        server.rolepms_id = category.id
+        if category:
+            server.rolepms_id = category.id
+        for category_row in categories:
+            session.add(category_row)
         session.commit()
 
         if len(error_names) > 0:
@@ -478,6 +494,8 @@ class HostBot(commands.Cog):
                 return
             server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
             server.rolepms_id = channel.id
+            chan = hbs.Channel(id=channel.id, type='rolepms', server_id=ctx.guild.id)
+            session.add(chan)
         else:
             if channel.type is not discord.ChannelType.text:
                 await ctx.send(f'{channel} is not a valid text channel.')
@@ -561,6 +579,7 @@ class HostBot(commands.Cog):
         Only usable by living players, and only in their Role PMs. Has a cooldown timer, so don't spam it.
         """
         session = session_maker()
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         # This should never have multiple roles in it, unless I'm manually overriding something for a game,
         # in which case, that is important to be able to support!
         player_roles = session.query(hbs.Role).filter_by(type='player', server_id=ctx.guild.id).all()
@@ -581,8 +600,13 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
-        if ctx.channel.id == gamechat_channel.id:
+        # gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
+        # if ctx.channel.id == gamechat_channel.id:
+        #     await ctx.send('Confessionals belong in your role PM.')
+        #     await ctx.message.add_reaction(ctx.bot.redtick)
+        #     return
+
+        if ctx.channel.id not in [server.rolepms_id] + [channel.id for channel in server.channels if channel.type == 'rolepms']:
             await ctx.send('Confessionals belong in your role PM.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -691,10 +715,14 @@ class HostBot(commands.Cog):
             await ctx.send("Adding specs to channels isn't enabled on this server.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        elif ctx.channel.category.id != server.rolepms_id:
+        if ctx.channel.id not in [server.rolepms_id] + [channel.id for channel in server.channels if channel.type == 'rolepms']:
             await ctx.send("This isn't a Role PM channel.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
+        # elif ctx.channel.category.id != server.rolepms_id:
+        #     await ctx.send("This isn't a Role PM channel.")
+        #     await ctx.message.add_reaction(ctx.bot.redtick)
+        #     return
 
         allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id,
                                                           or_(hbs.Role.type == 'player', hbs.Role.type == 'host')).all()
