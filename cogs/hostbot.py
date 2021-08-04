@@ -545,13 +545,17 @@ class HostBot(commands.Cog):
         flips_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='flips').one_or_none()
         gamechat_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='gamechat').one_or_none()
         graveyard_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='graveyard').one_or_none()
+        rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='rolepms').all()
+        rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
 
         em.add_field(name='Announcements',
                      value=f'{ctx.guild.get_channel(announcements_chan.id) if announcements_chan else "N/A"}')
         em.add_field(name='Flips', value=f'{ctx.guild.get_channel(flips_chan.id) if flips_chan else "N/A"}')
         em.add_field(name='Gamechat', value=f'{ctx.guild.get_channel(gamechat_chan.id) if gamechat_chan else "N/A"}')
         em.add_field(name='Graveyard', value=f'{ctx.guild.get_channel(graveyard_chan.id) if graveyard_chan else "N/A"}')
-        em.add_field(name='Role PMs category', value=f'{ctx.guild.get_channel(server.rolepms_id)}')
+        role_pms = [ctx.guild.get_channel(cid) for cid in rolepm_ids]
+        role_pms = ','.join(str(role_pms))
+        em.add_field(name='Role PMs category(s)', value=f'{role_pms}')
 
         await ctx.send(embed=em)
 
@@ -600,13 +604,15 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
+        # TODO: rm below
         # gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
         # if ctx.channel.id == gamechat_channel.id:
         #     await ctx.send('Confessionals belong in your role PM.')
         #     await ctx.message.add_reaction(ctx.bot.redtick)
         #     return
 
-        if ctx.channel.id not in [server.rolepms_id] + [channel.id for channel in server.channels if channel.type == 'rolepms']:
+        if ctx.channel.category.id not in [server.rolepms_id] + [channel.id for channel in server.channels if
+                                                                 channel.type == 'rolepms']:
             await ctx.send('Confessionals belong in your role PM.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -715,10 +721,12 @@ class HostBot(commands.Cog):
             await ctx.send("Adding specs to channels isn't enabled on this server.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        if ctx.channel.id not in [server.rolepms_id] + [channel.id for channel in server.channels if channel.type == 'rolepms']:
+        if ctx.channel.category.id not in [server.rolepms_id] + [channel.id for channel in server.channels if
+                                                                 channel.type == 'rolepms']:
             await ctx.send("This isn't a Role PM channel.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
+        # TODO: rm below
         # elif ctx.channel.category.id != server.rolepms_id:
         #     await ctx.send("This isn't a Role PM channel.")
         #     await ctx.message.add_reaction(ctx.bot.redtick)
