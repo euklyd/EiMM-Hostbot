@@ -1,4 +1,4 @@
-from discord import Status
+from discord import Activity, ActivityType, Status
 
 from conf.conf import Conf
 
@@ -6,6 +6,7 @@ name = 'mafia bidoof'
 owner_id = 123456789012345678  # this is me! it is not you! change it to be you!
 client_token = 'your token here'
 status = None
+# status = Status.idle
 
 cogs = [
     'eimm',
@@ -45,3 +46,7 @@ conf = Conf(
     imgur_keys=imgur_keys,
     google_email='your-bot-here@your-bot-here.iam.gserviceaccount.com',
 )
+
+activity = None
+# activity = Activity(name="myself evolving", type=ActivityType.streaming,
+#                     url="https://www.youtube.com/watch?v=pDshB51R2Rg")

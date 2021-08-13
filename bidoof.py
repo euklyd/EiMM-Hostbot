@@ -1,6 +1,7 @@
 import argparse
 import faulthandler
 import logging
+from datetime import datetime
 
 import discord
 from discord.ext import commands
@@ -80,6 +81,7 @@ if __name__ == '__main__':
         command_prefix=settings.prefix,
         description='https://board8.fandom.com/wiki/Mafia_Bidoof',
         conf=settings.conf,
+        activity=settings.activity,
         owner_id=settings.owner_id,
         status=settings.status,
         intents=intents,
