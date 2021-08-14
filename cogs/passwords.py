@@ -1,20 +1,9 @@
-import asyncio
-
-import io
-import json
-import pprint
-import random
-import re
-from typing import Any, Dict, List, Optional, Tuple
-
 import discord
-import yaml
 from discord import abc
 from discord.ext import commands
-from fuzzywuzzy import process
 from datetime import datetime
 from core.bot import Bot
-from utils import menu, spreadsheet
+from utils import spreadsheet
 
 SCOPE = [
     'https://spreadsheets.google.com/feeds',
@@ -79,6 +68,9 @@ class Passwords(commands.Cog):
 
     @commands.group(invoke_without_command=True)
     async def password(self, ctx: commands.Context):
+        """
+        Show your current password. Use only in DMs.
+        """
         if not await self.check_priv(ctx):
             return
         if ctx.author.id not in self.users:
@@ -90,6 +82,9 @@ class Passwords(commands.Cog):
 
     @password.group(name='set')
     async def password_set(self, ctx: commands.Context, *, password: str):
+        """
+        Set a new password. Use only in DMs.
+        """
         if not await self.check_priv(ctx):
             return
 
