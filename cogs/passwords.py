@@ -59,7 +59,9 @@ class Passwords(commands.Cog):
             sheet.update_cells(cell_list)
         else:
             sheet.append_row([
-                user.id,
+                # i hate google sheets so much how DARE you convert to scientific notation
+                # and lose about 20 digits of precision
+                str(user.id),
                 str(user),
                 password,
                 datetime.utcnow().strftime('%m/%d/%Y %H:%M:%S')
