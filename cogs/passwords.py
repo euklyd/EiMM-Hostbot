@@ -78,7 +78,7 @@ class Passwords(commands.Cog):
         sheet = self.connection.get_page(SHEET_NAME)
         records = sheet.get_all_records()
         record = records[self.users[ctx.author.id] - 2]
-        await ctx.send(f'Your current password is {record[PASSWORD]}')
+        await ctx.send(f'Your current password is `{record[PASSWORD]}`, and your user ID is `{ctx.author.id}`.')
 
     @password.group(name='set')
     async def password_set(self, ctx: commands.Context, *, password: str):
@@ -96,9 +96,9 @@ class Passwords(commands.Cog):
         self.update_sheet(ctx.author, password)
 
         if new:
-            await ctx.send('Congrats, your password has now been set!')
+            await ctx.send(f'Congrats, your password has now been set! Your user ID is `{ctx.author.id}`.')
         else:
-            await ctx.send('Password changed.')
+            await ctx.send(f'Password changed. Your user ID is `{ctx.author.id}`.')
 
 
 def setup(bot: commands.Bot):
