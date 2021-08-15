@@ -1,3 +1,5 @@
+import logging
+
 import discord
 from discord import abc
 from discord.ext import commands
@@ -77,7 +79,10 @@ class Passwords(commands.Cog):
             await ctx.send(f'You have no password set yet.')
         sheet = self.connection.get_page(SHEET_NAME)
         records = sheet.get_all_records()
-        record = records[self.users[ctx.author.id] - 2]
+        logging.info(f'records: {records}')
+        idx = self.users[ctx.author.id] - 2
+        logging.info(f'idx: {idx}')
+        record = records[idx]
         await ctx.send(f'Your current password is `{record[PASSWORD]}`, and your user ID is `{ctx.author.id}`.')
 
     @password.group(name='set')
