@@ -39,6 +39,18 @@ class NotFoundMember:
         return f'{self.name}#{self.discriminator}'
 
 
+def has_role(ctx: commands.Context, allowed_roles: List[str]) -> bool:
+    session = session_maker()
+
+    allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id,
+                                                      # or_(hbs.Role.type == 'player', hbs.Role.type == 'host')).all()
+                                                      hbs.Role.type.in_(roles)).all()
+    allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
+
+    # check if author has any of the player/host roles
+    return set(allowed_roles).isdisjoint(set(ctx.author.roles))
+
+
 class HostBot(commands.Cog):
     """
     Welcome to EiMM HostBot!
@@ -446,17 +458,33 @@ class HostBot(commands.Cog):
         except discord.Forbidden:
             await ctx.send('Insufficient permissions to delete roles.')
 
-        if server.rolepms_id is not None:
-            try:
-                category = ctx.guild.get_channel(server.rolepms_id)  # type: discord.CategoryChannel
+        # if server.rolepms_id is not None:
+        #     try:
+        #         category = ctx.guild.get_channel(server.rolepms_id)  # type: discord.CategoryChannel
+        #         if category is not None:
+        #             for channel in category.channels:
+        #                 await channel.delete(reason=reason)
+        #             await category.delete(reason=reason)
+        #         else:
+        #             await ctx.send('Could not find Role PMs category.')
+        #     except discord.Forbidden:
+        #         await ctx.send('Insufficient permissions to delete Role PMs.')
+
+        rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type='rolepms').all()
+        # the union maintains legacy support
+        rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
+        role_pms = sorted([str(ctx.guild.get_channel(cid)) for cid in rolepm_ids])
+
+        try:
+            for category in role_pms:
                 if category is not None:
                     for channel in category.channels:
                         await channel.delete(reason=reason)
                     await category.delete(reason=reason)
                 else:
                     await ctx.send('Could not find Role PMs category.')
-            except discord.Forbidden:
-                await ctx.send('Insufficient permissions to delete Role PMs.')
+        except discord.Forbidden:
+            await ctx.send('Insufficient permissions to delete Role PMs.')
 
         session.delete(server)
         session.commit()
@@ -521,6 +549,9 @@ class HostBot(commands.Cog):
         """
         session = session_maker()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        if server is None:
+            await ctx.send('This server has not been set up; no status exists.')
+            return
 
         spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='spec').one_or_none()
         host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='host').one_or_none()
@@ -732,18 +763,9 @@ class HostBot(commands.Cog):
             await ctx.send("This isn't a Role PM channel.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        # TODO: rm below
-        # elif ctx.channel.category.id != server.rolepms_id:
-        #     await ctx.send("This isn't a Role PM channel.")
-        #     await ctx.message.add_reaction(ctx.bot.redtick)
-        #     return
-
-        allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id,
-                                                          or_(hbs.Role.type == 'player', hbs.Role.type == 'host')).all()
-        allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
 
         # check if author has any of the player/host roles
-        if set(allowed_roles).isdisjoint(set(ctx.author.roles)):
+        if has_role(ctx, ['player', 'host']):
             await ctx.send('Only players and hosts can add spectators to a role PM.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -789,20 +811,8 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        # player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type='player').all()
-        # player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
-        #
-        # # check if author has any of the player roles
-        # if set(player_roles).isdisjoint(set(ctx.author.roles)):
-        #     await ctx.send()  # TODO: error message
-        #     return
-
-        allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id,
-                                                          or_(hbs.Role.type == 'player', hbs.Role.type == 'host')).all()
-        allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
-
         # check if author has any of the player/host roles
-        if set(allowed_roles).isdisjoint(set(ctx.author.roles)):
+        if has_role(ctx, ['player', 'host']):
             await ctx.send('Only players and hosts can add spectators to a role PM.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -838,12 +848,8 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id,
-                                                          or_(hbs.Role.type == 'player', hbs.Role.type == 'host')).all()
-        allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
-
         # check if author has any of the player/host roles
-        if set(allowed_roles).isdisjoint(set(ctx.author.roles)):
+        if has_role(ctx, ['player', 'host']):
             await ctx.send('Only players and hosts can remove spectators from a role PM.')
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
