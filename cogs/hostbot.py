@@ -43,8 +43,7 @@ def has_role(ctx: commands.Context, allowed_roles: List[str]) -> bool:
     session = session_maker()
 
     allowed_role_ids = session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id,
-                                                      # or_(hbs.Role.type == 'player', hbs.Role.type == 'host')).all()
-                                                      hbs.Role.type.in_(roles)).all()
+                                                      hbs.Role.type.in_(allowed_roles)).all()
     allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
 
     # check if author has any of the player/host roles
