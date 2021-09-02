@@ -14,6 +14,9 @@ from sqlalchemy.orm import sessionmaker, Session
 import cogs.hostbot_schema as hbs
 from core.bot import Bot
 from utils import spreadsheet
+import ast
+import csv
+from discord import File
 
 session_maker = None  # type: Union[None, Callable[[], Session]]
 # connection = None  # type: Optional[spreadsheet.SheetConnection]
@@ -793,6 +796,169 @@ class HostBot(commands.Cog):
         session.commit()
 
         await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    @commands.guild_only()
+    async def resolve(self, ctx: commands.Context, *, night: int):
+        big_sheet_name = 'Formido Oppugnatura Exsequens'
+
+        role_pm_category = discord.utils.get(ctx.guild.categories, name="Role PMs")
+        current_night_name = "N1"
+        # Columns are as follows
+        # A:# B:Temp C:Ninja D:Player E:Alias F,G,H: Max,Hp,MT I:Action Name J:Priority K:B/H/N L:Description M:Notes N:Input O:Output
+        if night == 1:
+            # First night, nothing fancy, just check for valid alias
+            current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
+        else:
+            prev_night = night - 1
+            previous_night_name = "N" + str(prev_night)
+            current_night_name = "N" + str(night)
+            prev_night_sheet = self.connection.get_page(big_sheet_name, previous_night_name)
+            current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
+
+        self.current_night_actions_dict = current_night_sheet.get_all_records()
+        self.last_night_action_dict = None
+        if night != 1:
+            #read last night's actions
+            self.last_night_action_dict = prev_night_sheet.get_all_records()
+
+        values_list = current_night_sheet.col_values(4)
+        values_list = [item.lower() for item in values_list]
+
+        for channel in ctx.guild.channels:
+            if channel in role_pm_category.channels:
+                #Role PM channel - use channel name to find discord player
+                channel_name = channel.name
+                user_name_list = channel_name.split("-")
+                username = ""
+                for x in user_name_list[:-1]:
+                    username+=x
+                username = username + "#" + user_name_list[-1]
+
+                actions = ""
+                actions_found = False
+                # Find their username in the sheet
+                if username in values_list:
+                    # Check if the alias for their actions are valid
+                    # Find their action submission
+                    pins = await channel.pins()
+                    for message in pins:
+                        str_match = "Night " + str(night)
+                        if str_match in message.content:
+                            actions_found = True
+                            actions = message.content
+                            break
+                    if actions_found:
+                        # Read last night actions from player
+                        self.last_night_actions = None
+                        await self.read_last_nights_actions(ctx, username)
+                        # Action message found
+                        await self.write_action(ctx, actions, username)
+
+                        if night != 1:
+                            for row in self.list_of_dicts:
+                                if row['Player'] == username:
+                                    # player found, load prev night actions
+                                    action_name = row['Action Name']
+                                    target = row['Output']
+                                    self.last_night_actions[action_name] = target
+                            print(self.last_night_actions)
+                        #Otherwise, no consect issues, actions are OK
+                        else:
+                            pass
+                            #await ctx.send("{} Actions valid placeholder".format(username))
+
+                    else:
+                        await ctx.send("No actions found by {}".format(username))
+
+        keys = self.current_night_actions_dict[0].keys()
+        with open('foee_output.csv', 'w', newline='') as output_file:
+            dict_writer = csv.DictWriter(output_file, keys)
+            dict_writer.writeheader()
+            dict_writer.writerows(self.current_night_actions_dict)
+        await ctx.channel.send('***Output File***', file=File('foee_output.csv'))
+
+    async def read_last_nights_actions(self, ctx, username):
+        if self.last_night_action_dict is not None:
+            for row in self.last_night_action_dict:
+                if row['Player'] == username:
+                    # player found, load prev night actions
+                    action_name = row['Action Name']
+                    target = row['Output']
+                    self.last_night_actions[action_name] = target
+            print(self.last_night_actions)
+
+    async def write_action(self, ctx, actions, username):
+        # self.list_of_dicts
+        self.submitted_actions = {}
+        # Split action string up with new line
+        actions_list = actions.split("\n")
+        for action in actions_list:
+            a = action.split(":")
+            # Action has no :, invalid action
+            if len(a) == 1:
+                pass
+            elif len(a) > 1:
+                action_name = a[0]
+                targets = a[1:]
+                #Strip BS spaces from the start
+                targets = [s.strip() for s in targets]
+                self.submitted_actions[action_name] = targets
+
+        for row in self.current_night_actions_dict:
+            if row['Player'].lower() == username:
+                # player found, write actions in
+                # Check if actions are valid
+                for action_name, target_alias in self.submitted_actions.items():
+                    if action_name.casefold() in row['Action Name'].casefold():
+                        actual_full_action_name = row['Action Name']
+                        # TODO: Check input alias is actually an alias
+                        check = False
+                        for alias in target_alias:
+                            if alias in self.alias_list:
+                                check = True
+                            else:
+                                check = False
+                                break
+                        if not check:
+                            await ctx.send("Action {} invalid because {} not in alias list".format(action_name, target_alias))
+                        else:
+                            # Is there last night info?
+                            if self.last_night_actions is not None:
+                                # Check if single target
+                                if isinstance(target_alias, list) and len(target_alias) == 1:
+                                    # Check if alias is a consecutive target or not.
+                                    target_alias = target_alias[0]
+                                    if target_alias != self.last_night_actions[actual_full_action_name] or actual_full_action_name=="Standard Shot":
+                                        row['Input'] = target_alias
+                                        # Clear it
+                                        self.submitted_actions[action_name] = ""
+                                    else:
+                                        await ctx.send("Action {} invalid because of consect target on alias {}".format(action_name, target_alias))
+                                elif isinstance(target_alias, list) and len(target_alias) > 1:
+                                    #multi target, ensure last night actions was multitarget too, otherwise prob failed
+                                    if len(self.last_night_actions[actual_full_action_name])>1:
+                                        set1 = set(target_alias)
+                                        list2 = ast.literal_eval(self.last_night_actions[actual_full_action_name])
+                                        set2 = set(list2)
+                                        consect = set1 & set2
+                                        if len(consect) > 0:
+                                            await ctx.send("Action {} invalid because of consect target on alias {}".format(action_name,
+                                                                                                                   consect))
+                            # Actions are ok, write in actions
+                            else:
+                                row['Input'] = target_alias
+                                # Clear it
+                                self.submitted_actions[action_name] = ""
+
+    @commands.command()
+    @commands.has_permissions(administrator=True)
+    @commands.guild_only()
+    async def update_alias_list(self, ctx: commands.Context, *, msg):
+        '''Pass it new line seperated list of aliases for that night'''
+        self.alias_list = msg.split("\n")
+        await ctx.send(self.alias_list)
 
     # TODO: all of these
     # @commands.group(invoke_without_command=True)
