@@ -17,6 +17,7 @@ from utils import spreadsheet
 import ast
 import csv
 from discord import File
+from collections import defaultdict
 
 session_maker = None  # type: Union[None, Callable[[], Session]]
 # connection = None  # type: Optional[spreadsheet.SheetConnection]
@@ -804,18 +805,16 @@ class HostBot(commands.Cog):
         big_sheet_name = 'Formido Oppugnatura Exsequens'
 
         role_pm_category = discord.utils.get(ctx.guild.categories, name="Role PMs")
-        current_night_name = "N1"
+        current_night_name = "N" + str(night)
+        current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
         # Columns are as follows
-        # A:# B:Temp C:Ninja D:Player E:Alias F,G,H: Max,Hp,MT I:Action Name J:Priority K:B/H/N L:Description M:Notes N:Input O:Output
         if night == 1:
             # First night, nothing fancy, just check for valid alias
-            current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
+            pass
         else:
             prev_night = night - 1
             previous_night_name = "N" + str(prev_night)
-            current_night_name = "N" + str(night)
             prev_night_sheet = self.connection.get_page(big_sheet_name, previous_night_name)
-            current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
 
         self.current_night_actions_dict = current_night_sheet.get_all_records()
         self.last_night_action_dict = None
@@ -823,8 +822,9 @@ class HostBot(commands.Cog):
             #read last night's actions
             self.last_night_action_dict = prev_night_sheet.get_all_records()
 
-        values_list = current_night_sheet.col_values(4)
-        values_list = [item.lower() for item in values_list]
+#TODO: REMOVE THIS MAGIC HARDCODED COL NUMBER
+        username_list = current_night_sheet.col_values(4)
+        username_list = [item.lower() for item in username_list]
 
         for channel in ctx.guild.channels:
             if channel in role_pm_category.channels:
@@ -839,7 +839,7 @@ class HostBot(commands.Cog):
                 actions = ""
                 actions_found = False
                 # Find their username in the sheet
-                if username in values_list:
+                if username in username_list:
                     # Check if the alias for their actions are valid
                     # Find their action submission
                     pins = await channel.pins()
@@ -851,23 +851,10 @@ class HostBot(commands.Cog):
                             break
                     if actions_found:
                         # Read last night actions from player
-                        self.last_night_actions = None
+                        self.last_night_actions = defaultdict(list)
                         await self.read_last_nights_actions(ctx, username)
                         # Action message found
                         await self.write_action(ctx, actions, username)
-
-                        if night != 1:
-                            for row in self.list_of_dicts:
-                                if row['Player'] == username:
-                                    # player found, load prev night actions
-                                    action_name = row['Action Name']
-                                    target = row['Output']
-                                    self.last_night_actions[action_name] = target
-                            print(self.last_night_actions)
-                        #Otherwise, no consect issues, actions are OK
-                        else:
-                            pass
-                            #await ctx.send("{} Actions valid placeholder".format(username))
 
                     else:
                         await ctx.send("No actions found by {}".format(username))
@@ -884,9 +871,10 @@ class HostBot(commands.Cog):
             for row in self.last_night_action_dict:
                 if row['Player'] == username:
                     # player found, load prev night actions
-                    action_name = row['Action Name']
+                    #action_name = row['Action Name']
+                    action_id = row['Action ID']
                     target = row['Output']
-                    self.last_night_actions[action_name] = target
+                    self.last_night_actions[action_id].append(target)
             print(self.last_night_actions)
 
     async def write_action(self, ctx, actions, username):
@@ -899,7 +887,14 @@ class HostBot(commands.Cog):
             # Action has no :, invalid action
             if len(a) == 1:
                 pass
-            elif len(a) > 1:
+            # OK IM JUST GOING TO ASSUME THAT THERE IS ONLY 1 TARGET AND THAT PEOPLE ARE USING THE TEMPLATE THING - alimdia
+            elif len(a) == 2:
+                action_name = a[0]
+                target = a[1].strip()
+                #Strip BS spaces from the start
+                self.submitted_actions[action_name] = target
+            # if ppl are being annoying and just dont follow the template
+            elif len(a) > 2:
                 action_name = a[0]
                 targets = a[1:]
                 #Strip BS spaces from the start
@@ -915,25 +910,34 @@ class HostBot(commands.Cog):
                         actual_full_action_name = row['Action Name']
                         # TODO: Check input alias is actually an alias
                         check = False
-                        for alias in target_alias:
-                            if alias in self.alias_list:
+                        # Check if target_alias is a list or string
+                        if isinstance(target_alias, list):
+                            for alias in target_alias:
+                                if alias in self.alias_list:
+                                    check = True
+                                else:
+                                    check = False
+                                    break
+                        elif isinstance(target_alias, str):
+                            if target_alias in self.alias_list:
                                 check = True
-                            else:
-                                check = False
-                                break
                         if not check:
-                            await ctx.send("Action {} invalid because {} not in alias list".format(action_name, target_alias))
+                            await ctx.send("Action {} from {} invalid because {} not in alias list".format(action_name, username, target_alias))
                         else:
                             # Is there last night info?
-                            if self.last_night_actions is not None:
+                            if self.last_night_actions:
                                 # Check if single target
-                                if isinstance(target_alias, list) and len(target_alias) == 1:
-                                    # Check if alias is a consecutive target or not.
-                                    target_alias = target_alias[0]
-                                    if target_alias != self.last_night_actions[actual_full_action_name] or actual_full_action_name=="Standard Shot":
+                                if isinstance(target_alias, str):
+                                    # Get action ID of Action
+                                    action_id = row['Action ID']
+                                    # Check if alias is a consecutive target or not with actions of the same Action ID
+
+                                    # Standard shots allow consect
+                                    if target_alias not in self.last_night_actions[action_id] or actual_full_action_name=="Standard Shot":
                                         row['Input'] = target_alias
                                         # Clear it
                                         self.submitted_actions[action_name] = ""
+                                    # Check against all other action targets with the same ID as well
                                     else:
                                         await ctx.send("Action {} invalid because of consect target on alias {}".format(action_name, target_alias))
                                 elif isinstance(target_alias, list) and len(target_alias) > 1:
@@ -959,6 +963,56 @@ class HostBot(commands.Cog):
         '''Pass it new line seperated list of aliases for that night'''
         self.alias_list = msg.split("\n")
         await ctx.send(self.alias_list)
+
+    @commands.command()
+    @commands.guild_only()
+    async def action_template(self, ctx: commands.Context, *, night: int):
+        """
+        Get an action template for your role
+
+        Only usable by living players, and only in their Role PMs.
+        """
+        session = session_maker()
+        # This should never have multiple roles in it, unless I'm manually overriding something for a game,
+        # in which case, that is important to be able to support!
+        player_roles = session.query(hbs.Role).filter_by(type='player', server_id=ctx.guild.id).all()
+        if len(player_roles) == 0:
+            await ctx.send("This server isn't set up for EiMM.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        player_roles = [ctx.guild.get_role(player_role.id) for player_role in player_roles]
+        found = False
+        for player_role in player_roles:
+            if player_role in ctx.author.roles:
+                found = True
+                break
+        if not found:
+            logging.debug(player_roles)
+            logging.debug(ctx.author.roles)
+            await ctx.send('This command is only usable by living players.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
+        if ctx.channel.id == gamechat_channel.id:
+            await ctx.send('This command belongs in your role PM.')
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        # Valid - get your abilities.
+        big_sheet_name = 'Formido Oppugnatura Exsequens'
+        current_night_name = "N" + str(night)
+        current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
+        # find ctx.author in google sheet
+        current_night_action_dict = current_night_sheet.get_all_records()
+        template = "Night " + str(night) + "\n" + "```\n"
+        for row in current_night_action_dict:
+            if row['Player'].lower() == str(ctx.author):
+                # player found, load their actions into str
+                template += row['Action Name']
+                template += ": \n"
+        template += "```"
+        await ctx.send("{}".format(template))
 
     # TODO: all of these
     # @commands.group(invoke_without_command=True)
