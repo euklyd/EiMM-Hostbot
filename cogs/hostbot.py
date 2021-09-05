@@ -56,6 +56,8 @@ class HostBot(commands.Cog):
 
         self.connection = spreadsheet.SheetConnection(bot.google_creds, bot.google_scope)
 
+        self.alias_list = []
+
         global session_maker
         db_dir = 'databases/'
         db_file = f'{db_dir}/hostbot.db'
@@ -805,7 +807,7 @@ class HostBot(commands.Cog):
         big_sheet_name = 'Formido Oppugnatura Exsequens'
 
         role_pm_category = discord.utils.get(ctx.guild.categories, name="Role PMs")
-        current_night_name = "N" + str(night)
+        current_night_name = "``N" + str(night) + "``"
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
         # Columns are as follows
         if night == 1:
@@ -825,6 +827,8 @@ class HostBot(commands.Cog):
 #TODO: REMOVE THIS MAGIC HARDCODED COL NUMBER
         username_list = current_night_sheet.col_values(4)
         username_list = [item.lower() for item in username_list]
+        username_list = [item.replace(" ", "") for item in username_list]
+        username_list = [item.replace("_", "") for item in username_list]
 
         for channel in ctx.guild.channels:
             if channel in role_pm_category.channels:
@@ -844,7 +848,7 @@ class HostBot(commands.Cog):
                     # Find their action submission
                     pins = await channel.pins()
                     for message in pins:
-                        str_match = "Night " + str(night)
+                        str_match = "##Night " + str(night)
                         if str_match in message.content:
                             actions_found = True
                             actions = message.content
@@ -855,12 +859,12 @@ class HostBot(commands.Cog):
                         await self.read_last_nights_actions(ctx, username)
                         # Action message found
                         await self.write_action(ctx, actions, username)
-
+                        await ctx.send("Actions by {} seems OK".format(username))
                     else:
                         await ctx.send("No actions found by {}".format(username))
 
         keys = self.current_night_actions_dict[0].keys()
-        with open('foee_output.csv', 'w', newline='') as output_file:
+        with open('foee_output.csv', 'w', newline='', encoding='utf-8') as output_file:
             dict_writer = csv.DictWriter(output_file, keys)
             dict_writer.writeheader()
             dict_writer.writerows(self.current_night_actions_dict)
@@ -883,7 +887,7 @@ class HostBot(commands.Cog):
         # Split action string up with new line
         actions_list = actions.split("\n")
         for action in actions_list:
-            a = action.split(":")
+            a = action.split(":", 1)
             # Action has no :, invalid action
             if len(a) == 1:
                 pass
@@ -893,7 +897,7 @@ class HostBot(commands.Cog):
                 target = a[1].strip()
                 #Strip BS spaces from the start
                 self.submitted_actions[action_name] = target
-            # if ppl are being annoying and just dont follow the template
+            # this is never gonna happen etc (since split with limit 1)
             elif len(a) > 2:
                 action_name = a[0]
                 targets = a[1:]
@@ -933,7 +937,7 @@ class HostBot(commands.Cog):
                                     # Check if alias is a consecutive target or not with actions of the same Action ID
 
                                     # Standard shots allow consect
-                                    if target_alias not in self.last_night_actions[action_id] or actual_full_action_name=="Standard Shot":
+                                    if target_alias not in self.last_night_actions[action_id] or action_id == 0:
                                         row['Input'] = target_alias
                                         # Clear it
                                         self.submitted_actions[action_name] = ""
@@ -959,10 +963,15 @@ class HostBot(commands.Cog):
     @commands.command()
     @commands.has_permissions(administrator=True)
     @commands.guild_only()
-    async def update_alias_list(self, ctx: commands.Context, *, msg):
-        '''Pass it new line seperated list of aliases for that night'''
-        self.alias_list = msg.split("\n")
-        await ctx.send(self.alias_list)
+    async def update_alias_list(self, ctx: commands.Context, *, night: int):
+        '''Get list of aliases from sheet for that night'''
+        big_sheet_name = 'Formido Oppugnatura Exsequens'
+        current_night_name = "N" + str(night)
+        current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
+        current_night_action_dict = current_night_sheet.get_all_records()
+        for row in current_night_action_dict:
+            if row['Alias'] != "" and row['Alias'] not in self.alias_list:
+                self.alias_list.append(row['Alias'])
 
     @commands.command()
     @commands.guild_only()
@@ -978,7 +987,7 @@ class HostBot(commands.Cog):
         player_roles = session.query(hbs.Role).filter_by(type='player', server_id=ctx.guild.id).all()
         if len(player_roles) == 0:
             await ctx.send("This server isn't set up for EiMM.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
+            #await ctx.message.add_reaction(ctx.bot.redtick)
             return
         player_roles = [ctx.guild.get_role(player_role.id) for player_role in player_roles]
         found = False
@@ -990,13 +999,13 @@ class HostBot(commands.Cog):
             logging.debug(player_roles)
             logging.debug(ctx.author.roles)
             await ctx.send('This command is only usable by living players.')
-            await ctx.message.add_reaction(ctx.bot.redtick)
+            #await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
         if ctx.channel.id == gamechat_channel.id:
             await ctx.send('This command belongs in your role PM.')
-            await ctx.message.add_reaction(ctx.bot.redtick)
+            #await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         # Valid - get your abilities.
@@ -1005,9 +1014,24 @@ class HostBot(commands.Cog):
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
         # find ctx.author in google sheet
         current_night_action_dict = current_night_sheet.get_all_records()
-        template = "Night " + str(night) + "\n" + "```\n"
+
+        template = "##Night " + str(night) + "\n" + "```\n"
+
+        ##HACKS - euklyd FIX PLS
+        channel_name = ctx.channel.name
+        user_name_list = channel_name.split("-")
+        username = ""
+        for x in user_name_list[:-1]:
+            username += x
+        username = username + "#" + user_name_list[-1]
+
         for row in current_night_action_dict:
-            if row['Player'].lower() == str(ctx.author):
+            #if row['Player'] == str(ctx.author) and row['Action ID'] != 27:
+            google_sheet_player = row['Player']
+            google_sheet_player = google_sheet_player.lower()
+            google_sheet_player = google_sheet_player.replace(" ","")
+            google_sheet_player = google_sheet_player.replace("_","")
+            if google_sheet_player == username and row['Action ID'] != 27:
                 # player found, load their actions into str
                 template += row['Action Name']
                 template += ": \n"
