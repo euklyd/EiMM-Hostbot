@@ -807,7 +807,7 @@ class HostBot(commands.Cog):
         big_sheet_name = 'Formido Oppugnatura Exsequens'
 
         role_pm_category = discord.utils.get(ctx.guild.categories, name="Role PMs")
-        current_night_name = "``N" + str(night) + "``"
+        current_night_name = "N" + str(night)
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
         # Columns are as follows
         if night == 1:
@@ -829,39 +829,37 @@ class HostBot(commands.Cog):
         username_list = [item.lower() for item in username_list]
         username_list = [item.replace(" ", "") for item in username_list]
         username_list = [item.replace("_", "") for item in username_list]
+        user_id_list = current_night_sheet.col_values(5)
 
         for channel in ctx.guild.channels:
             if channel in role_pm_category.channels:
-                #Role PM channel - use channel name to find discord player
+                #Role PM channel
                 channel_name = channel.name
-                user_name_list = channel_name.split("-")
-                username = ""
-                for x in user_name_list[:-1]:
-                    username+=x
-                username = username + "#" + user_name_list[-1]
 
                 actions = ""
                 actions_found = False
                 # Find their username in the sheet
-                if username in username_list:
-                    # Check if the alias for their actions are valid
-                    # Find their action submission
-                    pins = await channel.pins()
-                    for message in pins:
-                        str_match = "##Night " + str(night)
-                        if str_match in message.content:
-                            actions_found = True
-                            actions = message.content
-                            break
-                    if actions_found:
-                        # Read last night actions from player
-                        self.last_night_actions = defaultdict(list)
-                        await self.read_last_nights_actions(ctx, username)
-                        # Action message found
-                        await self.write_action(ctx, actions, username)
-                        await ctx.send("Actions by {} seems OK".format(username))
-                    else:
-                        await ctx.send("No actions found by {}".format(username))
+
+                # Check if the alias for their actions are valid
+                # Find their action submission
+                pins = await channel.pins()
+                for message in pins:
+                    str_match = "##Night " + str(night)
+                    if str_match in message.content:
+                        actions_found = True
+                        actions = message.content
+                        author = message.author.id
+                        break
+                if actions_found:
+                    # Read last night actions from player
+                    self.last_night_actions = defaultdict(list)
+                    await self.read_last_nights_actions(ctx, author)
+                    # Action message found
+                    ret_val = await self.write_action(ctx, actions, author)
+                    if ret_val:
+                        await ctx.send("Actions by {} seems OK".format(channel_name))
+                else:
+                    await ctx.send("No actions found by {}".format(channel_name))
 
         keys = self.current_night_actions_dict[0].keys()
         with open('foee_output.csv', 'w', newline='', encoding='utf-8') as output_file:
@@ -870,10 +868,10 @@ class HostBot(commands.Cog):
             dict_writer.writerows(self.current_night_actions_dict)
         await ctx.channel.send('***Output File***', file=File('foee_output.csv'))
 
-    async def read_last_nights_actions(self, ctx, username):
+    async def read_last_nights_actions(self, ctx, user_id):
         if self.last_night_action_dict is not None:
             for row in self.last_night_action_dict:
-                if row['Player'] == username:
+                if row['Player ID'] == user_id:
                     # player found, load prev night actions
                     #action_name = row['Action Name']
                     action_id = row['Action ID']
@@ -881,9 +879,10 @@ class HostBot(commands.Cog):
                     self.last_night_actions[action_id].append(target)
             print(self.last_night_actions)
 
-    async def write_action(self, ctx, actions, username):
+    async def write_action(self, ctx, actions, user_id):
         # self.list_of_dicts
         self.submitted_actions = {}
+        ret_val = True
         # Split action string up with new line
         actions_list = actions.split("\n")
         for action in actions_list:
@@ -895,6 +894,7 @@ class HostBot(commands.Cog):
             elif len(a) == 2:
                 action_name = a[0]
                 target = a[1].strip()
+                target = target.strip("```")
                 #Strip BS spaces from the start
                 self.submitted_actions[action_name] = target
             # this is never gonna happen etc (since split with limit 1)
@@ -906,7 +906,7 @@ class HostBot(commands.Cog):
                 self.submitted_actions[action_name] = targets
 
         for row in self.current_night_actions_dict:
-            if row['Player'].lower() == username:
+            if row['Player ID'] == user_id:
                 # player found, write actions in
                 # Check if actions are valid
                 for action_name, target_alias in self.submitted_actions.items():
@@ -917,15 +917,17 @@ class HostBot(commands.Cog):
                         # Check if target_alias is a list or string
                         if isinstance(target_alias, list):
                             for alias in target_alias:
-                                if alias in self.alias_list:
+                                if alias in self.alias_list or alias=="":
                                     check = True
                                 else:
                                     check = False
                                     break
                         elif isinstance(target_alias, str):
-                            if target_alias in self.alias_list:
+                            if target_alias in self.alias_list or target_alias=="":
                                 check = True
                         if not check:
+                            username = row['Player']
+                            ret_val = False
                             await ctx.send("Action {} from {} invalid because {} not in alias list".format(action_name, username, target_alias))
                         else:
                             # Is there last night info?
@@ -943,6 +945,7 @@ class HostBot(commands.Cog):
                                         self.submitted_actions[action_name] = ""
                                     # Check against all other action targets with the same ID as well
                                     else:
+                                        ret_val = False
                                         await ctx.send("Action {} invalid because of consect target on alias {}".format(action_name, target_alias))
                                 elif isinstance(target_alias, list) and len(target_alias) > 1:
                                     #multi target, ensure last night actions was multitarget too, otherwise prob failed
@@ -952,6 +955,7 @@ class HostBot(commands.Cog):
                                         set2 = set(list2)
                                         consect = set1 & set2
                                         if len(consect) > 0:
+                                            ret_val = False
                                             await ctx.send("Action {} invalid because of consect target on alias {}".format(action_name,
                                                                                                                    consect))
                             # Actions are ok, write in actions
@@ -959,6 +963,7 @@ class HostBot(commands.Cog):
                                 row['Input'] = target_alias
                                 # Clear it
                                 self.submitted_actions[action_name] = ""
+        return ret_val
 
     @commands.command()
     @commands.has_permissions(administrator=True)
@@ -1017,21 +1022,10 @@ class HostBot(commands.Cog):
 
         template = "##Night " + str(night) + "\n" + "```\n"
 
-        ##HACKS - euklyd FIX PLS
-        channel_name = ctx.channel.name
-        user_name_list = channel_name.split("-")
-        username = ""
-        for x in user_name_list[:-1]:
-            username += x
-        username = username + "#" + user_name_list[-1]
+        requestor_id = ctx.author.id
 
         for row in current_night_action_dict:
-            #if row['Player'] == str(ctx.author) and row['Action ID'] != 27:
-            google_sheet_player = row['Player']
-            google_sheet_player = google_sheet_player.lower()
-            google_sheet_player = google_sheet_player.replace(" ","")
-            google_sheet_player = google_sheet_player.replace("_","")
-            if google_sheet_player == username and row['Action ID'] != 27:
+            if row['Player ID']==requestor_id and row['Action ID'] != 27:
                 # player found, load their actions into str
                 template += row['Action Name']
                 template += ": \n"
