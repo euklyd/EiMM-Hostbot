@@ -556,7 +556,15 @@ class Cards(commands.Cog):
         collection = {}
         reader = csv.DictReader(csv_contents)
         for card_row in reader:
-            card = cards[int(card_row['cardid'])]
+            card_id = int(card_row['cardid'])
+            if card_id in cards:
+                card = cards[card_id]
+            else:
+                try:
+                    card = requests.get(ENDPOINT + f'?id={card_id}').json()['data'][0]
+                except Exception as e:
+                    await ctx.send(f'Could not retrieve data for card ID: `{card_id}`.')
+                    continue
 
             key = f"{card['id']}-{card_row['cardcode']}"
             if card_row['card_edition'] == '1st Edition':
