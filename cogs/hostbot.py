@@ -857,7 +857,8 @@ class HostBot(commands.Cog):
                     # Action message found
                     ret_val = await self.write_action(ctx, actions, author)
                     if ret_val:
-                        await ctx.send("Actions by {} seems OK".format(channel_name))
+                        pass
+                        #await ctx.send("Actions by {} seems OK".format(channel_name))
                 else:
                     await ctx.send("No actions found by {}".format(channel_name))
 
@@ -923,7 +924,7 @@ class HostBot(commands.Cog):
                                     check = False
                                     break
                         elif isinstance(target_alias, str):
-                            if target_alias in self.alias_list or target_alias=="":
+                            if target_alias.lower() in self.alias_list or target_alias=="":
                                 check = True
                         if not check:
                             username = row['Player']
@@ -975,8 +976,8 @@ class HostBot(commands.Cog):
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
         current_night_action_dict = current_night_sheet.get_all_records()
         for row in current_night_action_dict:
-            if row['Alias'] != "" and row['Alias'] not in self.alias_list:
-                self.alias_list.append(row['Alias'])
+            if row['Alias'] != "" and row['Alias'].lower() not in self.alias_list:
+                self.alias_list.append(row['Alias'].lower())
 
     @commands.command()
     @commands.guild_only()

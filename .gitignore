@@ -3,3 +3,8 @@ conf/*.json
 databases/*
 __pycache__
 .DS_Store
+/.idea/EiMM-Hostbot.iml
+/.idea/misc.xml
+/.idea/modules.xml
+/.idea/vcs.xml
+/.idea/workspace.xml
