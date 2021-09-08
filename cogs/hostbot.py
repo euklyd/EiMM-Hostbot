@@ -807,7 +807,7 @@ class HostBot(commands.Cog):
         big_sheet_name = 'Formido Oppugnatura Exsequens'
 
         role_pm_category = discord.utils.get(ctx.guild.categories, name="Role PMs")
-        current_night_name = "N" + str(night)
+        current_night_name = "N" + str(night) + " Sheet"
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
         # Columns are as follows
         if night == 1:
@@ -815,7 +815,7 @@ class HostBot(commands.Cog):
             pass
         else:
             prev_night = night - 1
-            previous_night_name = "N" + str(prev_night)
+            previous_night_name = "N" + str(prev_night) + " Sheet"
             prev_night_sheet = self.connection.get_page(big_sheet_name, previous_night_name)
 
         self.current_night_actions_dict = current_night_sheet.get_all_records()
@@ -823,13 +823,6 @@ class HostBot(commands.Cog):
         if night != 1:
             #read last night's actions
             self.last_night_action_dict = prev_night_sheet.get_all_records()
-
-#TODO: REMOVE THIS MAGIC HARDCODED COL NUMBER
-        username_list = current_night_sheet.col_values(4)
-        username_list = [item.lower() for item in username_list]
-        username_list = [item.replace(" ", "") for item in username_list]
-        username_list = [item.replace("_", "") for item in username_list]
-        user_id_list = current_night_sheet.col_values(5)
 
         for channel in ctx.guild.channels:
             if channel in role_pm_category.channels:
@@ -924,7 +917,9 @@ class HostBot(commands.Cog):
                                     check = False
                                     break
                         elif isinstance(target_alias, str):
-                            if target_alias.lower() in self.alias_list or target_alias=="":
+                            target_alias=target_alias.strip('\\')
+                            target_alias=target_alias.lower()
+                            if target_alias in self.alias_list or target_alias=="":
                                 check = True
                         if not check:
                             username = row['Player']
@@ -972,11 +967,13 @@ class HostBot(commands.Cog):
     async def update_alias_list(self, ctx: commands.Context, *, night: int):
         '''Get list of aliases from sheet for that night'''
         big_sheet_name = 'Formido Oppugnatura Exsequens'
-        current_night_name = "N" + str(night)
+        current_night_name = "N" + str(night) + " Sheet"
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
         current_night_action_dict = current_night_sheet.get_all_records()
         for row in current_night_action_dict:
-            if row['Alias'] != "" and row['Alias'].lower() not in self.alias_list:
+            clean_format = row['Alias'].strip("\\")
+            clean_format = clean_format.lower()
+            if clean_format != "" and clean_format not in self.alias_list:
                 self.alias_list.append(row['Alias'].lower())
 
     @commands.command()
@@ -1016,7 +1013,7 @@ class HostBot(commands.Cog):
 
         # Valid - get your abilities.
         big_sheet_name = 'Formido Oppugnatura Exsequens'
-        current_night_name = "N" + str(night)
+        current_night_name = "N" + str(night) + " Sheet"
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
         # find ctx.author in google sheet
         current_night_action_dict = current_night_sheet.get_all_records()
