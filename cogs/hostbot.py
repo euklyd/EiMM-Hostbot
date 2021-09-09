@@ -854,6 +854,7 @@ class HostBot(commands.Cog):
                         #await ctx.send("Actions by {} seems OK".format(channel_name))
                 else:
                     await ctx.send("No actions found by {}".format(channel_name))
+                    pass
 
         keys = self.current_night_actions_dict[0].keys()
         with open('foee_output.csv', 'w', newline='', encoding='utf-8') as output_file:
@@ -869,9 +870,9 @@ class HostBot(commands.Cog):
                     # player found, load prev night actions
                     #action_name = row['Action Name']
                     action_id = row['Action ID']
-                    target = row['Output']
+                    target = row['Output'].lower()
                     self.last_night_actions[action_id].append(target)
-            print(self.last_night_actions)
+            #print(self.last_night_actions)
 
     async def write_action(self, ctx, actions, user_id):
         # self.list_of_dicts
@@ -908,6 +909,7 @@ class HostBot(commands.Cog):
                         actual_full_action_name = row['Action Name']
                         # TODO: Check input alias is actually an alias
                         check = False
+                        username = row['Player']
                         # Check if target_alias is a list or string
                         if isinstance(target_alias, list):
                             for alias in target_alias:
@@ -922,7 +924,6 @@ class HostBot(commands.Cog):
                             if target_alias in self.alias_list or target_alias=="":
                                 check = True
                         if not check:
-                            username = row['Player']
                             ret_val = False
                             await ctx.send("Action {} from {} invalid because {} not in alias list".format(action_name, username, target_alias))
                         else:
@@ -935,14 +936,14 @@ class HostBot(commands.Cog):
                                     # Check if alias is a consecutive target or not with actions of the same Action ID
 
                                     # Standard shots allow consect
-                                    if target_alias not in self.last_night_actions[action_id] or action_id == 0:
+                                    if target_alias not in self.last_night_actions[action_id] or action_id == 0 or target_alias=="":
                                         row['Input'] = target_alias
                                         # Clear it
                                         self.submitted_actions[action_name] = ""
                                     # Check against all other action targets with the same ID as well
                                     else:
                                         ret_val = False
-                                        await ctx.send("Action {} invalid because of consect target on alias {}".format(action_name, target_alias))
+                                        await ctx.send("Action {} by {} invalid because of consect target on alias {}".format(action_name, username, target_alias))
                                 elif isinstance(target_alias, list) and len(target_alias) > 1:
                                     #multi target, ensure last night actions was multitarget too, otherwise prob failed
                                     if len(self.last_night_actions[actual_full_action_name])>1:
@@ -974,7 +975,7 @@ class HostBot(commands.Cog):
             clean_format = row['Alias'].strip("\\")
             clean_format = clean_format.lower()
             if clean_format != "" and clean_format not in self.alias_list:
-                self.alias_list.append(row['Alias'].lower())
+                self.alias_list.append(row['Alias'].strip('\\').lower())
 
     @commands.command()
     @commands.guild_only()
