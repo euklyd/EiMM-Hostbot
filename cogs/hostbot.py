@@ -1024,7 +1024,16 @@ class HostBot(commands.Cog):
         requestor_id = ctx.author.id
 
         for row in current_night_action_dict:
-            if row['Player ID']==requestor_id and row['Action ID'] != 27:
+            if row['Player ID']==requestor_id and row['Action ID'] != 27 and row['Priority'] != "Instant":
+                # player found, load their actions into str
+                template += row['Action Name']
+                template += ": \n"
+        template += "```"
+        await ctx.send("{}".format(template))
+
+        template = "##Night " + str(night) + " Instant Actions\n" + "```\n"
+        for row in current_night_action_dict:
+            if row['Player ID']==requestor_id and row['Action ID'] != 27 and row['Priority'] == "Instant":
                 # player found, load their actions into str
                 template += row['Action Name']
                 template += ": \n"
