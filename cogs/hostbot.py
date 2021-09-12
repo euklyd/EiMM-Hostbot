@@ -904,6 +904,7 @@ class HostBot(commands.Cog):
             if row['Player ID'] == user_id:
                 # player found, write actions in
                 # Check if actions are valid
+                target_alias_check = ""
                 for action_name, target_alias in self.submitted_actions.items():
                     if action_name.casefold() in row['Action Name'].casefold():
                         actual_full_action_name = row['Action Name']
@@ -919,47 +920,47 @@ class HostBot(commands.Cog):
                                     check = False
                                     break
                         elif isinstance(target_alias, str):
-                            target_alias=target_alias.strip('\\')
-                            target_alias=target_alias.lower()
-                            if target_alias in self.alias_list or target_alias=="":
+                            target_alias_check=target_alias.strip('\\')
+                            target_alias_check=target_alias_check.lower()
+                            if target_alias_check in self.alias_list or target_alias_check=="":
                                 check = True
                         if not check:
                             ret_val = False
-                            await ctx.send("Action {} from {} invalid because {} not in alias list".format(action_name, username, target_alias))
-                        else:
-                            # Is there last night info?
-                            if self.last_night_actions:
-                                # Check if single target
-                                if isinstance(target_alias, str):
-                                    # Get action ID of Action
-                                    action_id = row['Action ID']
-                                    # Check if alias is a consecutive target or not with actions of the same Action ID
+                            await ctx.send("Action {} from {} invalid because {} not in alias list. It is still added to output csv, but keep in mind that consect check skipped because of this".format(action_name, username, target_alias))
 
-                                    # Standard shots allow consect
-                                    if target_alias not in self.last_night_actions[action_id] or action_id == 0 or target_alias=="":
-                                        row['Input'] = target_alias
-                                        # Clear it
-                                        self.submitted_actions[action_name] = ""
-                                    # Check against all other action targets with the same ID as well
-                                    else:
+                        # Is there last night info?
+                        if self.last_night_actions:
+                            # Check if single target
+                            if isinstance(target_alias_check, str):
+                                # Get action ID of Action
+                                action_id = row['Action ID']
+                                # Check if alias is a consecutive target or not with actions of the same Action ID
+
+                                # Standard shots allow consect
+                                if target_alias_check not in self.last_night_actions[action_id] or action_id == 0 or target_alias_check=="":
+                                    row['Input'] = target_alias
+                                    # Clear it
+                                    self.submitted_actions[action_name] = ""
+                                # Check against all other action targets with the same ID as well
+                                else:
+                                    ret_val = False
+                                    await ctx.send("Action {} by {} invalid because of consect target on alias {}".format(action_name, username, target_alias))
+                            elif isinstance(target_alias_check, list) and len(target_alias_check) > 1:
+                                #multi target, ensure last night actions was multitarget too, otherwise prob failed
+                                if len(self.last_night_actions[actual_full_action_name])>1:
+                                    set1 = set(target_alias_check)
+                                    list2 = ast.literal_eval(self.last_night_actions[actual_full_action_name])
+                                    set2 = set(list2)
+                                    consect = set1 & set2
+                                    if len(consect) > 0:
                                         ret_val = False
-                                        await ctx.send("Action {} by {} invalid because of consect target on alias {}".format(action_name, username, target_alias))
-                                elif isinstance(target_alias, list) and len(target_alias) > 1:
-                                    #multi target, ensure last night actions was multitarget too, otherwise prob failed
-                                    if len(self.last_night_actions[actual_full_action_name])>1:
-                                        set1 = set(target_alias)
-                                        list2 = ast.literal_eval(self.last_night_actions[actual_full_action_name])
-                                        set2 = set(list2)
-                                        consect = set1 & set2
-                                        if len(consect) > 0:
-                                            ret_val = False
-                                            await ctx.send("Action {} invalid because of consect target on alias {}".format(action_name,
-                                                                                                                   consect))
-                            # Actions are ok, write in actions
-                            else:
-                                row['Input'] = target_alias
-                                # Clear it
-                                self.submitted_actions[action_name] = ""
+                                        await ctx.send("Action {} invalid because of consect target on alias {}".format(action_name,
+                                                                                                               consect))
+                        # Actions are ok, write in actions
+                        else:
+                            row['Input'] = target_alias
+                            # Clear it
+                            self.submitted_actions[action_name] = ""
         return ret_val
 
     @commands.command()
