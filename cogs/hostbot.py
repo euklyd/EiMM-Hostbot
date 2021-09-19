@@ -808,6 +808,12 @@ class HostBot(commands.Cog):
 
         role_pm_category = discord.utils.get(ctx.guild.categories, name="Role PMs")
         current_night_name = "N" + str(night) + " Sheet"
+        ''' 
+        session = session_maker()
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        big_sheet_name = server.sheet
+        current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
+        '''
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
         # Columns are as follows
         if night == 1:
@@ -906,7 +912,7 @@ class HostBot(commands.Cog):
                 # Check if actions are valid
                 target_alias_check = ""
                 for action_name, target_alias in self.submitted_actions.items():
-                    if action_name.casefold() in row['Action Name'].casefold():
+                    if action_name.casefold() == row['Action Name'].casefold():
                         actual_full_action_name = row['Action Name']
                         # TODO: Check input alias is actually an alias
                         check = False
@@ -922,7 +928,10 @@ class HostBot(commands.Cog):
                         elif isinstance(target_alias, str):
                             target_alias_check=target_alias.strip('\\')
                             target_alias_check=target_alias_check.lower()
-                            if target_alias_check in self.alias_list or target_alias_check=="":
+
+                            substring_in_list = any(target_alias_check in string for string in self.alias_list)
+
+                            if substring_in_list or target_alias_check=="":
                                 check = True
                         if not check:
                             ret_val = False
@@ -969,6 +978,14 @@ class HostBot(commands.Cog):
     async def update_alias_list(self, ctx: commands.Context, *, night: int):
         '''Get list of aliases from sheet for that night'''
         big_sheet_name = 'Formido Oppugnatura Exsequens'
+
+        ''' 
+        session = session_maker()
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        big_sheet_name = server.sheet
+        current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
+        '''
+
         current_night_name = "N" + str(night) + " Sheet"
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
         current_night_action_dict = current_night_sheet.get_all_records()
@@ -1017,6 +1034,15 @@ class HostBot(commands.Cog):
         big_sheet_name = 'Formido Oppugnatura Exsequens'
         current_night_name = "N" + str(night) + " Sheet"
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
+
+        ''' 
+        session = session_maker()
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        big_sheet_name = server.sheet
+        current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
+        '''
+
+
         # find ctx.author in google sheet
         current_night_action_dict = current_night_sheet.get_all_records()
 
