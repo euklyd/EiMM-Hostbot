@@ -804,16 +804,14 @@ class HostBot(commands.Cog):
     @commands.has_permissions(administrator=True)
     @commands.guild_only()
     async def resolve(self, ctx: commands.Context, *, night: int):
-        big_sheet_name = 'Formido Oppugnatura Exsequens'
 
         role_pm_category = discord.utils.get(ctx.guild.categories, name="Role PMs")
         current_night_name = "N" + str(night) + " Sheet"
-        ''' 
+
         session = session_maker()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         big_sheet_name = server.sheet
-        current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
-        '''
+
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
         # Columns are as follows
         if night == 1:
@@ -977,14 +975,10 @@ class HostBot(commands.Cog):
     @commands.guild_only()
     async def update_alias_list(self, ctx: commands.Context, *, night: int):
         '''Get list of aliases from sheet for that night'''
-        big_sheet_name = 'Formido Oppugnatura Exsequens'
 
-        ''' 
         session = session_maker()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         big_sheet_name = server.sheet
-        current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
-        '''
 
         current_night_name = "N" + str(night) + " Sheet"
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
@@ -1031,16 +1025,11 @@ class HostBot(commands.Cog):
             return
 
         # Valid - get your abilities.
-        big_sheet_name = 'Formido Oppugnatura Exsequens'
-        current_night_name = "N" + str(night) + " Sheet"
-        current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
-
-        ''' 
         session = session_maker()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         big_sheet_name = server.sheet
+        current_night_name = "N" + str(night) + " Sheet"
         current_night_sheet = self.connection.get_page(big_sheet_name, current_night_name)
-        '''
 
 
         # find ctx.author in google sheet
