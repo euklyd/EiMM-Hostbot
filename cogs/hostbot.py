@@ -726,7 +726,11 @@ class HostBot(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.waitemoji)
         try:
             for member in mentions:
-                await member.edit(roles=member.roles + [role])
+                if role not in member.roles:
+                    logging.debug(f"enroling {member}")
+                    await member.edit(roles=member.roles + [role])
+                else:
+                    logging.debug(f"skipping enroling {member}")
         except Exception as e:
             await ctx.message.add_reaction(ctx.bot.redtick)
             raise e
