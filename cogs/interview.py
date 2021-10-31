@@ -882,7 +882,7 @@ class Interview(commands.Cog):
                            "ask a mod.")
             return
         await asyncio.sleep(60 * minutes)
-        await stage.set_permissions(user, send_messages=False)
+        await stage.set_permissions(user, send_messages=None)
         await ctx.message.clear_reactions()
         await ctx.message.add_reaction(ctx.bot.greentick)
 
