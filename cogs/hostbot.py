@@ -613,6 +613,9 @@ class HostBot(commands.Cog):
 
         Only usable by living players, and only in their Role PMs. Has a cooldown timer, so don't spam it.
         """
+        if "@everyone" in ctx.message.content.lower():
+            await ctx.send(ctx.author.mention)
+            return
         session = session_maker()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         # This should never have multiple roles in it, unless I'm manually overriding something for a game,
