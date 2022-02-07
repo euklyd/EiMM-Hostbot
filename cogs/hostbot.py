@@ -808,13 +808,6 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        # TODO: rm below
-        # gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
-        # if ctx.channel.id == gamechat_channel.id:
-        #     await ctx.send('Confessionals belong in your role PM.')
-        #     await ctx.message.add_reaction(ctx.bot.redtick)
-        #     return
-
         if not self.is_rolepm(ctx, server):
             await ctx.send("Confessionals belong in your role PM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
