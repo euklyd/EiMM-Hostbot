@@ -1120,7 +1120,7 @@ class HostBot(commands.Cog):
             .one_or_none()
         )
         host_role = ctx.guild.get_role(host_role_id.id)
-        if host_role not in ctx.author.roles:
+        if host_role not in ctx.author.roles and ctx.author != ctx.guild.owner:
             await ctx.send("Only hosts can toggle this setting.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
