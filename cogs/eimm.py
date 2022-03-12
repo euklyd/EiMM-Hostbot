@@ -266,7 +266,7 @@ class EiMM(commands.Cog):
         NOTE: This and following methods were lifted straight from the original PenguinBot.
         """
         picks = EiMM._mod_bias_host_selection(hosts, priority=priority)
-        assignments = EiMM._mod_bias_hungarian_algorithm(picks[:total])
+        assignments = EiMM._mod_bias_hungarian_algorithm(picks[:total], total=total)
         return assignments, picks
 
     @staticmethod
@@ -335,7 +335,7 @@ class EiMM(commands.Cog):
 
     @commands.command()
     @commands.has_permissions(administrator=True)
-    async def qselect(self, ctx: commands.Context, *, jsonstr: str):
+    async def qselect(self, ctx: commands.Context, n_hosts: int, *, jsonstr: str):
         """
         Selects hosts to fill the next EiMM season.
 
@@ -357,7 +357,7 @@ class EiMM(commands.Cog):
         except json.JSONDecodeError as e:
             await ctx.send(str(e))
             return
-        assignments, picks = EiMM._mod_bias_queue_algorithm(hosts)
+        assignments, picks = EiMM._mod_bias_queue_algorithm(hosts, total=n_hosts)
         for host in picks:
             for i in range(0, len(host.prefs)):
                 if host.prefs[i] == DISALLOWED:
@@ -380,7 +380,7 @@ class EiMM(commands.Cog):
 
     @commands.command()
     @commands.has_permissions(administrator=True)
-    async def queueslots(self, ctx: commands.Context, *, jsonstr: str):
+    async def queueslots(self, ctx: commands.Context, n_hosts: int, *, jsonstr: str):
         """
         Assigns selected hosts to optimal slots for the next EiMM season.
 
@@ -398,7 +398,7 @@ class EiMM(commands.Cog):
             await ctx.send(str(e))
             return
         hosts = [Host(name, prios, None) for name, prios in hosts.items()]
-        assignments = self._mod_bias_hungarian_algorithm(hosts)
+        assignments = self._mod_bias_hungarian_algorithm(hosts, total=n_hosts)
 
         reply = "The next season's slot assignments are:\n"
         reply += '\n'.join([f'**Slot {i + 1}:** {host.name}' for i, host in enumerate(assignments)])
