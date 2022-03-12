@@ -11,13 +11,13 @@ from typing import Optional, List, Dict
 import discord
 from fuzzywuzzy import process
 import requests
-import ygoprodeck
 from discord.ext import commands
 
 import utils
 from core.bot import Bot
 
 API = 'https://api.scryfall.com/'
+YGOPRO_ENDPOINT = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
 
 
 # NOTE: You probably don't want to be running this module on your instance. It has a bit of
@@ -165,8 +165,7 @@ class Cards(commands.Cog):
         """
         ARROW_LEFT, ARROW_RIGHT = '\U000025c0', '\U000025b6'
 
-        ygo = ygoprodeck.YGOPro()
-        result = ygo.get_cards(fname=query)
+        result = requests.get(YGOPRO_ENDPOINT, params={"fname": query}).json()
         # top level: dict key: data
         # second level: list of matches
 
@@ -457,8 +456,7 @@ class Cards(commands.Cog):
 
         dt_name = f'Duel Terminal {dt_num}'
 
-        ygo = ygoprodeck.YGOPro()
-        cards = ygo.get_cards(cardset=dt_name)['data']
+        cards = requests.get(YGOPRO_ENDPOINT, params={"cardset": dt_name}).json()["data"]
 
         # This isn't actually used, but it's useful to keep track of how I arrived at these numbers
         # pull_ratios = {
