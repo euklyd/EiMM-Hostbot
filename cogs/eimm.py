@@ -49,7 +49,7 @@ def ability_text(row):
     template = (
         f'**Ability Name (Active, {limitations}, Targeted {targets}, {priority}, {hb}):**\n'
         '_Flavor_\n'
-        f'{text}'
+        f'`[{row["Ability Name"]}]` {text}'
     )
     return template
 
