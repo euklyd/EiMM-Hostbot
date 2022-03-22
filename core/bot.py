@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import re
 import time
 from pathlib import Path
@@ -15,7 +16,7 @@ from core.imgur import Imgur
 
 class Bot(commands.Bot):
     def __init__(self, command_prefix: Union[str, Iterable[str], Callable[['Bot', discord.Message], str]], conf: Conf,
-                 help_command=None, description: str = None, **options):
+                 cogs=Iterable[str], help_command=None, description: str = None, **options):
         if help_command is None:
             super().__init__(command_prefix, description=description, **options)
         else:
@@ -25,6 +26,7 @@ class Bot(commands.Bot):
         self._redtick = self.get_emoji(conf.redtick_id)  # type: discord.Emoji
         self._boostemoji = self.get_emoji(conf.boostemoji_id)  # type: discord.Emoji
         self._waitemoji = self.get_emoji(conf.waitemoji_id)  # type: discord.Emoji
+        self._cogs = cogs
 
         if Path('conf/google_creds.json').exists():
             self.google_creds = 'conf/google_creds.json'
@@ -75,6 +77,16 @@ class Bot(commands.Bot):
     def default_command_prefix(self) -> str:
         return self.command_prefix[0]
 
+    async def setup_hook(self):
+        print(self._cogs)
+        for cog in self._cogs:
+            try:
+                await self.load_extension(f'cogs.{cog}')
+                logging.warning(f'loaded cogs.{cog}')
+            except commands.errors.ExtensionNotFound:
+                await self.load_extension(f'plugins.{cog}')
+                logging.warning(f'loaded plugins.{cog}')
+
     async def on_message(self, message: discord.Message):
         """
         Override parent class on_message with author spoofing.
@@ -97,7 +109,7 @@ class Bot(commands.Bot):
             if message.guild is None or message.author is None:
                 # the second case is in case it was a user who's not on the guild
                 message.author = await self.fetch_user(userid)
-            print(f'spoofing message "{message.content}" as user "{message.author}"')
+            logging.info(f'spoofing message "{message.content}" as user "{message.author}"')
 
         await super().on_message(message)
 
