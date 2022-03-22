@@ -405,5 +405,5 @@ class EiMM(commands.Cog):
         await ctx.send(reply)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(EiMM(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(EiMM(bot))

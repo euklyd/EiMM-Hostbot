@@ -80,5 +80,5 @@ class Macro(commands.Cog):
         await ctx.send(embed=em)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(Macro(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Macro(bot))

@@ -1199,7 +1199,7 @@ class HostBot(commands.Cog):
 #     # TODO
 
 
-def setup(bot: Bot):
+async def setup(bot: Bot):
     # global connection
     # connection = spreadsheet.SheetConnection(bot.google_creds, bot.google_scope)
     #
@@ -1208,7 +1208,7 @@ def setup(bot: Bot):
     # bot.add_command(confessional)
     # bot.add_command(gameavatars)
     # bot.add_command(enrole)
-    bot.add_cog(HostBot(bot))
+    await bot.add_cog(HostBot(bot))
 
     # db_dir = 'databases/'
     # db_file = f'{db_dir}/hostbot.db'

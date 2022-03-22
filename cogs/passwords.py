@@ -108,5 +108,5 @@ class Passwords(commands.Cog):
             await ctx.send(f'Password changed. Your user ID is `{ctx.author.id}`.')
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(Passwords(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Passwords(bot))

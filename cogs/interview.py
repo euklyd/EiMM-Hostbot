@@ -1550,53 +1550,53 @@ class Interview(commands.Cog):
         await ctx.send(reply)
 
 
-# TODO: Remove before release.
-@commands.command()
-@commands.is_owner()
-async def populate(ctx: commands.Context, filename: str):
-    """
-    Populate Interview table from an existing JSON.
+# # TODO: Remove before release.
+# @commands.command()
+# @commands.is_owner()
+# async def populate(ctx: commands.Context, filename: str):
+#     """
+#     Populate Interview table from an existing JSON.
+#
+#     'filename' should be located in the bot's base directory. Format is a list of dicts with the following fields:
+#     "interviewee_id": int,
+#     "start_time": posix timestamp,
+#     "server_id": int,
+#     "channel_id": int,
+#     "message_id": int,
+#     "sheet_name": "str",
+#     "current": bool,
+#     "questions_asked": int,
+#     "questions_answered": int
+#     """
+#     import json
+#     from datetime import timezone
+#
+#     with open(filename, 'r') as fp:
+#         rows = json.load(fp)
+#
+#     session = session_maker()
+#     ivs = []
+#     for row in rows:
+#         ts = row['start_time']
+#         timestamp = datetime.utcfromtimestamp(ts).replace(tzinfo=timezone.utc)
+#         iv = schema.Interview(
+#             server_id=row['server_id'],
+#             interviewee_id=row['interviewee_id'],
+#             start_time=timestamp,
+#             sheet_name=row['sheet_name'],
+#             questions_asked=row['questions_asked'],
+#             questions_answered=row['questions_answered'],
+#             current=False,
+#             op_channel_id=row['channel_id'],
+#             op_message_id=row['message_id'],
+#         )
+#         ivs.append(iv)
+#     session.add_all(ivs)
+#     session.commit()
+#
+#     await ctx.message.add_reaction(ctx.bot.greentick)
 
-    'filename' should be located in the bot's base directory. Format is a list of dicts with the following fields:
-    "interviewee_id": int,
-    "start_time": posix timestamp,
-    "server_id": int,
-    "channel_id": int,
-    "message_id": int,
-    "sheet_name": "str",
-    "current": bool,
-    "questions_asked": int,
-    "questions_answered": int
-    """
-    import json
-    from datetime import timezone
 
-    with open(filename, 'r') as fp:
-        rows = json.load(fp)
-
-    session = session_maker()
-    ivs = []
-    for row in rows:
-        ts = row['start_time']
-        timestamp = datetime.utcfromtimestamp(ts).replace(tzinfo=timezone.utc)
-        iv = schema.Interview(
-            server_id=row['server_id'],
-            interviewee_id=row['interviewee_id'],
-            start_time=timestamp,
-            sheet_name=row['sheet_name'],
-            questions_asked=row['questions_asked'],
-            questions_answered=row['questions_answered'],
-            current=False,
-            op_channel_id=row['channel_id'],
-            op_message_id=row['message_id'],
-        )
-        ivs.append(iv)
-    session.add_all(ivs)
-    session.commit()
-
-    await ctx.message.add_reaction(ctx.bot.greentick)
-
-
-def setup(bot: commands.Bot):
-    bot.add_cog(Interview(bot))
-    bot.add_command(populate)  # TODO: Remove before release.
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Interview(bot))
+    # await bot.add_command(populate)  # TODO: Remove before release.
