@@ -255,7 +255,7 @@ class Management(commands.Cog):
             return
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(Utility(bot))
-    bot.add_cog(Moderation(bot))
-    bot.add_cog(Management(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Utility(bot))
+    await bot.add_cog(Moderation(bot))
+    await bot.add_cog(Management(bot))

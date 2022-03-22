@@ -199,7 +199,7 @@ async def vote_voters(ctx: commands.Context):
     await ctx.send(reply)
 
 
-def setup(bot: Bot):
+async def setup(bot: Bot):
     global session_maker
 
     # bot.add_command(vote_setup)

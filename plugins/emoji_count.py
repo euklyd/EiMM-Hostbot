@@ -375,7 +375,7 @@ async def emoji_export(ctx: commands.Context):
     await ctx.send('Alright, _nerd_.', file=discord.File(filename))
 
 
-def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot):
     global enabled_servers
     global session_maker
 

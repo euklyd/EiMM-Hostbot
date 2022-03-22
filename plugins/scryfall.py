@@ -601,5 +601,5 @@ class Cards(commands.Cog):
                            file=discord.File(csv_out, filename=f'{ctx.author} collection.csv'))
 
 
-def setup(bot: Bot):
-    bot.add_cog(Cards(bot))
+async def setup(bot: Bot):
+    await bot.add_cog(Cards(bot))
