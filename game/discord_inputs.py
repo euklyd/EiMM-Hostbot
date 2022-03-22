@@ -17,6 +17,7 @@ class ActionDropdown(ui.Select):
         self.actions_map = actions_map
 
     async def callback(self, interaction: Interaction) -> Any:
+        # TODO: check to make sure that it's submitted by the person who's submitting
         self.action.target = self.values[0]
         self.actions_map[self.action.key] = self.action
         # await interaction.response.send_message(f"**{self.values[0]}**, you're dead.")
@@ -47,6 +48,7 @@ class ActionView(ui.View):
         self.add_item(ActionConfirmation(self.button_callback))  # for confirmation
 
     async def button_callback(self, interaction: Interaction):
+        # TODO: check to make sure that it's submitted by the person who's submitting
         if len(self.actions_map) < len(self.actions):
             # not a complete submission
             return ...
