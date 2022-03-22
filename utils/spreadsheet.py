@@ -19,6 +19,9 @@ class SheetConnection:
         else:
             return self.get_sheet(sheet_name).worksheet(page_name)
 
+    def client(self):
+        return gspread.authorize(self.creds)
+
 
 def get_headings(ws: Worksheet) -> List[str]:
     return ws.row_values(1)

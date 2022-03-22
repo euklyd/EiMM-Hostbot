@@ -13,4 +13,3 @@ python-Levenshtein
 pytz
 pyyaml
 sqlalchemy
-ygoprodeck
