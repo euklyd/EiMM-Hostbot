@@ -1,6 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List
 
+from game.discord_inputs import Action
+
 
 class Engine(ABC):
     """Abstract Base Class to allow for smooth support for both relational database queries and Google Sheets."""
@@ -19,8 +21,9 @@ class Engine(ABC):
         pass
 
     @abstractmethod
-    async def get_actions(self, night: int, game_id: str, player_id: str) -> ...:
+    async def get_actions(self, night: int, game_id: str, player_id: ...) -> List[Action]:
         """
+        TODO: What type is player_id?
         TODO: Figure out what an action "is". Probably a somewhat complex dataclass but it might just be a
          container to tie strings to Cell IDs.
         :param night:
@@ -28,4 +31,8 @@ class Engine(ABC):
         :param player_id:
         :return:
         """
+        pass
+
+    @abstractmethod
+    async def submit_actions(self, night: int, game_id: str, player_id: ..., actions: List[Action]):
         pass

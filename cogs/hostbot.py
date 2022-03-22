@@ -13,6 +13,8 @@ from sqlalchemy.orm import sessionmaker, Session
 
 import cogs.hostbot_schema as hbs
 from core.bot import Bot
+from game.data_engine.abstract_engine import Engine
+from game.discord_inputs import ActionView
 from utils import spreadsheet
 
 session_maker = None  # type: Union[None, Callable[[], Session]]
@@ -1188,6 +1190,17 @@ class HostBot(commands.Cog):
     #     gamechat = ctx.guild.get_channel(gamechat_channel.id)
     #
     #     ...
+
+    @commands.command(name="submit")
+    async def submit_actions(self, ctx: commands.Context):
+        self.data_engine: Engine = ...  # TODO: actually put in __init__
+        night = self.get_night(ctx.guild)  # left as an exercise to the reader
+        game_id = self.get_game_id(ctx.guild)  # left as an exercise to the reader
+        aliases = await self.data_engine.get_aliases(night, game_id)
+        actions = await self.data_engine.get_actions(night, game_id, ctx.author)
+
+        view = ActionView(aliases, actions, self.data_engine)
+        await ctx.send(f"{ctx.author} action submission for Night {night}", view=view)
 
 
 # @init.command(name='updaterole')
