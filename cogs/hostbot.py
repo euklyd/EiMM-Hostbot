@@ -44,8 +44,8 @@ def has_role(ctx: commands.Context, allowed_roles: List[str]) -> bool:
 
     allowed_role_ids = (
         session.query(hbs.Role)
-        .filter(hbs.Role.server_id == ctx.guild.id, hbs.Role.type.in_(allowed_roles))
-        .all()
+            .filter(hbs.Role.server_id == ctx.guild.id, hbs.Role.type.in_(allowed_roles))
+            .all()
     )
     allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
 
@@ -388,22 +388,22 @@ class HostBot(commands.Cog):
 
         spec_role_id = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="spec")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="spec")
+                .one_or_none()
         )
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
         host_role_id = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="host")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="host")
+                .one_or_none()
         )
         host_role = ctx.guild.get_role(host_role_id.id)
 
         player_role_ids = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="player")
-            .all()
+                .filter_by(server_id=ctx.guild.id, type="player")
+                .all()
         )
         player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
 
@@ -425,7 +425,7 @@ class HostBot(commands.Cog):
         players = sorted(players, key=lambda p: p.name.lower())
 
         chunked_players = [
-            players[i : i + MAX_CATEGORY_SIZE]
+            players[i: i + MAX_CATEGORY_SIZE]
             for i in range(0, len(players), MAX_CATEGORY_SIZE)
         ]
 
@@ -543,8 +543,8 @@ class HostBot(commands.Cog):
 
         rolepms = (
             session.query(hbs.Channel)
-            .filter_by(server_id=ctx.guild.id, type="rolepms")
-            .all()
+                .filter_by(server_id=ctx.guild.id, type="rolepms")
+                .all()
         )
         # the union maintains legacy support
         rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
@@ -566,13 +566,48 @@ class HostBot(commands.Cog):
 
         await ctx.send("Deleted, like, everything.")
 
+    @init.command(name="setrole")
+    @commands.is_owner()
+    async def init_setrole(
+            self,
+            ctx: commands.Context,
+            role_type: str,
+            role: discord.Role,
+    ):
+        """
+        Set the roles hostbot associates with each type.
+
+        Valid channel types are:
+        - host
+        - player
+        - dead
+        - spec
+        """
+        valid_types = {"host", "player", "dead", "spec"}
+
+        session = session_maker()
+
+        role_type = role_type.lower()
+        if role_type not in valid_types:
+            await ctx.send(f"{role_type} is not a valid role type.")
+            return
+
+        role_row = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type=role_type).one_or_none()
+        if role_row:
+            role_row.id = role.id
+        else:
+            new_role = hbs.Role(id=role.id, type=role_type, server_id=ctx.guild.id)
+            session.add(new_role)
+        session.commit()
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
     @init.command(name="setchan")
     @commands.has_permissions(administrator=True)
     async def init_setchan(
-        self,
-        ctx: commands.Context,
-        channel_type: str,
-        channel: Union[discord.CategoryChannel, discord.TextChannel],
+            self,
+            ctx: commands.Context,
+            channel_type: str,
+            channel: Union[discord.CategoryChannel, discord.TextChannel],
     ):
         """
         Set the channels hostbot associates with each type.
@@ -609,8 +644,8 @@ class HostBot(commands.Cog):
                 return
             channel_row = (
                 session.query(hbs.Channel)
-                .filter_by(server_id=ctx.guild.id, type=channel_type)
-                .one_or_none()
+                    .filter_by(server_id=ctx.guild.id, type=channel_type)
+                    .one_or_none()
             )
             if channel_row:
                 channel_row.id = channel.id
@@ -640,23 +675,23 @@ class HostBot(commands.Cog):
 
         spec_role_id = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="spec")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="spec")
+                .one_or_none()
         )
         host_role_id = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="host")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="host")
+                .one_or_none()
         )
         player_role_ids = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="player")
-            .all()
+                .filter_by(server_id=ctx.guild.id, type="player")
+                .all()
         )
         dead_role_id = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="dead")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="dead")
+                .one_or_none()
         )
 
         spec_role = ctx.guild.get_role(spec_role_id.id)
@@ -706,28 +741,28 @@ class HostBot(commands.Cog):
 
         announcements_chan = (
             session.query(hbs.Channel)
-            .filter_by(server_id=ctx.guild.id, type="announcements")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="announcements")
+                .one_or_none()
         )
         flips_chan = (
             session.query(hbs.Channel)
-            .filter_by(server_id=ctx.guild.id, type="flips")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="flips")
+                .one_or_none()
         )
         gamechat_chan = (
             session.query(hbs.Channel)
-            .filter_by(server_id=ctx.guild.id, type="gamechat")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="gamechat")
+                .one_or_none()
         )
         graveyard_chan = (
             session.query(hbs.Channel)
-            .filter_by(server_id=ctx.guild.id, type="graveyard")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="graveyard")
+                .one_or_none()
         )
         rolepms = (
             session.query(hbs.Channel)
-            .filter_by(server_id=ctx.guild.id, type="rolepms")
-            .all()
+                .filter_by(server_id=ctx.guild.id, type="rolepms")
+                .all()
         )
         # the union maintains legacy support
         rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
@@ -786,8 +821,8 @@ class HostBot(commands.Cog):
         # in which case, that is important to be able to support!
         player_roles = (
             session.query(hbs.Role)
-            .filter_by(type="player", server_id=ctx.guild.id)
-            .all()
+                .filter_by(type="player", server_id=ctx.guild.id)
+                .all()
         )
         if len(player_roles) == 0:
             await ctx.send("This server isn't set up for EiMM.")
@@ -815,7 +850,7 @@ class HostBot(commands.Cog):
 
         if self._inc_cooldown(ctx.author) is False:
             time_til_next = cooldown_delta - (
-                datetime.utcnow() - self.confessional_cooldowns[ctx.author.id][0]
+                    datetime.utcnow() - self.confessional_cooldowns[ctx.author.id][0]
             )
             hours, rem = divmod(time_til_next.seconds, 3600)
             mins, secs = divmod(time_til_next.seconds, 60)
@@ -834,8 +869,8 @@ class HostBot(commands.Cog):
             return
         gy_channel = (
             session.query(hbs.Channel)
-            .filter_by(type="graveyard", server_id=ctx.guild.id)
-            .one_or_none()
+                .filter_by(type="graveyard", server_id=ctx.guild.id)
+                .one_or_none()
         )
         gy_channel = ctx.guild.get_channel(gy_channel.id)  # type: discord.TextChannel
         msg = msg.replace("@everyone", "@\u200beveryone").replace(
@@ -854,24 +889,24 @@ class HostBot(commands.Cog):
         session = session_maker()
         player_role_rows = (
             session.query(hbs.Role)
-            .filter_by(type="player", server_id=ctx.guild.id)
-            .all()
+                .filter_by(type="player", server_id=ctx.guild.id)
+                .all()
         )
         host_role = (
             session.query(hbs.Role)
-            .filter_by(type="host", server_id=ctx.guild.id)
-            .one_or_none()
+                .filter_by(type="host", server_id=ctx.guild.id)
+                .one_or_none()
         )
         gamechat_channel = (
             session.query(hbs.Channel)
-            .filter_by(type="gamechat", server_id=ctx.guild.id)
-            .one_or_none()
+                .filter_by(type="gamechat", server_id=ctx.guild.id)
+                .one_or_none()
         )
         if (
-            host_role is None
-            or gamechat_channel is None
-            or player_role_rows is None
-            or len(player_role_rows) == 0
+                host_role is None
+                or gamechat_channel is None
+                or player_role_rows is None
+                or len(player_role_rows) == 0
         ):
             await ctx.send("This server isn't set up for EiMM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
@@ -889,7 +924,7 @@ class HostBot(commands.Cog):
         replies = []
         reply = "**Host avatars:**```\n"
         for host in sorted(
-            host_role.members, key=lambda x: x.name.lower()
+                host_role.members, key=lambda x: x.name.lower()
         ):  # type: discord.Member
             if len(reply) > 1800:
                 replies.append(reply + "```")
@@ -900,7 +935,7 @@ class HostBot(commands.Cog):
         reply += "```**Player avatars:**```\n"
         for player_role in player_roles:
             for player in sorted(
-                player_role.members, key=lambda x: x.name.lower()
+                    player_role.members, key=lambda x: x.name.lower()
             ):  # type: discord.Member
                 if len(reply) > 1800:
                     replies.append(reply + "```")
@@ -916,10 +951,10 @@ class HostBot(commands.Cog):
     @commands.has_permissions(administrator=True)
     @commands.guild_only()
     async def enrole(
-        self,
-        ctx: commands.Context,
-        role: discord.Role,
-        mentions: commands.Greedy[discord.Member],
+            self,
+            ctx: commands.Context,
+            role: discord.Role,
+            mentions: commands.Greedy[discord.Member],
     ):
         """
         Add members to a role en masse.
@@ -951,7 +986,7 @@ class HostBot(commands.Cog):
 
     @commands.group(invoke_without_command=True)
     async def addspec(
-        self, ctx: commands.Context, specs: commands.Greedy[discord.Member]
+            self, ctx: commands.Context, specs: commands.Greedy[discord.Member]
     ):
         """
         Add a spectator to your Role PM.
@@ -982,8 +1017,8 @@ class HostBot(commands.Cog):
 
         spec_role_id = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="spec")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="spec")
+                .one_or_none()
         )
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
@@ -1035,8 +1070,8 @@ class HostBot(commands.Cog):
 
         spec_role_id = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="spec")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="spec")
+                .one_or_none()
         )
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
@@ -1078,8 +1113,8 @@ class HostBot(commands.Cog):
 
         spec_role_id = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="spec")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="spec")
+                .one_or_none()
         )
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
@@ -1109,8 +1144,8 @@ class HostBot(commands.Cog):
 
         host_role_id = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="host")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="host")
+                .one_or_none()
         )
         host_role = ctx.guild.get_role(host_role_id.id)
         if host_role not in ctx.author.roles and ctx.author != ctx.guild.owner:
@@ -1140,8 +1175,8 @@ class HostBot(commands.Cog):
 
         host_role_id = (
             session.query(hbs.Role)
-            .filter_by(server_id=ctx.guild.id, type="host")
-            .one_or_none()
+                .filter_by(server_id=ctx.guild.id, type="host")
+                .one_or_none()
         )
         host_role = ctx.guild.get_role(host_role_id.id)
         if host_role not in ctx.author.roles and ctx.author != ctx.guild.owner:
