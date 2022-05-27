@@ -494,7 +494,7 @@ class HostBot(commands.Cog):
             await ctx.send(error)
 
     @init.command(name="reset")
-    @commands.is_owner()
+    @commands.has_permissions(administrator=True)
     async def init_reset(self, ctx: commands.Context):
         """
         Delete previously created channels and roles.
