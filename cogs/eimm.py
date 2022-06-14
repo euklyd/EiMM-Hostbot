@@ -190,6 +190,7 @@ class EiMM(commands.Cog):
         await ctx.send(f'Use `{self.bot.default_command_prefix}help eimm` for more info.')
 
     @eimm.group(name='rebuild')
+    @commands.is_owner()
     async def eimm_rebuild(self, ctx: commands.Context):
         """
         Rebuild the sheet cache.
