@@ -154,7 +154,7 @@ class HostBot(commands.Cog):
             roles = yml_config["roles"]
             overwrites = {
                 ctx.guild.default_role: discord.PermissionOverwrite(
-                    send_messages=False
+                    send_messages=False, create_public_threads=False
                 ),
                 roles["host"]["role"]: discord.PermissionOverwrite(
                     read_messages=True, send_messages=True, manage_messages=True
@@ -162,7 +162,7 @@ class HostBot(commands.Cog):
             }
             if key == "gamechat":
                 overwrites[roles["player"]["role"]] = discord.PermissionOverwrite(
-                    send_messages=True
+                    send_messages=True, create_public_threads=False
                 )
                 logging.info(f"gamechat: creating {channel_name} for {key}")
             if key == "graveyard":
@@ -170,13 +170,13 @@ class HostBot(commands.Cog):
                     read_messages=False, send_messages=None
                 )
                 overwrites[roles["dead"]["role"]] = discord.PermissionOverwrite(
-                    read_messages=True
+                    read_messages=True, create_public_threads=False
                 )
                 overwrites[roles["host"]["role"]] = discord.PermissionOverwrite(
                     read_messages=True
                 )
                 overwrites[roles["spec"]["role"]] = discord.PermissionOverwrite(
-                    read_messages=True
+                    read_messages=True, create_public_threads=False
                 )
                 logging.info(f"graveyard: creating {channel_name} for {key}")
 
