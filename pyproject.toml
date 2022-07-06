@@ -20,7 +20,8 @@ Pillow = "^9.0.1"
 pycountry = "^22.3.5"
 python-Levenshtein = "^0.12.2"
 pytz = "^2021.3"
-SQLAlchemy = "^1.4.32"
+SQLAlchemy = "^1.4.39"
+aiosqlite = "^0.17.0"
 
 [tool.poetry.dev-dependencies]
 ipython = "^7.30.1"
