@@ -24,7 +24,7 @@ SQLAlchemy = "^1.4.39"
 aiosqlite = "^0.17.0"
 
 [tool.poetry.dev-dependencies]
-ipython = "^7.30.1"
+ipython = "^7.31.1"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
