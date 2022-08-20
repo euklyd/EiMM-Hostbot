@@ -2,21 +2,28 @@ import asyncio
 import csv
 import io
 import json
+import random
 import re
 import urllib
-from pprint import pprint
-import random
-from typing import Optional, List, Dict
+from datetime import datetime
+from pathlib import Path
+from typing import Optional, List, Dict, Any
 
+import aiohttp
 import discord
-from fuzzywuzzy import process
 import requests
 from discord.ext import commands
+from fuzzywuzzy import process
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, AsyncSession
+from sqlalchemy.future import select
+from sqlalchemy.orm import sessionmaker
 
-import utils
 from core.bot import Bot
+from schemas.scryfall_schema import ScryfallText, Base
 
 API = 'https://api.scryfall.com/'
+SCRYFALL_SEARCH_ENDPOINT = "https://api.scryfall.com/cards/search"
+SCRYFALL_CARD_ID_ENDPOINT = "https://api.scryfall.com/cards"
 YGOPRO_ENDPOINT = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
 
 
@@ -32,7 +39,6 @@ class ScryfallResponse:
         self.map = card_map
 
     def closest(self, query: str) -> dict:
-        # match = process.extractBests(query, self.names, limit=1)
         match = process.extractOne(query, self.names)
         return self.map[match[0]]
 
@@ -43,7 +49,7 @@ def scryfall_search(expr: str) -> ScryfallResponse:
     with requests.get(query) as response:
         if not response.ok:
             # TODO: handle error
-            return
+            return None
         content = json.loads(response.content)
         cards = content['data']
 
@@ -64,8 +70,13 @@ class Cards(commands.Cog):
     Use [[MtG card name]] or {{Yu-Gi-Oh card name}} to search for cards inline.
     """
 
-    def __init__(self, bot: Bot):
+    def __init__(self, bot: Bot, session: aiohttp.ClientSession, db_file: str):
         self.bot = bot
+        self.session = session
+        self.db: AsyncEngine = create_async_engine(f"sqlite+aiosqlite:///{db_file}")
+
+    def db_session(self):
+        return sessionmaker(self.db, expire_on_commit=False, class_=AsyncSession)
 
     @commands.command()
     async def oracle(self, ctx: commands.Context, *, expr: str):
@@ -75,34 +86,8 @@ class Cards(commands.Cog):
         Full search syntax guide online: https://scryfall.com/docs/syntax
         Also available inline as [[expr]].
         """
-        response = scryfall_search(expr)
-
-        if len(response.cards) > 1:
-            await ctx.send(f"There were {len(response.cards)} that matched your search parameters. "
-                           "Select the one you're looking for:")
-            try:
-                card = await utils.menu.menu_list(ctx, response.names)
-            except asyncio.TimeoutError:
-                return
-            except RuntimeError:
-                await ctx.send('You already have a menu going in this channel.')
-                return
-            if card is None:
-                return
-            # card = Card(card)
-            # reply = (
-            #     f'{card.name} - {card.mana_cost}\n'
-            #     f'{card.type_line}\n'
-            #     f'{card.oracle_text}\n'
-            # )
-            card = response.map[card]
-        else:
-            card = response.cards[0]
-
-        if 'image_uris' in card:
-            await ctx.send(card['image_uris']['normal'])
-        else:
-            await ctx.send(f"`'image_uris'` not present ( `{card['uri']}` ). Try: {card['scryfall_uri']}")
+        embeds = await self._scryfall_search(expr)
+        await self._card_menu(ctx, embeds)
 
     async def _mtg_inline(self, message: discord.Message) -> bool:
         """
@@ -157,42 +142,8 @@ class Cards(commands.Cog):
         if await self._ygo_inline(message):
             return
 
-    async def _ygo(self, ctx: commands.Context, query: str, text_only: bool = False) -> bool:
-        """
-        Displays Yu-Gi-Oh cards in a scrollable list.
-
-        Returns True if card(s) found, else False.
-        """
+    async def _card_menu(self, ctx: commands.Context, card_embeds) -> bool:
         ARROW_LEFT, ARROW_RIGHT = '\U000025c0', '\U000025b6'
-
-        result = requests.get(YGOPRO_ENDPOINT, params={"fname": query}).json()
-        # top level: dict key: data
-        # second level: list of matches
-
-        intermediate_keys = {card['name']: card for card in result['data']}
-        matches = process.extractBests(query, intermediate_keys.keys(), limit=100)
-
-        if text_only:
-            cards = [intermediate_keys[match[0]] for match in matches]
-            card_embeds = [self._ygo_textembed(card) for card in cards]
-
-        else:
-            card_embeds = []
-
-            for match in matches:
-                card = intermediate_keys[match[0]]
-                card_url = self._ygo_url(card)
-
-                em = discord.Embed()
-                em.set_author(name=card['name'], url=card_url)
-                em.set_image(url=card['card_images'][0]['image_url'])
-
-                baninfo = self._ygo_baninfo(card)
-                if baninfo is not None:
-                    em.add_field(name='Banlist', value=baninfo)
-                self._ygo_embed_field_sets(em, card, maxlen=4000)
-
-                card_embeds.append(em)
 
         for i, em in enumerate(card_embeds):
             em.set_footer(text=f'{i + 1} of {len(card_embeds)}')
@@ -241,6 +192,43 @@ class Cards(commands.Cog):
 
         return len(card_embeds) > 0
 
+    async def _ygo(self, ctx: commands.Context, query: str, text_only: bool = False) -> bool:
+        """
+        Displays Yu-Gi-Oh cards in a scrollable list.
+
+        Returns True if card(s) found, else False.
+        """
+        result = requests.get(YGOPRO_ENDPOINT, params={"fname": query}).json()
+        # top level: dict key: data
+        # second level: list of matches
+
+        intermediate_keys = {card['name']: card for card in result['data']}
+        matches = process.extractBests(query, intermediate_keys.keys(), limit=100)
+
+        if text_only:
+            cards = [intermediate_keys[match[0]] for match in matches]
+            card_embeds = [self._ygo_textembed(card) for card in cards]
+
+        else:
+            card_embeds = []
+
+            for match in matches:
+                card = intermediate_keys[match[0]]
+                card_url = self._ygo_url(card)
+
+                em = discord.Embed()
+                em.set_author(name=card['name'], url=card_url)
+                em.set_image(url=card['card_images'][0]['image_url'])
+
+                baninfo = self._ygo_baninfo(card)
+                if baninfo is not None:
+                    em.add_field(name='Banlist', value=baninfo)
+                self._ygo_embed_field_sets(em, card, maxlen=4000)
+
+                card_embeds.append(em)
+
+        return await self._card_menu(ctx, card_embeds)
+
     @commands.command()
     async def ygo(self, ctx: commands.Context, *, query):
         """
@@ -258,6 +246,84 @@ class Cards(commands.Cog):
         Also available inline as {{card name}}.
         """
         await self._ygo(ctx, query, text_only=True)
+
+    async def _scryfall_search(self, query: str) -> Optional[List[discord.Embed]]:
+        resp = await self.session.get(SCRYFALL_SEARCH_ENDPOINT, params={"q": query})
+        content = await resp.json()
+        cards: List[Dict[str, Any]] = content.get("data")
+        if cards is None:
+            # log an error
+            return None
+        embeds: List[discord.Embed] = await asyncio.gather(*[self._mtg_embed(card) for card in cards])
+        return embeds
+
+    async def _mtg_text(self, card_id: str) -> Optional[str]:
+        """
+        Retrieve card as text format from own db cache if it exists, otherwise pull it and cache it.
+        """
+        # TODO: Refresh the cache if it's out of date by... a month? That's what the cache_time field exists for.
+        async with self.db.begin() as conn:
+            result = await conn.execute(select(ScryfallText).where(ScryfallText.scryfall_id == card_id))
+            result = result.one_or_none()
+        if result:
+            return result.text
+        resp = await self.session.get(f"{SCRYFALL_CARD_ID_ENDPOINT}/{card_id}", params={"format": "text"})
+        text = await resp.text()
+        if not text:
+            return None
+
+        async_session = sessionmaker(
+            self.db,
+            expire_on_commit=False,
+            class_=AsyncSession,
+        )
+        async with async_session() as session:
+            session.add_all(
+                [ScryfallText(scryfall_id=card_id, cache_time=datetime.now(), text=text)]
+            )
+            await conn.commit()
+        return text
+
+    @staticmethod
+    def _format_mtg_text(text: str) -> str:
+        # TODO: Insert mana symbols, etc.
+        return text.replace("(", "_(").replace(")", ")_")
+
+    async def _mtg_embed(self, card: dict, session=None) -> discord.Embed:
+        """
+        Returns a text embed for a Scryfall card dictionary.
+        """
+        if not session:
+            session = self.session
+        em = discord.Embed()
+        colors = card.get("colors", [])  # use the card color, lol
+        if len(colors) == 0:
+            color = discord.Color(0xAAAAAA)  # colorless
+        elif len(colors) == 1:
+            color = {
+                "W": discord.Color(0xffffff),  # white
+                "U": discord.Color(0x1166BB),  # blue
+                "B": discord.Color(0x000000),  # black
+                "R": discord.Color(0xD02020),  # red
+                "G": discord.Color(0x007240),  # green
+            }[colors[0].upper()]
+        else:
+            color = discord.Color(0xAA8833)  # multicolored -> gold
+        em.colour = color  # stupid brits
+        em.set_thumbnail(url=card.get("image_uris", {}).get("normal"))
+
+        text = await self._mtg_text(card_id=card.get("id"))
+        if text:
+            lines = text.split("\n")
+            em.description = self._format_mtg_text("\n".join(lines[1:]))
+            card_title = self._format_mtg_text(lines[0])
+        else:
+            em.description = "_No text found._"
+            card_title = card.get("name", "???")
+
+        card_url = card.get("scryfall_uri")
+        em.set_author(name=card_title, url=card_url)
+        return em
 
     @staticmethod
     def _ygo_textembed(card: dict) -> discord.Embed:
@@ -600,6 +666,48 @@ class Cards(commands.Cog):
             await ctx.send(f'Processed your collection.',
                            file=discord.File(csv_out, filename=f'{ctx.author} collection.csv'))
 
+    @commands.command(name="sftext", aliases=["sftest"])
+    async def sftest(self, ctx: commands.Context, *, expr: str):
+        embeds = await self._scryfall_search(expr)
+        await ctx.send(embed=embeds[0])
 
-async def setup(bot: Bot):
-    await bot.add_cog(Cards(bot))
+
+async def create_metadata(db):
+    async with db.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+        # await conn.run_sync(meta.create_all)
+
+
+def setup_sync(bot: Bot):
+    db_dir = 'databases/'
+    db_file = f'{db_dir}/scryfall.db'
+    if not Path(db_file).exists():
+        Path(db_dir).mkdir(exist_ok=True)
+
+    session = aiohttp.ClientSession(loop=bot.loop)
+    cog = Cards(bot, session, db_file)
+
+    asyncio.run(create_metadata(cog.db))
+    bot.add_cog(cog)
+
+
+async def setup_async(bot: Bot):
+    db_dir = 'databases/'
+    db_file = f'{db_dir}/scryfall.db'
+    if not Path(db_file).exists():
+        Path(db_dir).mkdir(exist_ok=True)
+
+    async with aiohttp.ClientSession as session:
+        cog = Cards(bot, session, db_file)
+    await create_metadata(cog.db)
+    await bot.add_cog(cog)
+
+
+__discord_major_version = int(discord.__version__.split(".")[0])
+
+if __discord_major_version == 1:
+    setup = setup_sync
+elif __discord_major_version >= 2:
+    setup = setup_async
+else:
+    raise Exception(f"UNHANDLED discord.py VERSION: {discord.__version__}")
