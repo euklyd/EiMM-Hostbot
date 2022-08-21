@@ -2,7 +2,7 @@
 name = "EiMM Hostbot"
 version = "0.1.0"
 description = "EiMM hostbot for eimm things"
-authors = ["Your Name <you@example.com>"]
+authors = ["euklyd <you@example.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.9.10"
@@ -17,13 +17,13 @@ Pillow = "^9.0.1"
 pycountry = "^22.3.5"
 python-Levenshtein = "^0.12.2"
 pytz = "^2022.1"
-SQLAlchemy = "^1.4.32"
 "discord.py" = {git = "https://github.com/Rapptz/discord.py.git", rev = "master"}
 gspread-asyncio = "^1.5.3"
+SQLAlchemy = "^1.4.39"
+aiosqlite = "^0.17.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
-ipython = "^8.1.1"
 
 [tool.black]
 line-length = 120
