@@ -17,10 +17,10 @@ Pillow = "^9.0.1"
 pycountry = "^22.3.5"
 python-Levenshtein = "^0.12.2"
 pytz = "^2022.1"
-"discord.py" = {git = "https://github.com/Rapptz/discord.py.git", rev = "master"}
 gspread-asyncio = "^1.5.3"
 SQLAlchemy = "^1.4.39"
 aiosqlite = "^0.17.0"
+"discord.py" = "^2.0"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
