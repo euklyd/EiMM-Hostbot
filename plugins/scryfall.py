@@ -697,7 +697,7 @@ async def setup_async(bot: Bot):
     if not Path(db_file).exists():
         Path(db_dir).mkdir(exist_ok=True)
 
-    async with aiohttp.ClientSession as session:
+    async with aiohttp.ClientSession() as session:
         cog = Cards(bot, session, db_file)
     await create_metadata(cog.db)
     await bot.add_cog(cog)
@@ -705,5 +705,7 @@ async def setup_async(bot: Bot):
 
 __discord_major_version = int(discord.__version__.split(".")[0])
 
-async def setup(bot: Bot):
-    await bot.add_cog(Cards(bot))
+if __discord_major_version >= 2:
+    setup = setup_async
+else:
+    setup = setup_sync
