@@ -1042,7 +1042,8 @@ class Interview(commands.Cog):
         Each question must be a single line, separated by linebreaks.
         If you want multi-line single questions, use the 'ask' command.
         """
-        await self._ask_many(ctx, questions_str.split('\n'))
+        questions = [question for question in questions_str.split('\n') if question.strip()]
+        await self._ask_many(ctx, questions)
 
     # == Answers ==
 
