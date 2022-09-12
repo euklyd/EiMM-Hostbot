@@ -21,7 +21,7 @@ from sqlalchemy.orm import sessionmaker
 from core.bot import Bot
 from schemas.scryfall_schema import ScryfallText, Base
 
-API = 'https://api.scryfall.com/'
+API = "https://api.scryfall.com/"
 SCRYFALL_SEARCH_ENDPOINT = "https://api.scryfall.com/cards/search"
 SCRYFALL_CARD_ID_ENDPOINT = "https://api.scryfall.com/cards"
 YGOPRO_ENDPOINT = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
@@ -44,22 +44,22 @@ class ScryfallResponse:
 
 
 def scryfall_search(expr: str) -> ScryfallResponse:
-    ENDPOINT = 'cards/search?'
-    query = f'{API}{ENDPOINT}q={expr}'
+    ENDPOINT = "cards/search?"
+    query = f"{API}{ENDPOINT}q={expr}"
     with requests.get(query) as response:
         if not response.ok:
             # TODO: handle error
             return None
         content = json.loads(response.content)
-        cards = content['data']
+        cards = content["data"]
 
-        while content['has_more']:
-            response = requests.get(content['next_page'])
+        while content["has_more"]:
+            response = requests.get(content["next_page"])
             content = json.loads(response.content)
-            cards += content['data']
+            cards += content["data"]
 
-        cardnames = [card['name'] for card in cards]
-        card_map = {card['name']: card for card in cards}
+        cardnames = [card["name"] for card in cards]
+        card_map = {card["name"]: card for card in cards}
     return ScryfallResponse(cards, cardnames, card_map)
 
 
@@ -93,7 +93,7 @@ class Cards(commands.Cog):
         """
         Returns True if it found cards matching the MtG inline.
         """
-        mtg_regex = r'\[\[([^\[\]]*)]]'
+        mtg_regex = r"\[\[([^\[\]]*)]]"
         match = re.search(mtg_regex, message.content)
         if type(message.channel) == discord.TextChannel:
             for member in message.channel.members:  # type: discord.Member
@@ -113,10 +113,10 @@ class Cards(commands.Cog):
             return False
         card = resp.closest(message.content)
         for c in resp.cards:
-            if c['name'].lower() == expr.lower():
+            if c["name"].lower() == expr.lower():
                 card = c
-        if 'image_uris' in card:
-            await message.channel.send(card['image_uris']['normal'])
+        if "image_uris" in card:
+            await message.channel.send(card["image_uris"]["normal"])
         else:
             await message.channel.send(f"`'image_uris'` not present ( `{card['uri']}` ). Try: {card['scryfall_uri']}")
 
@@ -124,7 +124,7 @@ class Cards(commands.Cog):
         """
         Returns True if it found cards matching the Yu-Gi-Oh inline.
         """
-        ygo_regex = r'{{([^{}]*)}}'
+        ygo_regex = r"{{([^{}]*)}}"
         match = re.search(ygo_regex, message.content)
         if not match:
             return False
@@ -143,10 +143,10 @@ class Cards(commands.Cog):
             return
 
     async def _card_menu(self, ctx: commands.Context, card_embeds) -> bool:
-        ARROW_LEFT, ARROW_RIGHT = '\U000025c0', '\U000025b6'
+        ARROW_LEFT, ARROW_RIGHT = "\U000025c0", "\U000025b6"
 
         for i, em in enumerate(card_embeds):
-            em.set_footer(text=f'{i + 1} of {len(card_embeds)}')
+            em.set_footer(text=f"{i + 1} of {len(card_embeds)}")
 
         msg = await ctx.send(embed=card_embeds[0])
 
@@ -163,7 +163,7 @@ class Cards(commands.Cog):
                 return True
             return False
 
-        events = ['reaction_add', 'reaction_remove']
+        events = ["reaction_add", "reaction_remove"]
         checks = [check, check]
 
         i = 0
@@ -175,8 +175,7 @@ class Cards(commands.Cog):
                 break
 
             reaction = result[0]
-            assert type(
-                reaction) is discord.Reaction, f'result type was {type(reaction)}, expected discord.Reaction'
+            assert type(reaction) is discord.Reaction, f"result type was {type(reaction)}, expected discord.Reaction"
             if reaction.emoji == ARROW_LEFT:
                 i = (i - 1) % len(card_embeds)
             else:
@@ -202,7 +201,7 @@ class Cards(commands.Cog):
         # top level: dict key: data
         # second level: list of matches
 
-        intermediate_keys = {card['name']: card for card in result['data']}
+        intermediate_keys = {card["name"]: card for card in result["data"]}
         matches = process.extractBests(query, intermediate_keys.keys(), limit=100)
 
         if text_only:
@@ -217,12 +216,12 @@ class Cards(commands.Cog):
                 card_url = self._ygo_url(card)
 
                 em = discord.Embed()
-                em.set_author(name=card['name'], url=card_url)
-                em.set_image(url=card['card_images'][0]['image_url'])
+                em.set_author(name=card["name"], url=card_url)
+                em.set_image(url=card["card_images"][0]["image_url"])
 
                 baninfo = self._ygo_baninfo(card)
                 if baninfo is not None:
-                    em.add_field(name='Banlist', value=baninfo)
+                    em.add_field(name="Banlist", value=baninfo)
                 self._ygo_embed_field_sets(em, card, maxlen=4000)
 
                 card_embeds.append(em)
@@ -278,9 +277,7 @@ class Cards(commands.Cog):
             class_=AsyncSession,
         )
         async with async_session() as session:
-            session.add_all(
-                [ScryfallText(scryfall_id=card_id, cache_time=datetime.now(), text=text)]
-            )
+            session.add_all([ScryfallText(scryfall_id=card_id, cache_time=datetime.now(), text=text)])
             await conn.commit()
         return text
 
@@ -301,7 +298,7 @@ class Cards(commands.Cog):
             color = discord.Color(0xAAAAAA)  # colorless
         elif len(colors) == 1:
             color = {
-                "W": discord.Color(0xffffff),  # white
+                "W": discord.Color(0xFFFFFF),  # white
                 "U": discord.Color(0x1166BB),  # blue
                 "B": discord.Color(0x000000),  # black
                 "R": discord.Color(0xD02020),  # red
@@ -335,136 +332,138 @@ class Cards(commands.Cog):
         if color:
             em.colour = color
 
-        em.set_thumbnail(url=card['card_images'][0]['image_url'])
+        em.set_thumbnail(url=card["card_images"][0]["image_url"])
 
         card_url = Cards._ygo_url(card)
-        em.set_author(name=card['name'], url=card_url)
-        em.description = card['desc']
+        em.set_author(name=card["name"], url=card_url)
+        em.description = card["desc"]
 
         supertype = Cards._ygo_supertype(card)
-        if supertype == 'Monster':
+        if supertype == "Monster":
             # TODO: Once Discord figures out a way to do embed fields as double columns rather than only options of
             #  single / triple / overflow, update this to be:
             #       level, attribute
             #       type,  atk/def
 
-            if 'level' in card:
-                if 'xyz' in card['type'].lower():
-                    em.add_field(name='Rank', value=str(card['level']), inline=False)
+            if "level" in card:
+                if "xyz" in card["type"].lower():
+                    em.add_field(name="Rank", value=str(card["level"]), inline=False)
                 else:
-                    em.add_field(name='Level', value=str(card['level']), inline=False)
+                    em.add_field(name="Level", value=str(card["level"]), inline=False)
 
-            em.add_field(name='Attribute', value=card['attribute'], inline=False)
-            em.add_field(name='Type', value=f'[{card["race"]} / {card["type"]}]', inline=False)
+            em.add_field(name="Attribute", value=card["attribute"], inline=False)
+            em.add_field(name="Type", value=f'[{card["race"]} / {card["type"]}]', inline=False)
 
-            if 'def' in card:
-                em.add_field(name='ATK/DEF', value=f'ATK/{card["atk"]},  DEF/{card["def"]}', inline=False)
-            elif 'linkval' in card:
-                em.add_field(name='ATK/LINK', value=f'ATK/{card["atk"]},  LINK-{card["linkval"]}', inline=False)
+            if "def" in card:
+                em.add_field(name="ATK/DEF", value=f'ATK/{card["atk"]},  DEF/{card["def"]}', inline=False)
+            elif "linkval" in card:
+                em.add_field(name="ATK/LINK", value=f'ATK/{card["atk"]},  LINK-{card["linkval"]}', inline=False)
 
-            if 'scale' in card:
+            if "scale" in card:
                 # for pendulum monsters
-                em.add_field(name='Pendulum Scale', value=f'{card["scale"]} / {card["scale"]}', inline=False)
-            if 'linkmarkers' in card:
+                em.add_field(name="Pendulum Scale", value=f'{card["scale"]} / {card["scale"]}', inline=False)
+            if "linkmarkers" in card:
                 # for link monsters
-                em.add_field(name='Link Markers', value=card['linkmarkers'], inline=False)
-        elif supertype == 'Spell':
-            em.add_field(name='Type', value=card['race'], inline=False)
-        elif supertype == 'Trap':
-            em.add_field(name='Type', value=card['race'], inline=False)
+                em.add_field(name="Link Markers", value=card["linkmarkers"], inline=False)
+        elif supertype == "Spell":
+            em.add_field(name="Type", value=card["race"], inline=False)
+        elif supertype == "Trap":
+            em.add_field(name="Type", value=card["race"], inline=False)
         else:
             # something went wrong
             em.description = f'Type info could not be found for `{card["name"]}`.'
             return em
 
-        if 'archetype' in card:
+        if "archetype" in card:
             archetype_url = Cards._ygo_archetype_url(card)
             if archetype_url:
-                em.add_field(name='Archetype', value=f'[{card["archetype"]}]({archetype_url})')
+                em.add_field(name="Archetype", value=f'[{card["archetype"]}]({archetype_url})')
 
         baninfo = Cards._ygo_baninfo(card)
         if baninfo is not None:
-            em.add_field(name='Banlist', value=baninfo, inline=False)
-        if 'card_sets' in card:
+            em.add_field(name="Banlist", value=baninfo, inline=False)
+        if "card_sets" in card:
             Cards._ygo_embed_field_sets(em, card, maxlen=3000)
         return em
 
     @staticmethod
     def _ygo_embed_field_sets(em: discord.Embed, card: dict, maxlen: int = 4000):
-        if 'card_sets' not in card:
+        if "card_sets" not in card:
             return
 
         sets = []
-        for set_info in card['card_sets']:
+        for set_info in card["card_sets"]:
             set_url = Cards._ygo_set_url(set_info)
-            text = '[{} {}]({})'.format(set_info['set_name'], set_info['set_rarity_code'], set_url)
+            text = "[{} {}]({})".format(set_info["set_name"], set_info["set_rarity_code"], set_url)
             sets.append(text)
-        sets_text = ' | '.join(sets)
+        sets_text = " | ".join(sets)
         if len(sets_text) > maxlen:
             card_url = Cards._ygo_url(card)
-            em.add_field(name='Sets',
-                         value=f'Listing all the sets this card has appeared in would overflow the embed, check [its ygoprodeck page]({card_url}).')
+            em.add_field(
+                name="Sets",
+                value=f"Listing all the sets this card has appeared in would overflow the embed, check [its ygoprodeck page]({card_url}).",
+            )
         else:
             if len(sets_text) <= 1000:
-                em.add_field(name='Sets', value=sets_text, inline=False)
+                em.add_field(name="Sets", value=sets_text, inline=False)
             else:
                 subsets = []
                 length = 0
                 n = 1
                 for s in sets:
                     if length + len(s) + 3 > 1000:
-                        em.add_field(name=f'Sets ({n})', value=' | '.join(subsets), inline=False)
+                        em.add_field(name=f"Sets ({n})", value=" | ".join(subsets), inline=False)
                         n += 1
                         subsets = []
                         length = 0
                     subsets.append(s)
                     length += len(s) + 3  # the separator is 3 chars long
                 if len(subsets) > 0:
-                    em.add_field(name=f'Sets ({n})', value=' | '.join(subsets), inline=False)
+                    em.add_field(name=f"Sets ({n})", value=" | ".join(subsets), inline=False)
 
     @staticmethod
     def _ygo_url(card: dict) -> str:
-        base_card_url = 'https://db.ygoprodeck.com/card/?search='
-        return base_card_url + urllib.parse.quote(card['name'])
+        base_card_url = "https://db.ygoprodeck.com/card/?search="
+        return base_card_url + urllib.parse.quote(card["name"])
 
     @staticmethod
     def _ygo_set_url(set_info: dict) -> str:
         """
         As a card can have multiple sets, this needs to take a set dict rather than a card dict.
         """
-        base_set_url = 'https://db.ygoprodeck.com/set/?search='
-        return base_set_url + urllib.parse.quote(set_info['set_name'])
+        base_set_url = "https://db.ygoprodeck.com/set/?search="
+        return base_set_url + urllib.parse.quote(set_info["set_name"])
 
     @staticmethod
     def _ygo_archetype_url(card: dict) -> Optional[str]:
-        if 'archetype' not in card:
+        if "archetype" not in card:
             return None
-        base_archetype_url = 'https://db.ygoprodeck.com/search/?&archetype='
-        return base_archetype_url + urllib.parse.quote(card['archetype'])
+        base_archetype_url = "https://db.ygoprodeck.com/search/?&archetype="
+        return base_archetype_url + urllib.parse.quote(card["archetype"])
 
     @staticmethod
     def _ygo_supertype(card: dict) -> Optional[str]:
-        cardtype = card['type']
-        if 'monster' in cardtype.lower():
-            return 'Monster'
-        if 'spell' in cardtype.lower():
-            return 'Spell'
-        if 'trap' in cardtype.lower():
-            return 'Trap'
+        cardtype = card["type"]
+        if "monster" in cardtype.lower():
+            return "Monster"
+        if "spell" in cardtype.lower():
+            return "Spell"
+        if "trap" in cardtype.lower():
+            return "Trap"
         return None
 
     @staticmethod
     def _ygo_baninfo(card: dict) -> Optional[str]:
-        if 'banlist_info' in card:
+        if "banlist_info" in card:
             bans = []
-            if 'ban_tcg' in card['banlist_info']:
+            if "ban_tcg" in card["banlist_info"]:
                 bans.append(f"TCG: {card['banlist_info']['ban_tcg']}")
-            if 'ban_ocg' in card['banlist_info']:
+            if "ban_ocg" in card["banlist_info"]:
                 bans.append(f"OCG: {card['banlist_info']['ban_ocg']}")
-            if 'ban_goat' in card['banlist_info']:
+            if "ban_goat" in card["banlist_info"]:
                 bans.append(f"Goat: {card['banlist_info']['ban_goat']}")
 
-            return ' | '.join(bans)
+            return " | ".join(bans)
         return None
 
     @staticmethod
@@ -475,32 +474,28 @@ class Cards(commands.Cog):
         May support Egyptian Gods at some point.
         """
         color_dict = {
-            'normal monster': 0xc9b175,
-            'normal tuner monster': 0xc9b175,
-
-            'effect monster': 0xc26727,
-            'flip effect monster': 0xc26727,
-            'tuner monster': 0xc26727,
-            'union effect monster': 0xc26727,
-            'gemini monster': 0xc26727,
-
-            'synchro monster': 0xfefefe,
-            'synchro tuner monster': 0xfefefe,
-
-            'ritual monster': 0x446ec7,
-            'ritual effect monster': 0x446ec7,  # yu-gi-oh drives me nuts with how it codifies typelines
-            'fusion monster': 0x9051a6,
-            'xyz monster': 0x000000,
-            'link monster': 0x2652ab,
-
-            'spell card': 0x30ab83,
-            'trap card': 0xb135b5,
+            "normal monster": 0xC9B175,
+            "normal tuner monster": 0xC9B175,
+            "effect monster": 0xC26727,
+            "flip effect monster": 0xC26727,
+            "tuner monster": 0xC26727,
+            "union effect monster": 0xC26727,
+            "gemini monster": 0xC26727,
+            "synchro monster": 0xFEFEFE,
+            "synchro tuner monster": 0xFEFEFE,
+            "ritual monster": 0x446EC7,
+            "ritual effect monster": 0x446EC7,  # yu-gi-oh drives me nuts with how it codifies typelines
+            "fusion monster": 0x9051A6,
+            "xyz monster": 0x000000,
+            "link monster": 0x2652AB,
+            "spell card": 0x30AB83,
+            "trap card": 0xB135B5,
         }
-        if card['type'].lower() in color_dict:
-            return discord.Colour(color_dict[card['type'].lower()])
+        if card["type"].lower() in color_dict:
+            return discord.Colour(color_dict[card["type"].lower()])
         return None
 
-    @commands.command(name='dt')
+    @commands.command(name="dt")
     async def duel_terminal(self, ctx: commands.Context, dt_num: str, num_cards: int = 1):
         """
         Pull Duel Terminal cards.
@@ -508,19 +503,19 @@ class Cards(commands.Cog):
         Pull ratios are assumed to be identical to those in Dark Legends, etc (11:1, 1:1, 1:5, 1:12).
         """
         if num_cards > 100:
-            await ctx.send('Pick a lower number of cards.')
+            await ctx.send("Pick a lower number of cards.")
             return
         elif num_cards < 1:
             num_cards = 1
 
         COMMONS_PER_PACK = 6  # we're deciding there's 10 cards per pack so that's 9 common slots
 
-        dt_nums = ['1', '2', '3', '4', '5a', '5b', '6a', '6b', '7a', '7b']
+        dt_nums = ["1", "2", "3", "4", "5a", "5b", "6a", "6b", "7a", "7b"]
         if dt_num.lower() not in dt_nums:
-            await ctx.send(f'{dt_num} not a valid Duel Terminal (1-7).')
+            await ctx.send(f"{dt_num} not a valid Duel Terminal (1-7).")
             return
 
-        dt_name = f'Duel Terminal {dt_num}'
+        dt_name = f"Duel Terminal {dt_num}"
 
         cards = requests.get(YGOPRO_ENDPOINT, params={"cardset": dt_name}).json()["data"]
 
@@ -533,20 +528,20 @@ class Cards(commands.Cog):
         # }
 
         rarity_dict = {
-            '(DNPR)': [],  # C
-            '(DRPR)': [],  # R
-            '(DSPR)': [],  # SR
-            '(DUPR)': [],  # UR
+            "(DNPR)": [],  # C
+            "(DRPR)": [],  # R
+            "(DSPR)": [],  # SR
+            "(DUPR)": [],  # UR
             # '': []  # duel terminal secret rare doesn't exist in the TCG (yet?)
         }
 
         for card in cards:
-            for card_set in card['card_sets']:
-                if card_set['set_name'].lower() == dt_name.lower():
-                    if card_set['set_rarity_code'] not in rarity_dict:
+            for card_set in card["card_sets"]:
+                if card_set["set_name"].lower() == dt_name.lower():
+                    if card_set["set_rarity_code"] not in rarity_dict:
                         # When rarities are missing, treat them as commons:
-                        card_set['set_rarity_code'] = '(DNPR)'
-                    rarity_dict[card_set['set_rarity_code']].append(card)
+                        card_set["set_rarity_code"] = "(DNPR)"
+                    rarity_dict[card_set["set_rarity_code"]].append(card)
 
         pulls = {}
         c_odds = COMMONS_PER_PACK * 1 * 5 * 12
@@ -558,104 +553,104 @@ class Cards(commands.Cog):
 
             if rand < c_odds:
                 # common
-                rarity = '(DNPR)'
+                rarity = "(DNPR)"
             elif rand < c_odds + r_odds:
                 # rare
-                rarity = '(DRPR)'
+                rarity = "(DRPR)"
             elif rand < c_odds + r_odds + sr_odds:
                 # super rare
-                rarity = '(DSPR)'
+                rarity = "(DSPR)"
             else:
                 # ultra rare
-                rarity = '(DUPR)'
+                rarity = "(DUPR)"
 
             pull = random.choice(rarity_dict[rarity])
-            pull['num'] = 1
-            pull['rarity'] = rarity
+            pull["num"] = 1
+            pull["rarity"] = rarity
 
-            if pull['name'] in pulls:
-                pulls[pull['name']]['num'] += 1
+            if pull["name"] in pulls:
+                pulls[pull["name"]]["num"] += 1
             else:
-                pulls[pull['name']] = pull
+                pulls[pull["name"]] = pull
 
         pulls = [card for card in pulls.values()]
-        pulls = sorted(pulls, key=lambda x: x['name'].lower())
-        result = ''
+        pulls = sorted(pulls, key=lambda x: x["name"].lower())
+        result = ""
         for card in pulls:
             # I don't want to use the awful rarity symbols
             rarity = {
-                '(DNPR)': 'C',
-                '(DRPR)': 'R',
-                '(DSPR)': 'SR',
-                '(DUPR)': 'UR',
-            }[card['rarity']]
+                "(DNPR)": "C",
+                "(DRPR)": "R",
+                "(DSPR)": "SR",
+                "(DUPR)": "UR",
+            }[card["rarity"]]
             result += f'{card["num"]}x {card["name"]} ({rarity})\n'
 
         await ctx.send(result)
 
-    @commands.command(name='ygocsv')
+    @commands.command(name="ygocsv")
     async def collection_to_csv(self, ctx: commands.Context):
         """
         Exports a YGOProDeck collection CSV to something more detailed.
 
         I suggest importing the output CSV to Google sheets / MS Excel so you can easily filter it.
         """
-        ENDPOINT = 'https://db.ygoprodeck.com/api/v7/cardinfo.php'
+        ENDPOINT = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
 
         if len(ctx.message.attachments) != 1:
-            await ctx.send(f'Attach exactly one (1) item! ({len(ctx.message.attachments)} found.)')
+            await ctx.send(f"Attach exactly one (1) item! ({len(ctx.message.attachments)} found.)")
             return
 
-        ls_cards = requests.get(ENDPOINT).json()['data']
+        ls_cards = requests.get(ENDPOINT).json()["data"]
         cards = {}
 
         for card in ls_cards:
-            cards[card['id']] = card
+            cards[card["id"]] = card
 
         attachment = ctx.message.attachments[0]
         with io.BytesIO() as buffer:
             await attachment.save(buffer)
-            csv_contents = [line.decode('utf-8') for line in buffer.readlines()]
+            csv_contents = [line.decode("utf-8") for line in buffer.readlines()]
 
         collection = {}
         reader = csv.DictReader(csv_contents)
         for card_row in reader:
-            card_id = int(card_row['cardid'])
+            card_id = int(card_row["cardid"])
             if card_id in cards:
                 card = cards[card_id]
             else:
                 try:
-                    card = requests.get(ENDPOINT + f'?id={card_id}').json()['data'][0]
+                    card = requests.get(ENDPOINT + f"?id={card_id}").json()["data"][0]
                 except Exception as e:
-                    await ctx.send(f'Could not retrieve data for card ID: `{card_id}`.')
+                    await ctx.send(f"Could not retrieve data for card ID: `{card_id}`.")
                     continue
 
             key = f"{card['id']}-{card_row['cardcode']}"
-            if card_row['card_edition'] == '1st Edition':
-                key += '-1st'
+            if card_row["card_edition"] == "1st Edition":
+                key += "-1st"
 
             collection[key] = {
-                'quantity': int(card_row['cardq']),
-                'id': card['id'],
-                'name': card['name'],
-                'type': self._ygo_supertype(card),
-                'subtype': card['type'],
-                'atk': card['atk'] if 'atk' in card else None,
-                'def': card['def'] if 'def' in card else None,
-                'level': card['level'] if 'level' in card else None,
-                'scale': card['scale'] if 'scale' in card else None,
-                'link': card['linkval'] if 'linkval' in card else None,
-                'race': card['race'],
-                'attribute': card['attribute'] if 'attribute' in card else None,
-                'desc': card['desc'],
-                'archetype': card['archetype'] if 'archetype' in card else '',
-                'set': card_row['cardset'],
-                'rarity': card_row['cardrarity'],
-                'set code': card_row['cardcode'],
+                "quantity": int(card_row["cardq"]),
+                "id": card["id"],
+                "name": card["name"],
+                "type": self._ygo_supertype(card),
+                "subtype": card["type"],
+                "atk": card["atk"] if "atk" in card else None,
+                "def": card["def"] if "def" in card else None,
+                "level": card["level"] if "level" in card else None,
+                "scale": card["scale"] if "scale" in card else None,
+                "link": card["linkval"] if "linkval" in card else None,
+                "race": card["race"],
+                "attribute": card["attribute"] if "attribute" in card else None,
+                "desc": card["desc"],
+                "archetype": card["archetype"] if "archetype" in card else "",
+                "set": card_row["cardset"],
+                "rarity": card_row["cardrarity"],
+                "set code": card_row["cardcode"],
             }
 
         ls_collection = list(collection.values())
-        ls_collection = sorted(ls_collection, key=lambda x: x['name'])
+        ls_collection = sorted(ls_collection, key=lambda x: x["name"])
         keys = ls_collection[0].keys()
 
         with io.StringIO() as csv_out:
@@ -663,8 +658,9 @@ class Cards(commands.Cog):
             writer.writeheader()
             writer.writerows(ls_collection)
             csv_out.seek(0)
-            await ctx.send(f'Processed your collection.',
-                           file=discord.File(csv_out, filename=f'{ctx.author} collection.csv'))
+            await ctx.send(
+                f"Processed your collection.", file=discord.File(csv_out, filename=f"{ctx.author} collection.csv")
+            )
 
     @commands.command(name="sftext", aliases=["sftest"])
     async def sftest(self, ctx: commands.Context, *, expr: str):
@@ -679,8 +675,8 @@ async def create_metadata(db):
 
 
 def setup_sync(bot: Bot):
-    db_dir = 'databases/'
-    db_file = f'{db_dir}/scryfall.db'
+    db_dir = "databases/"
+    db_file = f"{db_dir}/scryfall.db"
     if not Path(db_file).exists():
         Path(db_dir).mkdir(exist_ok=True)
 
@@ -692,8 +688,8 @@ def setup_sync(bot: Bot):
 
 
 async def setup_async(bot: Bot):
-    db_dir = 'databases/'
-    db_file = f'{db_dir}/scryfall.db'
+    db_dir = "databases/"
+    db_file = f"{db_dir}/scryfall.db"
     if not Path(db_file).exists():
         Path(db_dir).mkdir(exist_ok=True)
 

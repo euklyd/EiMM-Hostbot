@@ -9,13 +9,20 @@ import discord
 from discord.ext import commands
 
 from conf.conf import Conf
+
 # from core.checks import Checks
 from core.imgur import Imgur
 
 
 class Bot(commands.Bot):
-    def __init__(self, command_prefix: Union[str, Iterable[str], Callable[['Bot', discord.Message], str]], conf: Conf,
-                 help_command=None, description: str = None, **options):
+    def __init__(
+        self,
+        command_prefix: Union[str, Iterable[str], Callable[["Bot", discord.Message], str]],
+        conf: Conf,
+        help_command=None,
+        description: str = None,
+        **options,
+    ):
         if help_command is None:
             super().__init__(command_prefix, description=description, **options)
         else:
@@ -26,12 +33,9 @@ class Bot(commands.Bot):
         self._boostemoji = self.get_emoji(conf.boostemoji_id)  # type: discord.Emoji
         self._waitemoji = self.get_emoji(conf.waitemoji_id)  # type: discord.Emoji
 
-        if Path('conf/google_creds.json').exists():
-            self.google_creds = 'conf/google_creds.json'
-            self.google_scope = [
-                'https://spreadsheets.google.com/feeds',
-                'https://www.googleapis.com/auth/drive'
-            ]
+        if Path("conf/google_creds.json").exists():
+            self.google_creds = "conf/google_creds.json"
+            self.google_scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
         else:
             # TODO: Add a warn log.
             self.google_creds = None
@@ -81,7 +85,7 @@ class Bot(commands.Bot):
 
         Spoof with "<message content> -a @user" or "<message content> -a <userid>".
         """
-        regex = r'^(.*[^ ]) +-a (?:<@!?(\d+)>|(\d+))$'
+        regex = r"^(.*[^ ]) +-a (?:<@!?(\d+)>|(\d+))$"
         match = re.match(regex, message.content, flags=re.DOTALL)
         if match is not None:
             if message.author.id != self.owner_id:
@@ -101,8 +105,9 @@ class Bot(commands.Bot):
 
         await super().on_message(message)
 
-    async def wait_for_first(self, events: List[str], *, checks: Optional[List[Callable[..., bool]]] = None,
-                             timeout: float = None) -> Tuple[Any, str]:
+    async def wait_for_first(
+        self, events: List[str], *, checks: Optional[List[Callable[..., bool]]] = None, timeout: float = None
+    ) -> Tuple[Any, str]:
         """|coro|
 
         Waits for the first of multiple WebSocket events to be dispatched.
@@ -158,6 +163,7 @@ class Bot(commands.Bot):
         for event, check in zip(events, checks):
             future = self.loop.create_future()
             if check is None:
+
                 def _check(*args):
                     return True
 
@@ -173,8 +179,9 @@ class Bot(commands.Bot):
             listeners.append((future, check))
             futures.append(future)
 
-        complete, pending = await asyncio.wait(futures, timeout=timeout, loop=self.loop,
-                                               return_when=asyncio.FIRST_COMPLETED)
+        complete, pending = await asyncio.wait(
+            futures, timeout=timeout, loop=self.loop, return_when=asyncio.FIRST_COMPLETED
+        )
         for future in pending:  # type: asyncio.Future
             future.cancel()
         if len(complete) == 0:

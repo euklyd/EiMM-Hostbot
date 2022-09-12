@@ -18,20 +18,20 @@ async def reload(ctx: commands.Context, plugin: str):
 
     If it is not loaded yet, load it. Only works for plugins (extensions), NOT cogs.
     """
-    if f'plugins.{plugin}' in ctx.bot.extensions:
-        ctx.bot.reload_extension(f'plugins.{plugin}')
-        await ctx.send(f'Reloaded plugin `{plugin}`.')
-        logging.warning(f'reloaded plugins.{plugin}')
-    elif f'cogs.{plugin}' in ctx.bot.extensions:
-        ctx.bot.reload_extension(f'cogs.{plugin}')
-        await ctx.send(f'Reloaded cog `{plugin}`.')
-        logging.warning(f'reloaded cogs.{plugin}')
+    if f"plugins.{plugin}" in ctx.bot.extensions:
+        ctx.bot.reload_extension(f"plugins.{plugin}")
+        await ctx.send(f"Reloaded plugin `{plugin}`.")
+        logging.warning(f"reloaded plugins.{plugin}")
+    elif f"cogs.{plugin}" in ctx.bot.extensions:
+        ctx.bot.reload_extension(f"cogs.{plugin}")
+        await ctx.send(f"Reloaded cog `{plugin}`.")
+        logging.warning(f"reloaded cogs.{plugin}")
     else:
         try:
-            ctx.bot.load_extension(f'plugins.{plugin}')
-            await ctx.send(f'Loaded plugin `{plugin}`.')
+            ctx.bot.load_extension(f"plugins.{plugin}")
+            await ctx.send(f"Loaded plugin `{plugin}`.")
         except commands.errors.ExtensionNotFound:
-            await ctx.send(f'Could not find plugin `{plugin}`.')
+            await ctx.send(f"Could not find plugin `{plugin}`.")
 
 
 @commands.command()
@@ -40,16 +40,16 @@ async def unload(ctx: commands.Context, plugin: str):
     """
     Unload the specified plugin.
     """
-    if f'plugins.{plugin}' in ctx.bot.extensions:
-        ctx.bot.unload_extension(f'plugins.{plugin}')
-        await ctx.send(f'Unloaded plugin `{plugin}`.')
-        logging.warning(f'reloaded plugins.{plugin}')
-    elif f'cogs.{plugin}' in ctx.bot.extensions:
-        ctx.bot.unload_extension(f'cogs.{plugin}')
-        await ctx.send(f'Unloaded cog `{plugin}`.')
-        logging.warning(f'reloaded cogs.{plugin}')
+    if f"plugins.{plugin}" in ctx.bot.extensions:
+        ctx.bot.unload_extension(f"plugins.{plugin}")
+        await ctx.send(f"Unloaded plugin `{plugin}`.")
+        logging.warning(f"reloaded plugins.{plugin}")
+    elif f"cogs.{plugin}" in ctx.bot.extensions:
+        ctx.bot.unload_extension(f"cogs.{plugin}")
+        await ctx.send(f"Unloaded cog `{plugin}`.")
+        logging.warning(f"reloaded cogs.{plugin}")
     else:
-        await ctx.send(f'Plugin `{plugin}` not loaded.')
+        await ctx.send(f"Plugin `{plugin}` not loaded.")
 
 
 @commands.command()
@@ -64,13 +64,13 @@ async def shutdown(ctx: commands.Context):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--loglevel', '-l', help='log level', default='INFO')
+    parser.add_argument("--loglevel", "-l", help="log level", default="INFO")
     return parser.parse_args()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     args = parse_args()
-    logging.basicConfig(level=args.loglevel, format='[%(asctime)s] %(message)s', datefmt='%Y/%m/%d %T:%M:%S')
+    logging.basicConfig(level=args.loglevel, format="[%(asctime)s] %(message)s", datefmt="%Y/%m/%d %T:%M:%S")
     faulthandler.enable()
 
     # At least, needs: members=True, emojis=True, invites=True, messages=True, reactions=True
@@ -79,7 +79,7 @@ if __name__ == '__main__':
     intents.members = True
     bot = Bot(
         command_prefix=settings.prefix,
-        description='https://board8.fandom.com/wiki/Mafia_Bidoof',
+        description="https://board8.fandom.com/wiki/Mafia_Bidoof",
         conf=settings.conf,
         activity=settings.activity,
         owner_id=settings.owner_id,
@@ -89,17 +89,17 @@ if __name__ == '__main__':
     )
 
     for cog in settings.cogs:
-        bot.load_extension(f'cogs.{cog}')
-        logging.warning(f'loaded cogs.{cog}')
+        bot.load_extension(f"cogs.{cog}")
+        logging.warning(f"loaded cogs.{cog}")
 
     for plugin in settings.plugins:
-        bot.load_extension(f'plugins.{plugin}')
-        logging.warning(f'loaded plugins.{plugin}')
+        bot.load_extension(f"plugins.{plugin}")
+        logging.warning(f"loaded plugins.{plugin}")
 
     bot.add_command(shutdown)
     bot.add_command(reload)
     bot.add_command(unload)
 
-    print('doot')
+    print("doot")
     logging.warning("starting bot")
     bot.run(settings.client_token)
