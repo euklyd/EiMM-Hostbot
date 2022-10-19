@@ -165,6 +165,7 @@ class HostBot(commands.Cog):
                     send_messages=True
                 )
                 logging.info(f"gamechat: creating {channel_name} for {key}")
+
             if key == "graveyard":
                 overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(
                     read_messages=False, send_messages=None
@@ -179,6 +180,21 @@ class HostBot(commands.Cog):
                     read_messages=True
                 )
                 logging.info(f"graveyard: creating {channel_name} for {key}")
+
+            if key == "confessionals":
+                overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(
+                    read_messages=False, send_messages=None
+                )
+                overwrites[roles["dead"]["role"]] = discord.PermissionOverwrite(
+                    read_messages=True, send_messages=False
+                )
+                overwrites[roles["host"]["role"]] = discord.PermissionOverwrite(
+                    read_messages=True
+                )
+                overwrites[roles["spec"]["role"]] = discord.PermissionOverwrite(
+                    read_messages=True, send_messages=False
+                )
+                logging.info(f"confessionals: creating {channel_name} for {key}")
 
             if key == "music":
                 overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(
@@ -198,7 +214,7 @@ class HostBot(commands.Cog):
         # Turn off @everyone ping
         default_role = ctx.guild.default_role
         perms = default_role.permissions
-        perms.mention_everyone = False
+        perms.update(mention_everyone=False)
         await default_role.edit(permissions=perms)
 
         session.add(server)
@@ -867,17 +883,17 @@ class HostBot(commands.Cog):
             )
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        gy_channel = (
+        confs_channel = (
             session.query(hbs.Channel)
-                .filter_by(type="graveyard", server_id=ctx.guild.id)
+                .filter_by(type="confessionals", server_id=ctx.guild.id)
                 .one_or_none()
         )
-        gy_channel = ctx.guild.get_channel(gy_channel.id)  # type: discord.TextChannel
+        confs_channel = ctx.guild.get_channel(confs_channel.id)  # type: discord.TextChannel
         msg = msg.replace("@everyone", "@\u200beveryone").replace(
             "@here", "@\u200bhere"
         )  # \u200b aka zero-width space
         conf = f"**Confessional from {ctx.author}:**\n>>> {msg}"
-        await gy_channel.send(conf)
+        await confs_channel.send(conf)
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.command()
