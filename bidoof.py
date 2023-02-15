@@ -68,7 +68,7 @@ def parse_args():
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def run():
     args = parse_args()
     logging.basicConfig(level=args.loglevel, format="[%(asctime)s] %(message)s", datefmt="%Y/%m/%d %T:%M:%S")
     faulthandler.enable()
@@ -103,3 +103,7 @@ if __name__ == "__main__":
     print("doot")
     logging.warning("starting bot")
     bot.run(settings.client_token)
+
+
+if __name__ == "__main__":
+    run()
