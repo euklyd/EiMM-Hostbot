@@ -21,13 +21,14 @@ SECRET = "conf/google_creds.json"
 SHEET_NAME = "eimm role templates & keywords"
 
 
-def thwart_misty(text: str) -> str:
+def thwart_misty(ability_name, text: str) -> str:
     """
     It's not MT it's Mt. Really it should be Atk but you are using it for doctors as well and that's harder to fix.
     """
     # return re.sub(r"\bMT\b", "Mt", text, flags=re.IGNORECASE)
-    if "doc" not in text.lower():
-        return re.sub(r"\bMt\b", "Atk", text, flags=re.IGNORECASE)
+    if "doc" in text.lower() and "busted" not in ability_name.lower() and "brutalize" not in ability_name.lower():
+        return text
+    return re.sub(r"\bMt\b", "Atk", text, flags=re.IGNORECASE)
 
 
 def default_val(val) -> str:
@@ -54,6 +55,7 @@ def b_h(row) -> str:
             return "N"
     return "???"
 
+
 def ability_text(row):
     limitations = "Unlimited"
     if "cycling" in row["Categories"].lower():
@@ -67,7 +69,7 @@ def ability_text(row):
         "_Flavor_\n"
         f'`[{row["Ability Name"]}]` {text}'
     )
-    return template
+    return thwart_misty(row["Ability Name"], template)
 
 
 def ability_embed(row):
@@ -83,7 +85,7 @@ def ability_embed(row):
         "H": "💀",
         "N": "N/A",
         "": "N/A",
-    }.get(b_h(row), "???")
+    }.get(b_h(row).upper(), "???")
     em.add_field(name="B/H", value=bh_val)
     em.add_field(name="Categories", value=default_val(row["Categories"]))
     em.add_field(name="Rules Text", value=default_val(row["Rules Text"]), inline=False)
@@ -226,11 +228,11 @@ class EiMM(commands.Cog):
         else:
             matches = [match[0] for match in matches]  # type: List[str]
             try:
+                await ctx.send("Which ability did you mean?")
                 match = await menu.menu_list(ctx, matches)
             except RuntimeError:
                 await ctx.send("Finish with your preview menu first.")
                 return
-            await ctx.send("Which ability did you mean?")
         em = ability_embed(self.abilities[match])
         await ctx.send(embed=em)
 
