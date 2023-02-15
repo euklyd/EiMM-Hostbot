@@ -4,6 +4,9 @@ version = "0.1.0"
 description = "EiMM hostbot for eimm things"
 authors = ["Your Name <you@example.com>"]
 
+[tool.poetry.scripts]
+bidoof = "bidoof:run"
+
 [tool.poetry.dependencies]
 python = "^3.7"
 PyYAML = "^6.0"
