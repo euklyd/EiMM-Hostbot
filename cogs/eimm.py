@@ -21,12 +21,38 @@ SECRET = "conf/google_creds.json"
 SHEET_NAME = "eimm role templates & keywords"
 
 
-def default_val(val):
+def thwart_misty(text: str) -> str:
+    """
+    It's not MT it's Mt. Really it should be Atk but you are using it for doctors as well and that's harder to fix.
+    """
+    # return re.sub(r"\bMT\b", "Mt", text, flags=re.IGNORECASE)
+    if "doc" not in text.lower():
+        return re.sub(r"\bMt\b", "Atk", text, flags=re.IGNORECASE)
+
+
+def default_val(val) -> str:
     if val == "":
         return "None"
     else:
         return str(val)
 
+
+def b_h(row) -> str:
+    if "B/H" in row and row["B/H"]:
+        return row["B/H"]
+    if "H/B" in row and row["H/B"]:
+        return row["H/B"]
+    if "H" in row and "B" in row:
+        # backwards compatibility...
+        if row["B"] == "TRUE" and row["H"] == "TRUE":
+            return "B/H"
+        elif row["B"] == "TRUE":
+            return "B"
+        elif row["H"] == "TRUE":
+            return "H"
+        else:
+            return "N"
+    return "???"
 
 def ability_text(row):
     limitations = "Unlimited"
@@ -34,14 +60,7 @@ def ability_text(row):
         limitations += " - Cycling"
     targets = row["Targets"]
     priority = row["Priority(s)"]
-    if row["B"] == "TRUE" and row["H"] == "TRUE":
-        hb = "B/H"
-    elif row["B"] == "TRUE":
-        hb = "B"
-    elif row["H"] == "TRUE":
-        hb = "H"
-    else:
-        hb = "N"
+    hb = b_h(row)
     text = row["Rules Text"]
     template = (
         f"**Ability Name (Active, {limitations}, Targeted {targets}, {priority}, {hb}):**\n"
@@ -56,13 +75,15 @@ def ability_embed(row):
     em.add_field(name="Priority", value=default_val(row["Priority(s)"]))
     em.add_field(name="Targets", value=default_val(row["Targets"]))
     em.add_field(name="Supertype", value=default_val(row["Supertype"]))
-    bh_val = ""
-    if row["B"] == "TRUE":
-        bh_val += "❤️"
-    if row["H"] == "TRUE":
-        bh_val += "💀"
-    if bh_val == "":
-        bh_val = "N/A"
+    bh_val = {
+        "B/H": "❤️/💀",
+        "B+H": "❤️+💀",
+        "B&H": "❤️+💀",
+        "B": "❤️",
+        "H": "💀",
+        "N": "N/A",
+        "": "N/A",
+    }.get(b_h(row), "???")
     em.add_field(name="B/H", value=bh_val)
     em.add_field(name="Categories", value=default_val(row["Categories"]))
     em.add_field(name="Rules Text", value=default_val(row["Rules Text"]), inline=False)
@@ -209,8 +230,8 @@ class EiMM(commands.Cog):
             except RuntimeError:
                 await ctx.send("Finish with your preview menu first.")
                 return
+            await ctx.send("Which ability did you mean?")
         em = ability_embed(self.abilities[match])
-        await ctx.send("Which ability did you mean?")
         await ctx.send(embed=em)
 
     @commands.Cog.listener()
