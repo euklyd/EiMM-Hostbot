@@ -69,7 +69,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
+def run():
     args = parse_args()
     logging.basicConfig(level=args.loglevel, format="[%(asctime)s] %(message)s", datefmt="%Y/%m/%d %T:%M:%S")
     faulthandler.enable()
@@ -100,10 +100,10 @@ def main():
     bot.run(settings.client_token)
 
 
-# def run():
-#     asyncio.run(main())
+def entrypoint():
+    asyncio.run(run())
 
 
 if __name__ == "__main__":
-    # run()
-    main()
+    entrypoint()
+

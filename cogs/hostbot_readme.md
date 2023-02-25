@@ -11,6 +11,7 @@ channels:
   flips: Flips Channel Name
   gamechat: Gamechat Channel Name
   graveyard: Graveyard Channel Name
+  confessionals: Confesionals Channel Name
   music: Music Channel Name
 roles:
   host:

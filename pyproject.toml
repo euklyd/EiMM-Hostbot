@@ -7,6 +7,9 @@ authors = ["euklyd <you@example.com>"]
 [tool.poetry.scripts]
 bidoof = "bidoof:main"
 
+[tool.poetry.scripts]
+bidoof = "bidoof:run"
+
 [tool.poetry.dependencies]
 python = "^3.9.10"
 PyYAML = "^6.0"
@@ -35,3 +38,8 @@ line-length = 120
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.black]
+line-length = 120
+target-version = ['py37']
+include = '\.pyi?$'

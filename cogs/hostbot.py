@@ -45,9 +45,7 @@ def has_role(ctx: commands.Context, allowed_roles: List[str]) -> bool:
     session = session_maker()
 
     allowed_role_ids = (
-        session.query(hbs.Role)
-            .filter(hbs.Role.server_id == ctx.guild.id, hbs.Role.type.in_(allowed_roles))
-            .all()
+        session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id, hbs.Role.type.in_(allowed_roles)).all()
     )
     allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
 
@@ -68,9 +66,7 @@ class HostBot(commands.Cog):
 
         self.confessional_cooldowns = {}  # type: Dict[int, List]
 
-        self.connection = spreadsheet.SheetConnection(
-            bot.google_creds, bot.google_scope
-        )
+        self.connection = spreadsheet.SheetConnection(bot.google_creds, bot.google_scope)
 
         global session_maker
         db_dir = "databases/"
@@ -91,9 +87,7 @@ class HostBot(commands.Cog):
         """
         HostBot server initialization commandgroup.
         """
-        await ctx.send(
-            f"This isn't a command! Use `{ctx.bot.default_command_prefix}help init`."
-        )
+        await ctx.send(f"This isn't a command! Use `{ctx.bot.default_command_prefix}help init`.")
 
     @init.command(name="server")
     @commands.has_permissions(administrator=True)
@@ -107,9 +101,7 @@ class HostBot(commands.Cog):
         session = session_maker()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is not None:
-            await ctx.send(
-                "This server has already been set up; duplicates setups aren't going to work."
-            )
+            await ctx.send("This server has already been set up; duplicates setups aren't going to work.")
             return
 
         yml_config = yaml.safe_load(yml_config.strip("```yml\n"))
@@ -155,52 +147,54 @@ class HostBot(commands.Cog):
         for key, channel_name in yml_config["channels"].items():
             roles = yml_config["roles"]
             overwrites = {
-                ctx.guild.default_role: discord.PermissionOverwrite(
-                    send_messages=False
-                ),
+                ctx.guild.default_role: discord.PermissionOverwrite(send_messages=False),
                 roles["host"]["role"]: discord.PermissionOverwrite(
                     read_messages=True, send_messages=True, manage_messages=True
                 ),
             }
             if key == "gamechat":
-                overwrites[roles["player"]["role"]] = discord.PermissionOverwrite(
-                    send_messages=True
-                )
+                overwrites[roles["player"]["role"]] = discord.PermissionOverwrite(send_messages=True)
                 logging.info(f"gamechat: creating {channel_name} for {key}")
+
             if key == "graveyard":
                 overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(
                     read_messages=False, send_messages=None
                 )
+                overwrites[roles["dead"]["role"]] = discord.PermissionOverwrite(read_messages=True)
+                overwrites[roles["host"]["role"]] = discord.PermissionOverwrite(read_messages=True)
+                overwrites[roles["spec"]["role"]] = discord.PermissionOverwrite(read_messages=True)
+                logging.info(f"graveyard: creating {channel_name} for {key}")
+
+            if key == "confessionals":
+                overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(
+                    read_messages=False, send_messages=None
+                )
                 overwrites[roles["dead"]["role"]] = discord.PermissionOverwrite(
-                    read_messages=True
+                    read_messages=True, send_messages=False
                 )
                 overwrites[roles["host"]["role"]] = discord.PermissionOverwrite(
                     read_messages=True
                 )
                 overwrites[roles["spec"]["role"]] = discord.PermissionOverwrite(
-                    read_messages=True
+                    read_messages=True, send_messages=False
                 )
-                logging.info(f"graveyard: creating {channel_name} for {key}")
+                logging.info(f"confessionals: creating {channel_name} for {key}")
 
             if key == "music":
-                overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(
-                    read_messages=False
-                )
+                overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(read_messages=False)
 
             new_channel = await ctx.guild.create_text_channel(
                 name=channel_name,
                 overwrites=overwrites,
             )
             channels.append(hbs.Channel(id=new_channel.id, type=key))
-            logging.info(
-                f"created {channel_name} `[{key}]` with overwrites:\n{pprint.pformat(overwrites)}\n"
-            )
+            logging.info(f"created {channel_name} `[{key}]` with overwrites:\n{pprint.pformat(overwrites)}\n")
         server.channels = channels
 
         # Turn off @everyone ping
         default_role = ctx.guild.default_role
         perms = default_role.permissions
-        perms.mention_everyone = False
+        perms.update(mention_everyone=False)
         await default_role.edit(permissions=perms)
 
         session.add(server)
@@ -217,14 +211,10 @@ class HostBot(commands.Cog):
         session = session_maker()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is not None:
-            await ctx.send(
-                "This server has already been set up; duplicates setups aren't going to work."
-            )
+            await ctx.send("This server has already been set up; duplicates setups aren't going to work.")
             return
 
-        await ctx.send(
-            "Since you don't know how to follow directions, I'm going to explain this very slowly for you."
-        )
+        await ctx.send("Since you don't know how to follow directions, I'm going to explain this very slowly for you.")
         template = (
             "Graveyard: \\_\\_\\_\\_\n"
             "Host Role: \\_\\_\\_\\_\n"
@@ -243,9 +233,7 @@ class HostBot(commands.Cog):
         try:
             settings = yaml.safe_load(reply.content)
         except Exception as e:
-            await ctx.send(
-                f"You messed up the formatting, try again (exception: `{e}`)."
-            )
+            await ctx.send(f"You messed up the formatting, try again (exception: `{e}`).")
             return
 
         if type(settings) is not dict:
@@ -279,9 +267,7 @@ class HostBot(commands.Cog):
         session.add(server)
         session.commit()
 
-        await ctx.send(
-            "Registered channels and roles. Use `init setchan` to configure further channels."
-        )
+        await ctx.send("Registered channels and roles. Use `init setchan` to configure further channels.")
 
     @staticmethod
     def _player_channel_name(player: discord.Member):
@@ -388,25 +374,13 @@ class HostBot(commands.Cog):
             await ctx.send("Server is not set up")
             return
 
-        spec_role_id = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="spec")
-                .one_or_none()
-        )
+        spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="spec").one_or_none()
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
-        host_role_id = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="host")
-                .one_or_none()
-        )
+        host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="host").one_or_none()
         host_role = ctx.guild.get_role(host_role_id.id)
 
-        player_role_ids = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="player")
-                .all()
-        )
+        player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="player").all()
         player_roles = [ctx.guild.get_role(role_id.id) for role_id in player_role_ids]
 
         ls_usernames = playerlist.strip("```").strip("\n").split("\n")
@@ -426,54 +400,35 @@ class HostBot(commands.Cog):
 
         players = sorted(players, key=lambda p: p.name.lower())
 
-        chunked_players = [
-            players[i: i + MAX_CATEGORY_SIZE]
-            for i in range(0, len(players), MAX_CATEGORY_SIZE)
-        ]
+        chunked_players = [players[i : i + MAX_CATEGORY_SIZE] for i in range(0, len(players), MAX_CATEGORY_SIZE)]
 
         category = None  # type: Optional[discord.CategoryChannel]
         categories = []
 
         for chunk in chunked_players:
             overwrites = {
-                ctx.guild.default_role: discord.PermissionOverwrite(
-                    read_messages=False
-                ),
+                ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
-                host_role: discord.PermissionOverwrite(
-                    read_messages=True, manage_messages=True
-                ),
+                host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
             }
             for player_role in player_roles:
-                overwrites[player_role] = discord.PermissionOverwrite(
-                    manage_messages=True
-                )
-            category = await ctx.guild.create_category(
-                "Role PMs", overwrites=overwrites
-            )
+                overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
+            category = await ctx.guild.create_category("Role PMs", overwrites=overwrites)
 
             for player in chunk:
                 overwrites = {
-                    ctx.guild.default_role: discord.PermissionOverwrite(
-                        read_messages=False
-                    ),
+                    ctx.guild.default_role: discord.PermissionOverwrite(read_messages=False),
                     ctx.guild.me: discord.PermissionOverwrite(read_messages=True),
-                    host_role: discord.PermissionOverwrite(
-                        read_messages=True, manage_messages=True
-                    ),
+                    host_role: discord.PermissionOverwrite(read_messages=True, manage_messages=True),
                 }
                 for player_role in player_roles:
-                    overwrites[player_role] = discord.PermissionOverwrite(
-                        manage_messages=True
-                    )
+                    overwrites[player_role] = discord.PermissionOverwrite(manage_messages=True)
                 if type(player) is discord.Member:
                     if len(player_roles) == 1:
                         if player_roles[0] not in player.roles:
                             await player.edit(roles=player.roles + [player_roles[0]])
                     # manage needed for pins
-                    overwrites[player] = discord.PermissionOverwrite(
-                        read_messages=True, manage_messages=True
-                    )
+                    overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
                 topic = f"{player}'s Role PM"
                 await category.create_text_channel(
                     HostBot._player_channel_name(player),
@@ -481,9 +436,7 @@ class HostBot(commands.Cog):
                     topic=topic,
                 )
 
-            categories.append(
-                hbs.Channel(id=category.id, type="rolepms", server_id=ctx.guild.id)
-            )
+            categories.append(hbs.Channel(id=category.id, type="rolepms", server_id=ctx.guild.id))
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if category:
@@ -543,11 +496,7 @@ class HostBot(commands.Cog):
         #     except discord.Forbidden:
         #         await ctx.send('Insufficient permissions to delete Role PMs.')
 
-        rolepms = (
-            session.query(hbs.Channel)
-                .filter_by(server_id=ctx.guild.id, type="rolepms")
-                .all()
-        )
+        rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="rolepms").all()
         # the union maintains legacy support
         rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
         role_pms = sorted([str(ctx.guild.get_channel(cid)) for cid in rolepm_ids])
@@ -571,10 +520,10 @@ class HostBot(commands.Cog):
     @init.command(name="setrole")
     @commands.has_permissions(administrator=True)
     async def init_setrole(
-            self,
-            ctx: commands.Context,
-            role_type: str,
-            role: discord.Role,
+        self,
+        ctx: commands.Context,
+        role_type: str,
+        role: discord.Role,
     ):
         """
         Set the roles hostbot associates with each type.
@@ -606,10 +555,10 @@ class HostBot(commands.Cog):
     @init.command(name="setchan")
     @commands.has_permissions(administrator=True)
     async def init_setchan(
-            self,
-            ctx: commands.Context,
-            channel_type: str,
-            channel: Union[discord.CategoryChannel, discord.TextChannel],
+        self,
+        ctx: commands.Context,
+        channel_type: str,
+        channel: Union[discord.CategoryChannel, discord.TextChannel],
     ):
         """
         Set the channels hostbot associates with each type.
@@ -644,17 +593,11 @@ class HostBot(commands.Cog):
             if channel.type is not discord.ChannelType.text:
                 await ctx.send(f"{channel} is not a valid text channel.")
                 return
-            channel_row = (
-                session.query(hbs.Channel)
-                    .filter_by(server_id=ctx.guild.id, type=channel_type)
-                    .one_or_none()
-            )
+            channel_row = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type=channel_type).one_or_none()
             if channel_row:
                 channel_row.id = channel.id
             else:
-                channel_row = hbs.Channel(
-                    id=channel.id, type=channel_type, server_id=ctx.guild.id
-                )
+                channel_row = hbs.Channel(id=channel.id, type=channel_type, server_id=ctx.guild.id)
                 session.add(channel_row)
 
         session.commit()
@@ -675,26 +618,10 @@ class HostBot(commands.Cog):
             await ctx.send("This server has not been set up; no status exists.")
             return
 
-        spec_role_id = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="spec")
-                .one_or_none()
-        )
-        host_role_id = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="host")
-                .one_or_none()
-        )
-        player_role_ids = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="player")
-                .all()
-        )
-        dead_role_id = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="dead")
-                .one_or_none()
-        )
+        spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="spec").one_or_none()
+        host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="host").one_or_none()
+        player_role_ids = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="player").all()
+        dead_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="dead").one_or_none()
 
         spec_role = ctx.guild.get_role(spec_role_id.id)
         host_role = ctx.guild.get_role(host_role_id.id)
@@ -717,9 +644,7 @@ class HostBot(commands.Cog):
             em.add_field(name="N/A (Hosts)", value=f"Host role not found", inline=False)
 
         for player_role in player_roles:
-            em.add_field(
-                name=f"{player_role} (Players)", value=f"{len(player_role.members)}"
-            )
+            em.add_field(name=f"{player_role} (Players)", value=f"{len(player_role.members)}")
 
         if spec_role:
             em.add_field(
@@ -728,9 +653,7 @@ class HostBot(commands.Cog):
                 inline=False,
             )
         else:
-            em.add_field(
-                name=f"N/A (Specs)", value=f"Spec role not found", inline=False
-            )
+            em.add_field(name=f"N/A (Specs)", value=f"Spec role not found", inline=False)
 
         if dead_role:
             em.add_field(
@@ -742,30 +665,12 @@ class HostBot(commands.Cog):
             em.add_field(name=f"N/A (Dead)", value="Dead role not found", inline=False)
 
         announcements_chan = (
-            session.query(hbs.Channel)
-                .filter_by(server_id=ctx.guild.id, type="announcements")
-                .one_or_none()
+            session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="announcements").one_or_none()
         )
-        flips_chan = (
-            session.query(hbs.Channel)
-                .filter_by(server_id=ctx.guild.id, type="flips")
-                .one_or_none()
-        )
-        gamechat_chan = (
-            session.query(hbs.Channel)
-                .filter_by(server_id=ctx.guild.id, type="gamechat")
-                .one_or_none()
-        )
-        graveyard_chan = (
-            session.query(hbs.Channel)
-                .filter_by(server_id=ctx.guild.id, type="graveyard")
-                .one_or_none()
-        )
-        rolepms = (
-            session.query(hbs.Channel)
-                .filter_by(server_id=ctx.guild.id, type="rolepms")
-                .all()
-        )
+        flips_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="flips").one_or_none()
+        gamechat_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="gamechat").one_or_none()
+        graveyard_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="graveyard").one_or_none()
+        rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="rolepms").all()
         # the union maintains legacy support
         rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
 
@@ -821,18 +726,12 @@ class HostBot(commands.Cog):
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         # This should never have multiple roles in it, unless I'm manually overriding something for a game,
         # in which case, that is important to be able to support!
-        player_roles = (
-            session.query(hbs.Role)
-                .filter_by(type="player", server_id=ctx.guild.id)
-                .all()
-        )
+        player_roles = session.query(hbs.Role).filter_by(type="player", server_id=ctx.guild.id).all()
         if len(player_roles) == 0:
             await ctx.send("This server isn't set up for EiMM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        player_roles = [
-            ctx.guild.get_role(player_role.id) for player_role in player_roles
-        ]
+        player_roles = [ctx.guild.get_role(player_role.id) for player_role in player_roles]
         found = False
         for player_role in player_roles:
             if player_role in ctx.author.roles:
@@ -851,9 +750,7 @@ class HostBot(commands.Cog):
             return
 
         if self._inc_cooldown(ctx.author) is False:
-            time_til_next = cooldown_delta - (
-                    datetime.utcnow() - self.confessional_cooldowns[ctx.author.id][0]
-            )
+            time_til_next = cooldown_delta - (datetime.utcnow() - self.confessional_cooldowns[ctx.author.id][0])
             hours, rem = divmod(time_til_next.seconds, 3600)
             mins, secs = divmod(time_til_next.seconds, 60)
             await ctx.send(
@@ -864,22 +761,21 @@ class HostBot(commands.Cog):
             return
 
         if len(msg) > 1900:
-            await ctx.send(
-                "Your confessional is too long! Please keep it below 1900 characters."
-            )
+            await ctx.send("Your confessional is too long! Please keep it below 1900 characters.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        gy_channel = (
+        gy_channel = session.query(hbs.Channel).filter_by(type="graveyard", server_id=ctx.guild.id).one_or_none()
+        confs_channel = (
             session.query(hbs.Channel)
-                .filter_by(type="graveyard", server_id=ctx.guild.id)
+                .filter_by(type="confessionals", server_id=ctx.guild.id)
                 .one_or_none()
         )
-        gy_channel = ctx.guild.get_channel(gy_channel.id)  # type: discord.TextChannel
+        confs_channel = ctx.guild.get_channel(confs_channel.id)  # type: discord.TextChannel
         msg = msg.replace("@everyone", "@\u200beveryone").replace(
             "@here", "@\u200bhere"
         )  # \u200b aka zero-width space
         conf = f"**Confessional from {ctx.author}:**\n>>> {msg}"
-        await gy_channel.send(conf)
+        await confs_channel.send(conf)
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.command()
@@ -889,27 +785,10 @@ class HostBot(commands.Cog):
         List all avatar URLs for all players and hosts.
         """
         session = session_maker()
-        player_role_rows = (
-            session.query(hbs.Role)
-                .filter_by(type="player", server_id=ctx.guild.id)
-                .all()
-        )
-        host_role = (
-            session.query(hbs.Role)
-                .filter_by(type="host", server_id=ctx.guild.id)
-                .one_or_none()
-        )
-        gamechat_channel = (
-            session.query(hbs.Channel)
-                .filter_by(type="gamechat", server_id=ctx.guild.id)
-                .one_or_none()
-        )
-        if (
-                host_role is None
-                or gamechat_channel is None
-                or player_role_rows is None
-                or len(player_role_rows) == 0
-        ):
+        player_role_rows = session.query(hbs.Role).filter_by(type="player", server_id=ctx.guild.id).all()
+        host_role = session.query(hbs.Role).filter_by(type="host", server_id=ctx.guild.id).one_or_none()
+        gamechat_channel = session.query(hbs.Channel).filter_by(type="gamechat", server_id=ctx.guild.id).one_or_none()
+        if host_role is None or gamechat_channel is None or player_role_rows is None or len(player_role_rows) == 0:
             await ctx.send("This server isn't set up for EiMM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -925,9 +804,7 @@ class HostBot(commands.Cog):
         host_role = ctx.guild.get_role(host_role.id)  # type: discord.Role
         replies = []
         reply = "**Host avatars:**```\n"
-        for host in sorted(
-                host_role.members, key=lambda x: x.name.lower()
-        ):  # type: discord.Member
+        for host in sorted(host_role.members, key=lambda x: x.name.lower()):  # type: discord.Member
             if len(reply) > 1800:
                 replies.append(reply + "```")
                 reply = "```\n"
@@ -936,9 +813,7 @@ class HostBot(commands.Cog):
             reply += " "
         reply += "```**Player avatars:**```\n"
         for player_role in player_roles:
-            for player in sorted(
-                    player_role.members, key=lambda x: x.name.lower()
-            ):  # type: discord.Member
+            for player in sorted(player_role.members, key=lambda x: x.name.lower()):  # type: discord.Member
                 if len(reply) > 1800:
                     replies.append(reply + "```")
                     reply = "```\n"
@@ -953,10 +828,10 @@ class HostBot(commands.Cog):
     @commands.has_permissions(administrator=True)
     @commands.guild_only()
     async def enrole(
-            self,
-            ctx: commands.Context,
-            role: discord.Role,
-            mentions: commands.Greedy[discord.Member],
+        self,
+        ctx: commands.Context,
+        role: discord.Role,
+        mentions: commands.Greedy[discord.Member],
     ):
         """
         Add members to a role en masse.
@@ -982,14 +857,10 @@ class HostBot(commands.Cog):
         if ctx.channel.category.id == server.rolepms_id:
             # this maintains support for legacy servers
             return True
-        return ctx.channel.category.id in [
-            c.id for c in server.channels if c.type == "rolepms"
-        ]
+        return ctx.channel.category.id in [c.id for c in server.channels if c.type == "rolepms"]
 
     @commands.group(invoke_without_command=True)
-    async def addspec(
-            self, ctx: commands.Context, specs: commands.Greedy[discord.Member]
-    ):
+    async def addspec(self, ctx: commands.Context, specs: commands.Greedy[discord.Member]):
         """
         Add a spectator to your Role PM.
 
@@ -1017,11 +888,7 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        spec_role_id = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="spec")
-                .one_or_none()
-        )
+        spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="spec").one_or_none()
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
         badspecs = []
@@ -1037,9 +904,7 @@ class HostBot(commands.Cog):
 
         if badspecs:
             badspec_msg = ", ".join([str(spec) for spec in badspecs])
-            await ctx.send(
-                f"Failed to add {badspec_msg}: only spectators can be added to a role PM!"
-            )
+            await ctx.send(f"Failed to add {badspec_msg}: only spectators can be added to a role PM!")
 
     @addspec.command(name="all")
     async def addspec_all(self, ctx: commands.Context):
@@ -1070,11 +935,7 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        spec_role_id = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="spec")
-                .one_or_none()
-        )
+        spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="spec").one_or_none()
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
         # now we can do the actual function:
@@ -1107,17 +968,11 @@ class HostBot(commands.Cog):
 
         # check if author has any of the player/host roles
         if has_role(ctx, ["player", "host"]):
-            await ctx.send(
-                "Only players and hosts can remove spectators from a role PM."
-            )
+            await ctx.send("Only players and hosts can remove spectators from a role PM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        spec_role_id = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="spec")
-                .one_or_none()
-        )
+        spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="spec").one_or_none()
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
         if spec_role not in spec.roles:
@@ -1144,11 +999,7 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        host_role_id = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="host")
-                .one_or_none()
-        )
+        host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="host").one_or_none()
         host_role = ctx.guild.get_role(host_role_id.id)
         if host_role not in ctx.author.roles and ctx.author != ctx.guild.owner:
             await ctx.send("Only hosts can toggle this setting.")
@@ -1175,11 +1026,7 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        host_role_id = (
-            session.query(hbs.Role)
-                .filter_by(server_id=ctx.guild.id, type="host")
-                .one_or_none()
-        )
+        host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="host").one_or_none()
         host_role = ctx.guild.get_role(host_role_id.id)
         if host_role not in ctx.author.roles and ctx.author != ctx.guild.owner:
             await ctx.send("Only hosts can toggle this setting.")
