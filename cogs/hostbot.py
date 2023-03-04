@@ -566,6 +566,7 @@ class HostBot(commands.Cog):
         - flips
         - gamechat
         - graveyard
+        - confessionals
         - rolepms
 
         As rolepms is a category channel, it must be specified either through exact text name (case-sensitive) or channel ID snowflake.
