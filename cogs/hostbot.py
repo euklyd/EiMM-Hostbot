@@ -570,7 +570,7 @@ class HostBot(commands.Cog):
 
         As rolepms is a category channel, it must be specified either through exact text name (case-sensitive) or channel ID snowflake.
         """
-        valid_types = {"announcements", "flips", "gamechat", "graveyard", "rolepms"}
+        valid_types = {"announcements", "flips", "gamechat", "graveyard", "confessionals", "rolepms"}
 
         session = session_maker()
 
@@ -668,6 +668,7 @@ class HostBot(commands.Cog):
         flips_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="flips").one_or_none()
         gamechat_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="gamechat").one_or_none()
         graveyard_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="graveyard").one_or_none()
+        confs_chan = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="confessionals").one_or_none()
         rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="rolepms").all()
         # the union maintains legacy support
         rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
@@ -687,6 +688,10 @@ class HostBot(commands.Cog):
         em.add_field(
             name="Graveyard",
             value=f'{ctx.guild.get_channel(graveyard_chan.id) if graveyard_chan else "N/A"}',
+        )
+        em.add_field(
+            name="Confessionals",
+            value=f'{ctx.guild.get_channel(confs_chan.id) if confs_chan else "N/A"}',
         )
         role_pms = sorted([str(ctx.guild.get_channel(cid)) for cid in rolepm_ids])
         role_pms = ", ".join(channel for channel in role_pms)
