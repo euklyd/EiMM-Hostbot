@@ -273,7 +273,7 @@ def add_question(em: discord.Embed, question: Question, current_length: int) -> 
     # chars rather than 1000.
     if sum([len(line) for line in question_lines]) + len(question_lines) * 3 + len(question.answer) <= 900:
         question_block = "\n> ".join(question_lines)
-        formatted_question_text = f"[> {question_block}]({question.jump_url})"
+        formatted_question_text = f"> [{question_block}]({question.jump_url})"
 
         text_length = len(f"Question #{question.question_num}") + len(f"{formatted_question_text}\n{question.answer}")
         if text_length > 4800:
@@ -295,14 +295,14 @@ def add_question(em: discord.Embed, question: Question, current_length: int) -> 
     if current_length + len(question.question) + len(question.answer) > 4700:
         return -1
 
-    question_chunk = "[> "
+    question_chunk = "> ["
     question_chunks = []
     for word in question.question_words():
         if len(question_chunk + word) > 900:
             # question_chunk += f']({question.message.jump_url})'
             question_chunk += f"]({question.jump_url})"
             question_chunks.append(question_chunk)
-            question_chunk = "[> "
+            question_chunk = "> ["
         word = word.replace("\n", "\n> ")
         question_chunk += f"{word}" + " "
     # question_chunk += f']({question.message.jump_url})'
