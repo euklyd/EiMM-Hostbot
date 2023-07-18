@@ -1098,21 +1098,5 @@ async def setup(bot: Bot):
     # global connection
     # connection = spreadsheet.SheetConnection(bot.google_creds, bot.google_scope)
     #
-    # global session_maker
-    # bot.add_command(init)
-    # bot.add_command(confessional)
-    # bot.add_command(gameavatars)
-    # bot.add_command(enrole)
     await bot.add_cog(HostBot(bot))
 
-    # db_dir = 'databases/'
-    # db_file = f'{db_dir}/hostbot.db'
-    # if not Path(db_file).exists():
-    #     # TODO: Don't technically need this condition?
-    #     # Adds a bit of clarity though, so keeping it in for now.
-    #     Path(db_dir).mkdir(exist_ok=True)
-    #
-    # engine = create_engine(f'sqlite:///{db_file}')
-    # session_maker = sessionmaker(bind=engine)
-    #
-    # hbs.Base.metadata.create_all(engine)
