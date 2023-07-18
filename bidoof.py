@@ -4,6 +4,7 @@ import faulthandler
 import logging
 from datetime import datetime
 
+import aiohttp
 import discord
 from discord.ext import commands
 
@@ -69,7 +70,7 @@ def parse_args():
     return parser.parse_args()
 
 
-def run():
+async def run():
     args = parse_args()
     logging.basicConfig(level=args.loglevel, format="[%(asctime)s] %(message)s", datefmt="%Y/%m/%d %T:%M:%S")
     faulthandler.enable()
@@ -79,25 +80,27 @@ def run():
     # intents = discord.Intents.default()
     intents = discord.Intents.all()
     # intents.message_content = True
-    bot = Bot(
-        command_prefix=settings.prefix,
-        description="https://board8.fandom.com/wiki/Mafia_Bidoof",
-        conf=settings.conf,
-        activity=settings.activity,
-        owner_id=settings.owner_id,
-        status=settings.status,
-        intents=intents,
-        cogs=settings.cogs + settings.plugins,
-        case_insensitive=True,  # unfortunately this doesn't help with "help <cogname>"
-    )
+    async with aiohttp.ClientSession() as session:
+        bot = Bot(
+            command_prefix=settings.prefix,
+            session=session,
+            description="https://board8.fandom.com/wiki/Mafia_Bidoof",
+            conf=settings.conf,
+            activity=settings.activity,
+            owner_id=settings.owner_id,
+            status=settings.status,
+            intents=intents,
+            cogs=settings.cogs + settings.plugins,
+            case_insensitive=True,  # unfortunately this doesn't help with "help <cogname>"
+        )
 
-    bot.add_command(shutdown)
-    bot.add_command(reload)
-    bot.add_command(unload)
+        bot.add_command(shutdown)
+        bot.add_command(reload)
+        bot.add_command(unload)
 
-    print("doot")
-    logging.warning("starting bot")
-    bot.run(settings.client_token)
+        print("doot")
+        logging.warning("starting bot")
+        await bot.start(settings.client_token)
 
 
 def entrypoint():

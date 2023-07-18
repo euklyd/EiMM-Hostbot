@@ -6,6 +6,7 @@ import time
 from pathlib import Path
 from typing import List, Optional, Callable, Union, Any, Tuple, Iterable
 
+import aiohttp
 import discord
 from discord.ext import commands
 
@@ -20,6 +21,7 @@ class Bot(commands.Bot):
         self,
         command_prefix: Union[str, Iterable[str], Callable[['Bot', discord.Message], str]],
         conf: Conf,
+        session: aiohttp.ClientSession,
         cogs=Iterable[str],
         help_command=None,
         description: str = None,
@@ -30,6 +32,7 @@ class Bot(commands.Bot):
         else:
             super().__init__(command_prefix, help_command=help_command, description=description, **options)
         self.conf = conf  # type: Conf
+        self.http_session = session
         self._greentick = self.get_emoji(conf.greentick_id)  # type: discord.Emoji
         self._redtick = self.get_emoji(conf.redtick_id)  # type: discord.Emoji
         self._boostemoji = self.get_emoji(conf.boostemoji_id)  # type: discord.Emoji

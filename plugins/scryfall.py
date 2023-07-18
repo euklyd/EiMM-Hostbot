@@ -70,9 +70,9 @@ class Cards(commands.Cog):
     Use [[MtG card name]] or {{Yu-Gi-Oh card name}} to search for cards inline.
     """
 
-    def __init__(self, bot: Bot, session: aiohttp.ClientSession, db_file: str):
+    def __init__(self, bot: Bot, db_file: str):
         self.bot = bot
-        self.session = session
+        self.session: aiohttp.ClientSession = bot.http_session
         self.db: AsyncEngine = create_async_engine(f"sqlite+aiosqlite:///{db_file}")
 
     def db_session(self):
@@ -693,8 +693,7 @@ async def setup_async(bot: Bot):
     if not Path(db_file).exists():
         Path(db_dir).mkdir(exist_ok=True)
 
-    async with aiohttp.ClientSession() as session:
-        cog = Cards(bot, session, db_file)
+    cog = Cards(bot, db_file)
     await create_metadata(cog.db)
     await bot.add_cog(cog)
 
