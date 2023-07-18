@@ -107,6 +107,8 @@ class HostBot(commands.Cog):
         yml_config = yaml.safe_load(yml_config.strip("```yml\n"))
         # await ctx.send(f'parsed:```json\n{pprint.pformat(yml)}```')
 
+        await ctx.message.add_reaction(self.bot.waitemoji)
+
         server = hbs.Server(
             id=ctx.guild.id,
             name=yml_config["name"],
@@ -201,6 +203,8 @@ class HostBot(commands.Cog):
         session.commit()
 
         await ctx.send("Created channels and roles.")
+        await ctx.message.remove_reaction(self.bot.waitemoji)
+        await ctx.message.add_reaction(self.bot.greentick)
 
     @init.command(name="badly")
     @commands.has_permissions(administrator=True)
@@ -431,7 +435,7 @@ class HostBot(commands.Cog):
                     overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
                 topic = f"{player}'s Role PM"
                 await category.create_text_channel(
-                    HostBot._player_channel_name(player),
+                    str(player),
                     overwrites=overwrites,
                     topic=topic,
                 )
@@ -499,7 +503,7 @@ class HostBot(commands.Cog):
         rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="rolepms").all()
         # the union maintains legacy support
         rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
-        role_pms = sorted([str(ctx.guild.get_channel(cid)) for cid in rolepm_ids])
+        role_pms = sorted([ctx.guild.get_channel(cid) for cid in rolepm_ids], key=str)
 
         try:
             for category in role_pms:
