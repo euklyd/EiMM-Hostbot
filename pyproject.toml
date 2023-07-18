@@ -5,9 +5,6 @@ description = "EiMM hostbot for eimm things"
 authors = ["euklyd <you@example.com>"]
 
 [tool.poetry.scripts]
-bidoof = "bidoof:main"
-
-[tool.poetry.scripts]
 bidoof = "bidoof:run"
 
 [tool.poetry.dependencies]
@@ -26,14 +23,11 @@ pytz = "^2022.1"
 gspread-asyncio = "^1.5.3"
 SQLAlchemy = "^1.4.39"
 aiosqlite = "^0.17.0"
-"discord.py" = "^2.0.1"
+"discord.py" = "^v2.3.1"
 
 [tool.poetry.dev-dependencies]
 black = "^22.1.0"
 ipython = "^8.4.0"
-
-[tool.black]
-line-length = 120
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
