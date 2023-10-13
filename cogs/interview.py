@@ -752,6 +752,7 @@ class Interview(commands.Cog):
         em.add_field(name="Sheet name", value=f"{server.sheet_name}")
         em.add_field(name="Default question", value=f"{server.default_question}")
         em.add_field(name="Reinterview limit", value=f"{server.limit}")
+        em.add_field(name="Manager", value=f"{ctx.guild.get_role(server.manager_role_id)}")
         await ctx.send(embed=em)
 
     @iv.command(name="overwrite")
