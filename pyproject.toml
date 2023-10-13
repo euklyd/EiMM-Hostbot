@@ -10,7 +10,6 @@ bidoof = "bidoof:run"
 [tool.poetry.dependencies]
 python = "^3.7"
 PyYAML = "^6.0"
-numpy = "1.18"
 black = "^21.12b0"
 "discord.py" = {extras = ["voice"], version = "^1.7.3"}
 fuzzywuzzy = "^0.18.0"
