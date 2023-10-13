@@ -385,6 +385,22 @@ def _ck_interview_enabled():
     return commands.check(predicate)
 
 
+def _ck_is_manager():
+    """
+    Command check to make sure the invoker is an interview manager.
+
+    Checked when doing routine interview management.
+    """
+    async def predicate(ctx: commands.Context):
+        if ctx.author.guild_permissions.administrator:
+            return True
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        return server is not None and server.manager_role_id in {role.id for role in ctx.author.roles}
+
+    return commands.check(predicate)
+
+
 def _ck_is_interviewee():
     """
     Command check to make sure the invoker is the interviewee.
@@ -623,8 +639,21 @@ class Interview(commands.Cog):
         )
         await ctx.message.add_reaction(ctx.bot.greentick)
 
-    @iv.command(name="next")
+    @iv.command(name="setmanager")
     @commands.has_permissions(administrator=True)
+    @_ck_server_active()
+    async def iv_setmanager(self, ctx: commands.Context, role: discord.Role):
+        """
+        Set the interview maanger role.
+        """
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        server.manager_role_id = role.id
+        session.commit()
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @iv.command(name="next")
+    @_ck_is_manager()
     @_ck_server_active()
     async def iv_next(self, ctx: commands.Context, interviewee: discord.Member, *, email: Optional[str] = None):
         """
@@ -810,7 +839,7 @@ class Interview(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @iv.command(name="disable")
-    @commands.has_permissions(administrator=True)
+    @_ck_is_manager()
     @_ck_server_active()
     async def iv_disable(self, ctx: commands.Context):
         """
@@ -831,7 +860,7 @@ class Interview(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @iv.command(name="enable")
-    @commands.has_permissions(administrator=True)
+    @_ck_is_manager()
     @_ck_server_active()
     async def iv_enable(self, ctx: commands.Context):
         """
@@ -852,7 +881,7 @@ class Interview(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @iv.command(name="limit")
-    @commands.has_permissions(administrator=True)
+    @_ck_is_manager()
     @_ck_server_active()
     async def iv_limit(self, ctx: commands.Context, date: str = None):
         """

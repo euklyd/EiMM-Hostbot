@@ -18,6 +18,7 @@ class Server(Base):
     limit = Column(DateTime)  # time since someone's last interview (start date) to be reinterviewed
     reinterviews_allowed = Column(Boolean)
     active = Column(Boolean)  # are interviews open for new questions / voting
+    manager_role_id = Column(Integer)
 
     # I'm typing the relationships manually, since type hinting is getting messed up elsewhere without it.
     interviews = relationship('Interview', back_populates='server')  # type: Iterable[Interview]
