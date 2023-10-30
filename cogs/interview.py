@@ -1331,6 +1331,50 @@ class Interview(commands.Cog):
             await mention.remove_roles(audience_role, reason=f"revoked by revokestage command used by {ctx.author}.")
         await ctx.message.add_reaction(ctx.bot.greentick)
 
+    @commands.command()
+    @_ck_server_active()
+    @_ck_is_interviewee()
+    async def lsstage(self, ctx: commands.Context):
+        """
+        List all members who have interview stage permissions.
+
+        Usable only by the current interviewee.
+        """
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        audience_role = ctx.guild.get_role(server.audience_role_id)
+        if not audience_role:
+            await ctx.send(f"No audience role set up for {ctx.guild}.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        members = "\n".join((str(member) for member in audience_role.members))
+        try:
+            await ctx.message.send(f"```\n{members}\n```")
+        except:
+            await ctx.message.send(
+                f"Too many people on stage to list ({len(audience_role.members)}. Consider `clearstage`."
+            )
+
+    @commands.command()
+    @_ck_server_active()
+    @_ck_is_interviewee()
+    async def clearstage(self, ctx: commands.Context):
+        """
+        Remove all interview audience members from the stage.
+
+        Usable only by the current interviewee.
+        """
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        audience_role = ctx.guild.get_role(server.audience_role_id)
+        if not audience_role:
+            await ctx.send(f"No audience role set up for {ctx.guild}.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        for member in audience_role.members:  # type: discord.Member
+            await member.remove_roles(audience_role, reason=f"clearstage used by {ctx.author}")
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
     # == Votes ==
 
     @staticmethod
