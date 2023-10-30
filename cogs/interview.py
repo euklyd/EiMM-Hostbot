@@ -1289,13 +1289,17 @@ class Interview(commands.Cog):
             channel = ctx.guild.get_channel(server.answer_channel)
         await self._imganswer(ctx, row_num, url, channel)
 
-    # == Enrole audience members
+    # == Manage audience members
 
     @commands.command()
     @_ck_server_active()
     @_ck_is_interviewee()
     async def grantstage(self, ctx: commands.Context, mentions: commands.Greedy[discord.Member]):
-        """Grant all mentioned users access to the interview stage. Usable only by the current interviewee."""
+        """
+        Grant all mentioned users access to the interview stage.
+
+        Usable only by the current interviewee.
+        """
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
         audience_role = ctx.guild.get_role(server.audience_role_id)
@@ -1305,6 +1309,26 @@ class Interview(commands.Cog):
             return
         for mention in mentions:  # type: discord.Member
             await mention.add_roles(audience_role, reason=f"enroled by grantstage command used by {ctx.author}.")
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @commands.command()
+    @_ck_server_active()
+    @_ck_is_interviewee()
+    async def revokestage(self, ctx: commands.Context, mentions: commands.Greedy[discord.Member]):
+        """
+        Revoke interview stage permissions from all mentioned users.
+
+        Usable only by the current interviewee.
+        """
+        session = session_maker()
+        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        audience_role = ctx.guild.get_role(server.audience_role_id)
+        if not audience_role:
+            await ctx.send(f"No audience role set up for {ctx.guild}.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        for mention in mentions:  # type: discord.Member
+            await mention.remove_roles(audience_role, reason=f"revoked by revokestage command used by {ctx.author}.")
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     # == Votes ==
