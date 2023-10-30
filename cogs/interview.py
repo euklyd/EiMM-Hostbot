@@ -1349,9 +1349,9 @@ class Interview(commands.Cog):
             return
         members = "\n".join((str(member) for member in audience_role.members))
         try:
-            await ctx.message.send(f"```\n{members}\n```")
+            await ctx.send(f"```\n{members}\n```")
         except:
-            await ctx.message.send(
+            await ctx.send(
                 f"Too many people on stage to list ({len(audience_role.members)}. Consider `clearstage`."
             )
 
