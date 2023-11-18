@@ -1,10 +1,12 @@
 import csv
 import json
 import re
-from datetime import datetime, timedelta
+from collections import namedtuple
+from datetime import datetime, timedelta, date
 from pathlib import Path
 from typing import Union, Callable, Optional, List, Dict, Any
 
+import aiohttp
 import discord
 from discord.ext import commands
 from sqlalchemy import create_engine, func
@@ -14,6 +16,7 @@ import cogs.emoji_schema as es
 import utils
 
 _EMOJI_RE = re.compile(r"<:(?P<name>\w\w+):(?P<id>\d+)>")
+MAX_ATTACHMENT_SIZE = 1e6
 
 session_maker = None  # type: Union[None, Callable[[], Session]]
 enabled_servers = []  # type: List[int]  # discord server IDs
@@ -72,6 +75,19 @@ async def count_emoji(message: discord.Message):
             # await message.channel.send(f'Count for {emoji_ids[emoji_id]} is now {count}.')  # NOTE: Only for debug
 
 
+def get_count(ctx: commands.Context, emoji_id: int, oldest: date) -> int:
+    session = session_maker()
+    entries = (
+        session.query(es.EmojiCount)
+            .filter_by(server_id=ctx.guild.id, emoji_id=emoji_id)
+            .filter(func.DATE(es.EmojiCount.date) > oldest)
+    )  # type: List[es.EmojiCount]
+    count = 0
+    for entry in entries:
+        count += entry.count
+    return count
+
+
 class Emoji(commands.Cog):
     """Emoji management."""
 
@@ -127,21 +143,7 @@ class Emoji(commands.Cog):
 
         oldest = datetime.utcnow().date() - timedelta(days=days)
 
-        session = session_maker()
-        entries = (
-            session.query(es.EmojiCount)
-            .filter_by(server_id=ctx.guild.id, emoji_id=emoji_id)
-            .filter(func.DATE(es.EmojiCount.date) > oldest)
-        )  # type: List[es.EmojiCount]
-        # count = session.query(func.sum(es.EmojiCount)).filter_by(
-        #     server_id=ctx.guild.id, emoji_id=emoji_id).filter(
-        #     func.DATE(es.EmojiCount.date) > oldest)  # # type: List[es.EmojiCount]
-        # if count is None:
-        #     count = 0
-
-        count = 0
-        for entry in entries:
-            count += entry.count
+        count = get_count(ctx, emoji_id, oldest)
         # TODO: This logic sucks, rewrite it sometime. You can do this in the query.
 
         # -- output conversion --
@@ -406,6 +408,142 @@ class Emoji(commands.Cog):
                 )
 
         await ctx.send("Alright, _nerd_.", file=discord.File(filename))
+
+    @commands.group(invoke_without_command=True)
+    @commands.has_permissions(manage_emojis=True)
+    async def evemoji(self, ctx: commands.Context):
+        """Event Emoji command group."""
+        pass
+
+    @evemoji.command(name="add")
+    @commands.has_permissions(manage_emojis=True)
+    async def evemoji_add(
+        self,
+        ctx: commands.Context,
+        event: str,
+        owner: discord.Member,
+        emojiname: str,
+        # emoji: Union[discord.Emoji, discord.Attachment],  # TODO(dpy2.0)
+        emoji: Union[discord.Emoji, discord.PartialEmoji, None],
+    ):
+        """Add a new Event Emoji."""
+        emoji_url: Optional[str] = None
+        if emoji:
+            emoji_url = str(emoji.url)
+        elif len(ctx.message.attachments) == 1:
+            attachment: discord.Attachment = ctx.message.attachments[0]
+            if attachment.size > MAX_ATTACHMENT_SIZE:
+                await ctx.send(f"Attachment too large ({attachment.size} bytes; max {MAX_ATTACHMENT_SIZE}).")
+                await ctx.message.add_reaction(ctx.bot.redtick)
+                return
+            emoji_url = str(attachment.url)
+        else:
+            await ctx.send("Must either specify an emoji or upload an image.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+
+        async with aiohttp.ClientSession() as aiosession:
+            async with aiosession.get(emoji_url) as resp:
+                if resp.status != 200:
+                    await ctx.send("Error retrieving emoji data.")
+                    await ctx.message.add_reaction(ctx.bot.redtick)
+                    return
+                emoji_bytes: bytes = await resp.content.read()
+
+        try:
+            created_emoji: discord.Emoji = await ctx.guild.create_custom_emoji(
+                name=emojiname,
+                image=emoji_bytes,
+                reason=f"Added for {owner} ({event}).",
+            )
+        except Exception as e:
+            await ctx.send(f"Upload error: {e}")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        event_emoji = es.EventEmoji(
+            emoji_id=created_emoji.id,
+            server_id=ctx.guild.id,
+            date=datetime.utcnow(),
+            owner_id=owner.id,
+            event=event,
+            active=True,
+        )
+        session = session_maker()
+        session.add(event_emoji)
+        session.commit()
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @evemoji.command(name="rm")
+    @commands.has_permissions(manage_emojis=True)
+    async def evemoji_rm(
+        self,
+        ctx: commands.Context,
+        emoji: discord.Emoji,
+    ):
+        """Remove an event emoji."""
+        session = session_maker()
+        event_emoji: es.EventEmoji = session.query(es.EventEmoji).filter_by(emoji_id=emoji.id, server_id=ctx.guild.id).one_or_none()
+        if not event_emoji:
+            await ctx.send(f"{emoji} is not registered as an Event Emoji.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        emoji: discord.Emoji = await ctx.guild.fetch_emoji(event_emoji.emoji_id)
+        if emoji:
+            await emoji.delete(reason="Deleted Event Emoji")
+        else:
+            await ctx.send("Emoji not found so cannot delete, but will be set inactive.")
+        event_emoji.active = False
+        session.commit()
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @evemoji.command(name="ls")
+    @commands.has_permissions(manage_emojis=True)
+    async def evemoji_ls(
+        self,
+        ctx: commands.Context,
+        sort: Optional[str] = "alphabetical",
+        # active: Optional[bool] = True,
+        days: Optional[int] = 30,
+    ):
+        """
+        List all (active) Event Emojis.
+        Sort options: alphabetical, usage, date, owner, event
+        Use days to limit the time window if you're counting by usage (default 30).
+        """
+        session = session_maker()
+        query_emojis: List[es.EventEmoji] = []
+        # I don't think it makes sense to show inactive emojis atm, it clutters up the command invocation.
+        active = True
+        if active:
+            query_emojis = session.query(es.EventEmoji).filter_by(server_id=ctx.guild.id, active=True).all()
+        else:
+            query_emojis = session.query(es.EventEmoji).filter_by(server_id=ctx.guild.id).all()
+
+        EmojiTuple = namedtuple("EmojiTuple", "discord db_entry count owner")
+        emojis: List[EmojiTuple] = []
+        for emoji in query_emojis:
+            owner = ctx.guild.get_member(emoji.owner_id)
+            oldest = datetime.utcnow().date() - timedelta(days=days)
+            count = get_count(ctx, emoji.emoji_id, oldest)
+            et = EmojiTuple(ctx.bot.get_emoji(emoji.emoji_id), emoji, count, owner)
+            emojis.append(et)
+
+        if sort.lower() not in {"alphabetical", "usage", "date", "owner", "event"}:
+            await ctx.send(f"_Unrecognized sort '{sort}', using alphabetical._")
+        if sort.lower() == "usage":
+            emojis.sort(key=lambda e: e.count, reverse=True)
+        elif sort.lower() == "date":
+            emojis.sort(key=lambda e: e.db_entry.date)
+        elif sort.lower() == "owner":
+            emojis.sort(key=lambda e: e.db_entry.owner_id, reverse=True)
+        elif sort.lower() == "event":
+            emojis.sort(key=lambda e: e.db_entry.event, reverse=True)
+        else:
+            emojis.sort(key=lambda e: e.discord.name)
+
+        s = "\n".join(f"{em.discord} {em.discord.name}, {em.owner}, {em.db_entry.event}, {em.count}" for em in emojis)
+        print(s)
+        await ctx.send(sort + ":\n" + s)
 
 
 def setup(bot: commands.Bot):
