@@ -10,7 +10,7 @@ from discord.ext import commands
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import sessionmaker, Session
 
-import plugins.emoji_schema as es
+import cogs.emoji_schema as es
 import utils
 
 _EMOJI_RE = re.compile(r"<:(?P<name>\w\w+):(?P<id>\d+)>")
@@ -432,4 +432,4 @@ def setup(bot: commands.Bot):
         enabled_servers = []
 
     bot.add_listener(count_emoji, "on_message")
-    bot.add_cog(Emoji)
+    bot.add_cog(Emoji(bot))
