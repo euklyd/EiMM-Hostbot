@@ -707,8 +707,8 @@ class Interview(commands.Cog):
         # Make & clear a new sheet page
 
         interview_sheet = self.connection.get_sheet(server.sheet_name)
-        old_sheet = interview_sheet.sheet1
-        new_sheet = old_sheet.duplicate(insert_sheet_index=0, new_sheet_name=sheet_name)
+        old_sheet: gspread.Worksheet = interview_sheet.sheet1
+        new_sheet: gspread.Worksheet = old_sheet.duplicate(insert_sheet_index=0, new_sheet_name=sheet_name)
         new_sheet.insert_row(
             [
                 timestamp.strftime("%m/%d/%Y %H:%M:%S"),
@@ -726,6 +726,7 @@ class Interview(commands.Cog):
             index=2,
         )
         new_sheet.resize(rows=2)
+        old_sheet.hide()
 
         if email is not None:
             interview_sheet.share(email, perm_type="user", role="writer")
