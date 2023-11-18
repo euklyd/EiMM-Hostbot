@@ -76,13 +76,13 @@ class Emoji(commands.Cog):
     """Emoji management."""
 
     @commands.group(invoke_without_command=True)
-    @commands.has_permissions(administrator=True)
+    @commands.has_permissions(manage_emojis=True)
     async def emoji(self, ctx: commands.Context):
         await ctx.send("nah")
         # await emoji_head(ctx)  # if you wanted to do this by default? idk
 
     @emoji.command(name="enable")
-    @commands.is_owner()
+    @commands.has_permissions(administrator=True)
     async def emoji_enable(self, ctx: commands.Context):
         """
         Enable emoji counting on the current server.
@@ -97,7 +97,7 @@ class Emoji(commands.Cog):
             await ctx.send(f"Emoji counting already enabled; use `disable` to turn it off.")
 
     @emoji.command(name="disable")
-    @commands.is_owner()
+    @commands.has_permissions(administrator=True)
     async def emoji_disable(self, ctx: commands.Context):
         """
         Disable emoji counting on the current server.
@@ -112,7 +112,7 @@ class Emoji(commands.Cog):
             await ctx.send(f"Emoji counting not enabled; use `enable` to turn it on.")
 
     @emoji.command(name="count")
-    @commands.has_permissions(administrator=True)
+    @commands.has_permissions(manage_emojis=True)
     async def emoji_count(self, ctx: commands.Context, em: Union[discord.Emoji, int], days: Optional[int] = 30):
         """
         Count the times an emoji has been used in the last <days> days.
@@ -156,7 +156,7 @@ class Emoji(commands.Cog):
         await ctx.send(f"{ctx.bot.get_emoji(emoji_id)} has been used `{n_times}` in the last `{n_days}`.")
 
     @emoji.command(name="stats")
-    @commands.has_permissions(administrator=True)
+    @commands.has_permissions(manage_emojis=True)
     async def emoji_stats(
         self,
         ctx: commands.Context,
@@ -224,7 +224,7 @@ class Emoji(commands.Cog):
         await ctx.send(f"{ctx.bot.get_emoji(emoji_id)} has been used `{n_times}` in the last `{n_days}`.\n{freq}.")
 
     @emoji.command(name="head")
-    @commands.has_permissions(administrator=True)
+    @commands.has_permissions(manage_emojis=True)
     async def emoji_head(self, ctx: commands.Context, days: int = 30, num: int = 5, anim: bool = False):
         """
         Display the most frequently emojis for the current server.
@@ -267,7 +267,7 @@ class Emoji(commands.Cog):
         await ctx.send(reply)
 
     @emoji.command(name="tail")
-    @commands.has_permissions(administrator=True)
+    @commands.has_permissions(manage_emojis=True)
     async def emoji_tail(self, ctx: commands.Context, days: int = 30, num: int = 5, anim: bool = False):
         """
         Display the least frequently emojis for the current server.
@@ -312,7 +312,7 @@ class Emoji(commands.Cog):
         await ctx.send(reply)
 
     @emoji.command(name="all")
-    @commands.has_permissions(administrator=True)
+    @commands.has_permissions(manage_emojis=True)
     async def emoji_all(self, ctx: commands.Context, days: int = 30, anim: bool = False):
         """
         Display counts for all emojis for the current server.
@@ -355,7 +355,7 @@ class Emoji(commands.Cog):
         await utils.menu.menu_list(ctx, emoji_ls)  # we don't actually care to select anything
 
     @emoji.command(name="export")
-    @commands.has_permissions(administrator=True)
+    @commands.has_permissions(manage_emojis=True)
     async def emoji_export(self, ctx: commands.Context):
         """
         Export the emoji usage data for the current server to a CSV.
