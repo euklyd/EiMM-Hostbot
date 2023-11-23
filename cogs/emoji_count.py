@@ -14,6 +14,7 @@ from sqlalchemy.orm import sessionmaker, Session
 
 import cogs.emoji_schema as es
 import utils
+from utils.menu import menu_list, CANCEL
 
 _EMOJI_RE = re.compile(r"<:(?P<name>\w\w+):(?P<id>\d+)>")
 MAX_ATTACHMENT_SIZE = 1e6
@@ -415,6 +416,29 @@ class Emoji(commands.Cog):
         """Event Emoji command group."""
         pass
 
+    async def ditto_add(self, ctx: commands.Context, session: Session) -> Optional[str]:
+        """Interactive menu to get or confirm the name of the most recent game."""
+        prev_emojis: List[es.EventEmoji] = []
+        prev_emojis = session.query(es.EventEmoji).filter_by(server_id=ctx.guild.id, active=True).order_by(
+            es.EventEmoji.date.desc()).all()
+        if not prev_emojis:
+            await ctx.send("No active previous event.")
+            return None
+        prev_event = prev_emojis[0].event
+        await ctx.send(f"The previous event was {prev_event}. Confirm? [y/n]")
+        msg = await ctx.bot.wait_for(event='message', check=lambda m: m.author == ctx.author, timeout=60)
+        if msg.content.lower() == "y":
+            return prev_event
+        print(msg.content.lower())
+        ls_events: List[str] = []
+        for em in prev_emojis:
+            if em.event not in ls_events:
+                ls_events.append(em.event)
+            if ls_events == 3:
+                break
+        events = ", ".join(ls_events)
+        await ctx.send(f"Please rerun the command with the event you want. The previous three events were {events}.")
+
     @evemoji.command(name="add")
     @commands.has_permissions(manage_emojis=True)
     async def evemoji_add(
@@ -460,6 +484,14 @@ class Emoji(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
+        session = session_maker()
+
+        if event.lower() == "ditto" or not event:
+            prev_game = await self.ditto_add(ctx, session)
+            if not prev_game:
+                return
+            event = prev_game
+
         event_emoji = es.EventEmoji(
             emoji_id=created_emoji.id,
             server_id=ctx.guild.id,
@@ -468,7 +500,6 @@ class Emoji(commands.Cog):
             event=event,
             active=True,
         )
-        session = session_maker()
         session.add(event_emoji)
         session.commit()
         await ctx.message.add_reaction(ctx.bot.greentick)
@@ -541,9 +572,24 @@ class Emoji(commands.Cog):
         else:
             emojis.sort(key=lambda e: e.discord.name)
 
-        s = "\n".join(f"{em.discord} {em.discord.name}, {em.owner}, {em.db_entry.event}, {em.count}" for em in emojis)
-        print(s)
-        await ctx.send(sort + ":\n" + s)
+        # s = "\n".join(f"{em.discord} {em.discord.name}, {em.owner}, {em.db_entry.event}, {em.count}" for em in emojis)
+        # print(s)
+        # await ctx.send(sort + ":\n" + s)
+        menu_entries = [
+            f"{em.discord} from `{em.owner}` ({em.db_entry.event}, {em.db_entry.date}), {em.count} uses"
+            for em in emojis
+        ]
+        try:
+            await menu_list(
+                ctx,
+                menu_entries,
+                heading=f"Event Emoji with usage over the past {days} days:",
+                timeout=60,
+                use_code_block=False,
+            )
+        except RuntimeError:
+            await ctx.send(f"Exit your currently running menu first with `{CANCEL}`.")
+
 
 
 def setup(bot: commands.Bot):
