@@ -948,9 +948,9 @@ class HostBot(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @addspec.command(name="rm")
-    async def addspec_rm(self, ctx: commands.Context, spec: discord.Member):
+    async def addspec_rm(self, ctx: commands.Context, specs: commands.Greedy[discord.Member]):
         """
-        Remove a spectator from your role PM.
+        Remove one or more spectators from your role PM.
 
         Usable by players and hosts, and only from your Role PM channel.
         """
@@ -979,13 +979,12 @@ class HostBot(commands.Cog):
         spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="spec").one_or_none()
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
-        if spec_role not in spec.roles:
-            await ctx.send("Only spectators can be removed from a role PM!")
-            await ctx.message.add_reaction(ctx.bot.redtick)
-            return
-
-        # now we can do the actual function:
-        await ctx.channel.set_permissions(spec, read_messages=False)
+        for spec in specs:
+            if spec_role not in spec.roles:
+                await ctx.message.add_reaction(ctx.bot.redtick)
+                continue
+            # now we can do the actual function:
+            await ctx.channel.set_permissions(spec, read_messages=False)
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @addspec.command(name="off")
