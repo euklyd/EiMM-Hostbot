@@ -5,9 +5,11 @@ import json
 import random
 import re
 import urllib
+import collections
+import typing
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Set, Tuple, FrozenSet, Iterable
 
 import aiohttp
 import discord
@@ -25,6 +27,23 @@ API = "https://api.scryfall.com/"
 SCRYFALL_SEARCH_ENDPOINT = "https://api.scryfall.com/cards/search"
 SCRYFALL_CARD_ID_ENDPOINT = "https://api.scryfall.com/cards"
 YGOPRO_ENDPOINT = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
+DEFAULT_TREASURE_CRUISE_DECKLIST = [
+    # From Maldhound's appearance on Shuffle Up and Play: https://archidekt.com/decks/4731042/treasure_deck
+    "Aetherflux Reservoir", "Arcane Signet", "Avarice Totem", "Chromatic Lantern", "Chromatic Star",
+    "Contagion Engine", "Expedition Map", "Font of Mythos", "Helm of Awakening", "Horn of Greed", "Howling Golem",
+    "Howling Mine", "Illusionist's Bracers", "Mana Crypt", "Mana Prism", "Mirage Mirror", "Mirrorworks",
+    "Panharmonicon", "Power Matrix", "Prism Ring", "Retrofitter Foundry", "Rocket Launcher", "Sensei's Divining Top",
+    "Shadowspear", "Sol Ring", "Spine of Ish Sah", "Staff of Domination", "Sundial of the Infinite",
+    "Sword of Body and Mind", "Sword of Feast and Famine", "Sword of Fire and Ice", "Sword of Hearth and Home",
+    "Sword of Sinew and Steel", "Sword of Truth and Justice", "Sword of War and Peace", "Sword of the Animist",
+    "Tamiyo's Journal", "Temporal Aperture", "The Mightstone and Weakstone", "Tower of Calamities", "Trading Post",
+    "Vedalken Orrery", "Vexing Puzzlebox",
+
+    "Curse of Bounty", "Curse of Chaos", "Curse of Conformity", "Curse of Disturbance", "Curse of Hospitality",
+    "Curse of Inertia", "Curse of Leeches // Leeching Lurker", "Curse of Oblivion", "Curse of Opulence",
+    "Curse of Predation", "Curse of Shaken Faith", "Curse of Shallow Graves", "Curse of Thirst", "Curse of Verbosity",
+    "Curse of the Bloody Tome", "Curse of the Forsaken", "Curse of the Nightly Hunt",
+]
 
 
 # NOTE: You probably don't want to be running this module on your instance. It has a bit of
@@ -41,6 +60,44 @@ class ScryfallResponse:
     def closest(self, query: str) -> dict:
         match = process.extractOne(query, self.names)
         return self.map[match[0]]
+
+
+class TreasureCruiseGame:
+    def __init__(self, decklist: Iterable[str] = None):
+        if decklist is None:
+            decklist = DEFAULT_TREASURE_CRUISE_DECKLIST
+        # card name mapped to count of cards
+        self._deck: List[str] = list(decklist)
+        random.shuffle(self._deck)
+        self._board: typing.Counter[str, int] = collections.Counter()
+        self._graveyard: List[str] = []
+
+    def cruise(self, n: int) -> Tuple[str, List[str], bool]:
+        shuffled = False
+        if n > len(self._deck):
+            self._deck = self._deck + self._graveyard
+            self._graveyard = []
+            random.shuffle(self._deck)
+            shuffled = True
+        drawn_cards = self._deck[:n]
+        self._deck = self._deck[n:]
+        card = drawn_cards[0]
+        gy_cards = drawn_cards[1:]
+        # self._graveyard.extend(gy_cards)
+        # self._board.update([card])
+        return card, gy_cards, shuffled
+
+    def to_board(self, cards: List[str]):
+        self._board.update(cards)
+
+    def to_gy(self, cards: List[str]):
+        self._graveyard.extend(cards)
+
+    def bin(self, card: str):
+        if self._board[card] == 0:
+            raise ValueError(f"card {card} not on board")
+        self._board.subtract([card])
+        self._graveyard.append(card)
 
 
 def scryfall_search(expr: str) -> ScryfallResponse:
@@ -74,6 +131,8 @@ class Cards(commands.Cog):
         self.bot = bot
         self.session = session
         self.db: AsyncEngine = create_async_engine(f"sqlite+aiosqlite:///{db_file}")
+        # Dict of server IDs -> frozenset of players in the game -> game
+        self.cruises: Dict[int, Dict[FrozenSet[int, ...], TreasureCruiseGame]] = {}
 
     def db_session(self):
         return sessionmaker(self.db, expire_on_commit=False, class_=AsyncSession)
@@ -666,6 +725,162 @@ class Cards(commands.Cog):
     async def sftest(self, ctx: commands.Context, *, expr: str):
         embeds = await self._scryfall_search(expr)
         await ctx.send(embed=embeds[0])
+
+    @commands.group(invoke_without_command=True)
+    async def tr(self, ctx: commands.Context):
+        """
+        TREASURE CRUISE
+        """
+        ...
+
+    def _get_cruise(self, ctx: commands.Context) -> typing.Union[TreasureCruiseGame, None]:
+        if ctx.guild.id not in self.cruises:
+            self.cruises[ctx.guild.id] = {}
+        for pl, cruise in self.cruises[ctx.guild.id].items():
+            if ctx.author.id in pl:
+                return cruise
+        return None
+
+    @tr.command(name="start")
+    async def tr_start(self, ctx: commands.Context, players: commands.Greedy[discord.Member]):
+        """
+        Start a new game of TREASURE CRUISE with the mentioned players.
+        Note that you can only be in one game at a time per server.
+        """
+        if ctx.guild.id not in self.cruises:
+            self.cruises[ctx.guild.id] = {}
+
+        players = [ctx.author] + list(players)
+
+        for cruise in self.cruises.get(ctx.guild.id, {}).keys():  # iterate over all ongoing cruises in the server
+            for player in players:
+                if player.id in cruise:
+                    await ctx.send(
+                        f"{player} is already in an ongoing **TREASURE CRUISE** in this server. "
+                        f"They'll need to end it before they can join a new one."
+                    )
+                    await ctx.message.add_reaction(ctx.bot.redtick)
+                    return
+
+        pl = frozenset(player.id for player in players)
+        if pl in self.cruises.get(ctx.guild.id):
+            await ctx.send("You are already in a game on this server with these players.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        self.cruises[ctx.guild.id][pl] = TreasureCruiseGame(decklist=DEFAULT_TREASURE_CRUISE_DECKLIST)
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @tr.command(name="end")
+    async def tr_end(self, ctx: commands.Context):
+        """
+        End the TREASURE CRUISE you're currently in. This ends the game for ALL players in it.
+        """
+        # TODO: Add a way to withdraw from a game without ending it?
+        cruises = self.cruises.get(ctx.guild.id, {})
+        found_pl = None
+        for pl, cruise in cruises.items():
+            if ctx.author.id in pl:
+                found_pl = pl
+                break
+        if found_pl is None:
+            await ctx.send("You are not in any ongoing games on this server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        self.cruises[ctx.guild.id].pop(found_pl)
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @tr.command(name="cruise")
+    async def tr_cruise(self, ctx: commands.Context):
+        """
+        Go **CRUISING FOR TREASURE**.
+        """
+        cruise = self._get_cruise(ctx)
+        if cruise is None:
+            await ctx.send("You are not in any ongoing games on this server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        n = random.randint(1, 6)
+        if n == 6:
+            draw_n = 3
+        else:
+            draw_n = n
+        treasure, others, shuffled = cruise.cruise(draw_n)
+        if shuffled:
+            await ctx.send("Ran out of cards... shuffling...")
+            await asyncio.sleep(0.5)
+        if n == 6:
+            reveals = [treasure] + others
+            reveals_str = ", ".join(reveals)
+            await ctx.send(
+                f"You rolled a 6!! You revealed {reveals_str}, please select one of them (type the name exactly):"
+            )
+            selection = None
+            while not selection:
+                reply_input: discord.Message = await ctx.bot.wait_for(
+                    "message",
+                    check=lambda msg: msg.author == ctx.author and msg.channel == ctx.channel,
+                    timeout=180,
+                )
+                if reply_input.content not in reveals:
+                    await ctx.send(f"Didn't recognize {reply_input.content}, try again")
+                else:
+                    selection = reply_input.content
+            reveals.remove(selection)
+            cruise.to_board([selection])
+            cruise.to_gy(reveals)
+        else:
+            others_str = ", ".join(others)
+            reply_str = f"You rolled a {n}. "
+            if n == 1:
+                reply_str += f"You drew **{treasure}**."
+            else:
+                reply_str += f"You revealed {others_str}, eventually drawing **{treasure}**."
+            await ctx.send(reply_str)
+            cruise.to_board([treasure])
+            cruise.to_gy(others)
+        await ctx.message.add_reaction(self.bot.greentick)
+
+    @tr.command(name="bin")
+    async def tr_bin(self, ctx: commands.Context, *cards: str):
+        """
+        Move one or more cards from the field to the graveyard.
+        """
+        cruise = self._get_cruise(ctx)
+        if cruise is None:
+            await ctx.send("You are not in any ongoing games on this server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        successes = []
+        errors = []
+        for card in cards:
+            try:
+                cruise.bin(card)
+                successes.append(card)
+            except ValueError:
+                errors.append(card)
+        if successes:
+            await ctx.message.add_reaction(self.bot.greentick)
+        if errors:
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            errors_str = ", ".join(errors)
+            await ctx.send(f"Did not find {errors_str} on the field (use quotes around multi-word card names).")
+
+    @tr.command(name="ls")
+    async def tr_ls(self, ctx: commands.Context, full: bool = False):
+        cruises = self.cruises.get(ctx.guild.id, {})
+        reply = "Ongoing cruises:\n"
+        for pl, cruise in cruises.items():
+            players = []
+            for player in pl:
+                players.append(str(ctx.guild.get_member(player)))
+            players = ", ".join(players)
+            board = list(key for key, count in cruise._board.items() if count > 0)  # this processing kinda sucks
+            reply += f"- {players}: A cruise with Deck:{len(cruise._deck)}, Board:{len(board)}, GY:{len(cruise._graveyard)}\n"
+            if full:
+                reply += f"  - board: {board}\n"
+                reply += f"  - gy: {cruise._graveyard}"
+        await ctx.send(reply)
 
 
 async def create_metadata(db):
