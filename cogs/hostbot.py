@@ -22,6 +22,7 @@ cooldown_delta = timedelta(minutes=30)
 cooldown_max = 3
 
 MAX_CATEGORY_SIZE = 50
+LOCK_EMOJI = "\U0001F512"
 
 
 class NotFoundMember:
@@ -1059,13 +1060,13 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        if lock and ctx.channel.name[0] != "\U0001F512":
-            await ctx.channel.edit(name=f"\U0001F512{ctx.channel.name}")
+        if lock and ctx.channel.name[0] != LOCK_EMOJI:
+            await ctx.channel.edit(name=f"{LOCK_EMOJI}{ctx.channel.name}")
             await ctx.message.add_reaction(ctx.bot.greentick)
         elif lock:
             await ctx.send("You're already locked.")
             await ctx.message.add_reaction(ctx.bot.redtick)
-        elif not lock and ctx.channel.name[0] == "\U0001F512":
+        elif not lock and ctx.channel.name[0] == LOCK_EMOJI:
             await ctx.channel.edit(name=ctx.channel.name[1:])
             await ctx.message.add_reaction(ctx.bot.greentick)
         else:
