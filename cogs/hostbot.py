@@ -48,7 +48,7 @@ def has_role(ctx: commands.Context, allowed_roles: List[str]) -> bool:
     allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
 
     # check if author has any of the player/host roles
-    return set(allowed_roles).isdisjoint(set(ctx.author.roles))
+    return not set(allowed_roles).isdisjoint(set(ctx.author.roles))
 
 
 class HostBot(commands.Cog):
@@ -887,7 +887,7 @@ class HostBot(commands.Cog):
             return
 
         # check if author has any of the player/host roles
-        if has_role(ctx, ["player", "host"]):
+        if not has_role(ctx, ["player", "host"]):
             await ctx.send("Only players and hosts can add spectators to a role PM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -934,7 +934,7 @@ class HostBot(commands.Cog):
             return
 
         # check if author has any of the player/host roles
-        if has_role(ctx, ["player", "host"]):
+        if not has_role(ctx, ["player", "host"]):
             await ctx.send("Only players and hosts can add spectators to a role PM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -971,7 +971,7 @@ class HostBot(commands.Cog):
             return
 
         # check if author has any of the player/host roles
-        if has_role(ctx, ["player", "host"]):
+        if not has_role(ctx, ["player", "host"]):
             await ctx.send("Only players and hosts can remove spectators from a role PM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -1040,6 +1040,49 @@ class HostBot(commands.Cog):
         session.commit()
 
         await ctx.message.add_reaction(ctx.bot.greentick)
+
+    async def _lockunlock(self, ctx: commands.Context, lock=True):
+        session = session_maker()
+
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+
+        if not server:
+            await ctx.send("This server isn't a game server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        if not self.is_rolepm(ctx, server):
+            await ctx.send("This isn't a Role PM channel.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        if not has_role(ctx, ["player", "host"]):
+            await ctx.send("Only players and hosts can remove spectators from a role PM.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        if lock and ctx.channel.name[0] != "\U0001F512":
+            await ctx.channel.edit(name=f"\U0001F512{ctx.channel.name}")
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        elif lock:
+            await ctx.send("You're already locked.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+        elif not lock and ctx.channel.name[0] == "\U0001F512":
+            await ctx.channel.edit(name=ctx.channel.name[1:])
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send("You need to be locked to unlock.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+
+    @commands.command()
+    @commands.guild_only()
+    async def lock(self, ctx: commands.Context):
+        """Lock your actions."""
+        await self._lockunlock(ctx, True)
+
+    @commands.command()
+    @commands.guild_only()
+    async def unlock(self, ctx: commands.Context):
+        """Unlock your actions."""
+        await self._lockunlock(ctx, False)
 
     # @commands.Cog.listener("on_join")
     # async def on_join(self):
