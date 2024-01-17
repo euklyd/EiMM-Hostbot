@@ -1055,7 +1055,7 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
         if not has_role(ctx, ["player", "host"]):
-            await ctx.send("Only players and hosts can remove spectators from a role PM.")
+            await ctx.send("Only players and hosts can lock/unlock role PMs.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
