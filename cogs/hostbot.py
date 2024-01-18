@@ -498,7 +498,9 @@ class HostBot(commands.Cog):
         rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="rolepms").all()
         # the union maintains legacy support
         rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
-        role_pms = sorted([str(ctx.guild.get_channel(cid)) for cid in rolepm_ids])
+        role_pms: List[discord.CategoryChannel] = sorted(
+            [ctx.guild.get_channel(cid) for cid in rolepm_ids], key=lambda x: str(x),
+        )
 
         try:
             for category in role_pms:
@@ -1056,7 +1058,7 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
         if not has_role(ctx, ["player", "host"]):
-            await ctx.send("Only players and hosts can lock/unlock role PMs.")
+            await ctx.send("Only players and hosts can lock/unlock Role PMs.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
@@ -1073,6 +1075,29 @@ class HostBot(commands.Cog):
             await ctx.send("You need to be locked to unlock.")
             await ctx.message.add_reaction(ctx.bot.redtick)
 
+    @staticmethod
+    async def _unlock_all(ctx: commands.Context):
+        session = session_maker()
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="rolepms").all()
+        # the union maintains legacy support
+        rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
+
+        role_pms: List[discord.CategoryChannel] = sorted(
+            [ctx.guild.get_channel(cid) for cid in rolepm_ids], key=lambda x: str(x),
+        )
+
+        try:
+            for category in role_pms:
+                if category is not None:
+                    for channel in category.channels:
+                        if channel.name[0] == LOCK_EMOJI:
+                            await channel.edit(name=channel.name[1:])
+                else:
+                    await ctx.send("Could not find Role PMs category.")
+        except discord.Forbidden:
+            await ctx.send("Insufficient permissions to delete Role PMs.")
+
     @commands.command()
     @commands.guild_only()
     async def lock(self, ctx: commands.Context):
@@ -1081,9 +1106,18 @@ class HostBot(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    async def unlock(self, ctx: commands.Context):
+    async def unlock(self, ctx: commands.Context, all: str = "not all"):
         """Unlock your actions."""
-        await self._lockunlock(ctx, False)
+        if all.lower() != "all":
+            await self._lockunlock(ctx, False)
+            return
+
+        if not has_role(ctx, ["host"]):
+            await ctx.send("Only the host can unlock all Role PMs.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        await self._unlock_all(ctx)
 
     # @commands.Cog.listener("on_join")
     # async def on_join(self):
