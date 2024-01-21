@@ -498,8 +498,12 @@ class Interview(commands.Cog):
 
         em = None  # type: Optional[discord.Embed]
         for question in questions:
+            # Three cases where we need to start a new embed:
+            # 1. If the total length of the embed is > max message size
+            # 2. If the number of embed fields > 25
+            # 3. If there's a new asker (only one asker per embed)
             logging.debug(f"generating {question.asker}-{question.question_num}")
-            if last_asker != question.asker:
+            if last_asker != question.asker or len(em.fields) > 23:  # 23 as a buffer idk
                 # new asker, append old embed and make a new one
                 if em is not None and len(em.fields) > 0:
                     ls_embeds.append(finalize(em))
