@@ -14,6 +14,8 @@ class Server(Base):
     sheet = Column(String)
     rolepms_id = Column(Integer)
     addspec_on = Column(Boolean)  # allows players to add specs to their own role pm
+    players_can_lock = Column(Boolean)  # allows players to lock their own role pm
+    lock_emoji = Column(String)
     roles = relationship('Role', back_populates='server')  # type: Iterable[Role]
     channels = relationship('Channel', back_populates='server')  # type: Iterable[Channel]
 
