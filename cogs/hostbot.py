@@ -22,6 +22,7 @@ cooldown_delta = timedelta(minutes=30)
 cooldown_max = 3
 
 MAX_CATEGORY_SIZE = 50
+LOCK_EMOJI = "\U0001F512"
 
 
 class NotFoundMember:
@@ -48,7 +49,7 @@ def has_role(ctx: commands.Context, allowed_roles: List[str]) -> bool:
     allowed_roles = [ctx.guild.get_role(role_id.id) for role_id in allowed_role_ids]
 
     # check if author has any of the player/host roles
-    return set(allowed_roles).isdisjoint(set(ctx.author.roles))
+    return not set(allowed_roles).isdisjoint(set(ctx.author.roles))
 
 
 class HostBot(commands.Cog):
@@ -110,6 +111,8 @@ class HostBot(commands.Cog):
             name=yml_config["name"],
             sheet=yml_config["sheet"],
             addspec_on=False,
+            players_can_lock=False,
+            lock_emoji=LOCK_EMOJI,
         )
         roles = []
         channels = []
@@ -251,6 +254,8 @@ class HostBot(commands.Cog):
             name=ctx.guild.name,
             sheet="",
             addspec_on=False,
+            players_can_lock=False,
+            lock_emoji=LOCK_EMOJI,
         )
         roles = [
             hbs.Role(id=host_role_id, type="host"),
@@ -497,7 +502,9 @@ class HostBot(commands.Cog):
         rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="rolepms").all()
         # the union maintains legacy support
         rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
-        role_pms = sorted([str(ctx.guild.get_channel(cid)) for cid in rolepm_ids])
+        role_pms: List[discord.CategoryChannel] = sorted(
+            [ctx.guild.get_channel(cid) for cid in rolepm_ids], key=lambda x: str(x),
+        )
 
         try:
             for category in role_pms:
@@ -887,7 +894,7 @@ class HostBot(commands.Cog):
             return
 
         # check if author has any of the player/host roles
-        if has_role(ctx, ["player", "host"]):
+        if not has_role(ctx, ["player", "host"]):
             await ctx.send("Only players and hosts can add spectators to a role PM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -934,7 +941,7 @@ class HostBot(commands.Cog):
             return
 
         # check if author has any of the player/host roles
-        if has_role(ctx, ["player", "host"]):
+        if not has_role(ctx, ["player", "host"]):
             await ctx.send("Only players and hosts can add spectators to a role PM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -971,7 +978,7 @@ class HostBot(commands.Cog):
             return
 
         # check if author has any of the player/host roles
-        if has_role(ctx, ["player", "host"]):
+        if not has_role(ctx, ["player", "host"]):
             await ctx.send("Only players and hosts can remove spectators from a role PM.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
@@ -1040,6 +1047,120 @@ class HostBot(commands.Cog):
         session.commit()
 
         await ctx.message.add_reaction(ctx.bot.greentick)
+
+    async def _lockunlock(self, ctx: commands.Context, lock=True):
+        session = session_maker()
+
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+
+        if not server:
+            await ctx.send("This server isn't a game server.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        if not self.is_rolepm(ctx, server):
+            await ctx.send("This isn't a Role PM channel.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        if not has_role(ctx, ["player", "host"]):
+            await ctx.send("Only players and hosts can lock/unlock Role PMs.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        if not has_role(ctx, ["host"]) and not server.players_can_lock and lock is True:
+            await ctx.send("Locking is currently disabled for players; only hosts can lock role PMs.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        if lock and ctx.channel.name[0] != LOCK_EMOJI:
+            await ctx.channel.edit(name=f"{LOCK_EMOJI}{ctx.channel.name}")
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        elif lock:
+            await ctx.send("You're already locked.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+        elif not lock and ctx.channel.name[0] == LOCK_EMOJI:
+            await ctx.channel.edit(name=ctx.channel.name[1:])
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send("You need to be locked to unlock.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+
+    @staticmethod
+    async def _unlock_all(ctx: commands.Context):
+        session = session_maker()
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="rolepms").all()
+        # the union maintains legacy support
+        rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
+
+        role_pms: List[discord.CategoryChannel] = sorted(
+            [ctx.guild.get_channel(cid) for cid in rolepm_ids], key=lambda x: str(x),
+        )
+
+        try:
+            for category in role_pms:
+                if category is not None:
+                    for channel in category.channels:
+                        if channel.name[0] == LOCK_EMOJI:
+                            await channel.edit(name=channel.name[1:])
+                else:
+                    await ctx.send("Could not find Role PMs category.")
+        except discord.Forbidden:
+            await ctx.send("Insufficient permissions to delete Role PMs.")
+
+    @staticmethod
+    async def _enable_locking(ctx: commands.Context):
+        if not has_role(ctx, ["host"]):
+            await ctx.send("Only hosts may enable locking.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+        session = session_maker()
+        server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
+        server.players_can_lock = True
+        session.commit()
+        await ctx.message.add_reaction(ctx.bot.greentick)
+
+    @commands.command()
+    @commands.guild_only()
+    async def lock(self, ctx: commands.Context, str_that_might_be_on: str = ""):
+        """Lock your actions."""
+        if str_that_might_be_on.lower() == "on":
+            # I don't love this way of adding "lock on" in the same vein as "addspec on",
+            # but I really don't want use a command group and lose "##lock".
+            await self._enable_locking(ctx)
+            return
+        await self._lockunlock(ctx, True)
+
+    @commands.command()
+    @commands.guild_only()
+    async def unlock(self, ctx: commands.Context, all: str = "not all"):
+        """Unlock your actions."""
+        if all.lower() != "all":
+            await self._lockunlock(ctx, False)
+            return
+
+        if not has_role(ctx, ["host"]):
+            await ctx.send("Only the host can unlock all Role PMs.")
+            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        await self._unlock_all(ctx)
+
+    # TODO on this... need to:
+    #  (a) do db updates
+    #  (b) ensure the emoji is valid
+    #  (c) update all current usages of the emoji in role pm titles
+    #  (d) update all current usages of LOCK_EMOJI in the code
+    # @commands.command()
+    # @commands.guild_only()
+    # async def lockemoji(self, ctx: commands.Context, emoji: str):
+    #     if not has_role(ctx, ["host"]):
+    #         await ctx.send("Only the host can change the emoji.")
+    #         await ctx.message.add_reaction(ctx.bot.redtick)
+    #         return
+    #
+    #     if len(emoji) != 1:
+    #         await ctx.send("Only the host can unlock all Role PMs.")
+    #         await ctx.message.add_reaction(ctx.bot.redtick)
+    #         return
 
     # @commands.Cog.listener("on_join")
     # async def on_join(self):
