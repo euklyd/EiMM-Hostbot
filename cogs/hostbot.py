@@ -1120,7 +1120,7 @@ class HostBot(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    async def lock(self, ctx: commands.Context, *, str_that_might_be_on):
+    async def lock(self, ctx: commands.Context, str_that_might_be_on: str = ""):
         """Lock your actions."""
         if str_that_might_be_on.lower() == "on":
             # I don't love this way of adding "lock on" in the same vein as "addspec on",
