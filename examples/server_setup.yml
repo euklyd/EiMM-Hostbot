@@ -11,11 +11,11 @@ roles:
     color: 0x8855ee
   player:
     name: Player Role Name
-    color: 0x00bb99
+    color: 0xc2ffe1
   dead:
     name: Dead Role Name
-    color: 0xbb0055
+    color: 0xffacab
   spec:
     name: Spec Role Name
-    color: 0x8181bb
+    color: 0xc7fdff
 sheet: Sheet Name Here  # This will provide access to everything on your sheet.
