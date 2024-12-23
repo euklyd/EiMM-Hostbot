@@ -57,36 +57,26 @@ def b_h(row) -> str:
 
 
 def ability_text(row):
-    limitations = "Unlimited"
-    if "cycling" in row["Categories"].lower():
-        limitations += " - Cycling"
-    targets = row["Targets"]
-    priority = row["Priority(s)"]
-    hb = b_h(row)
-    text = row["Rules Text"]
-    template = (
-        f"**Ability Name (Active, {limitations}, Targeted {targets}, {priority}, {hb}):**\n"
-        "_Flavor_\n"
-        f'`[{row["Ability Name"]}]` {text}'
-    )
+    template = row["Template to Copy / Paste"]
     return thwart_misty(row["Ability Name"], template)
 
 
 def ability_embed(row):
     em = discord.Embed(title=row["Ability Name"])
-    em.add_field(name="Priority", value=default_val(row["Priority(s)"]))
-    em.add_field(name="Targets", value=default_val(row["Targets"]))
+    if default_val(row["Priority(s)"]).lower() != "passive":
+        em.add_field(name="Priority", value=default_val(row["Priority(s)"]))
+        em.add_field(name="Targets", value=default_val(row["Targets"]))
+        bh_val = {
+            "B/H": "❤️/💀",
+            "B+H": "❤️+💀",
+            "B&H": "❤️+💀",
+            "B": "❤️",
+            "H": "💀",
+            "N": "N/A",
+            "": "N/A",
+        }.get(b_h(row).upper(), "???")
+        em.add_field(name="B/H", value=bh_val)
     em.add_field(name="Supertype", value=default_val(row["Supertype"]))
-    bh_val = {
-        "B/H": "❤️/💀",
-        "B+H": "❤️+💀",
-        "B&H": "❤️+💀",
-        "B": "❤️",
-        "H": "💀",
-        "N": "N/A",
-        "": "N/A",
-    }.get(b_h(row).upper(), "???")
-    em.add_field(name="B/H", value=bh_val)
     em.add_field(name="Categories", value=default_val(row["Categories"]))
     em.add_field(name="Rules Text", value=default_val(row["Rules Text"]), inline=False)
 
