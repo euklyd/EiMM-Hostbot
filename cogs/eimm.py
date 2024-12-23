@@ -55,22 +55,11 @@ def b_h(row) -> str:
             return "N"
     return "???"
 
-
 def ability_text(row):
-    limitations = "Unlimited"
-    if "cycling" in row["Categories"].lower():
-        limitations += " - Cycling"
-    targets = row["Targets"]
-    priority = row["Priority(s)"]
-    hb = b_h(row)
-    text = row["Rules Text"]
     template = (
-        f"**Ability Name (Active, {limitations}, Targeted {targets}, {priority}, {hb}):**\n"
-        "_Flavor_\n"
-        f'`[{row["Ability Name"]}]` {text}'
+        f'`[{row["Template to Copy / Paste"]}]` {text}'
     )
     return thwart_misty(row["Ability Name"], template)
-
 
 def ability_embed(row):
     em = discord.Embed(title=row["Ability Name"])
