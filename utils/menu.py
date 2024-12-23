@@ -10,38 +10,77 @@ from discord.ext import commands
 
 import core
 
+CANCEL = "cancel"
+
 _locks = set()  # type: Set[Tuple[int, int]]  # represents a tuple of user IDs and channel IDs
 
 
-async def menu_list(ctx: commands.Context, ls: Iterable, timeout: int = 600,
-                    select_max: Union[int, None] = 1, repeats: bool = False):
+async def menu_list(ctx: commands.Context, ls: Iterable, heading: str = None, timeout: int = 600,
+                    select_max: Union[int, None] = 1, repeats: bool = False, use_code_block: bool = True):
     keys, elems = [], []
     for i, e in enumerate(ls):
         keys.append(str(i))
         elems.append(e)
-    return await menu_wrapper(ctx, keys, elems, timeout=timeout, select_max=select_max, repeats=repeats)
+    return await menu_wrapper(
+        ctx,
+        keys,
+        elems,
+        heading=heading,
+        timeout=timeout,
+        select_max=select_max,
+        repeats=repeats,
+        use_code_block=use_code_block,
+    )
 
 
-async def menu_dict(ctx: commands.Context, d: MutableMapping, timeout: int = 600,
-                    select_max: Union[int, None] = 1, repeats: bool = False):
+async def menu_dict(ctx: commands.Context, d: MutableMapping, heading: str = None, timeout: int = 600,
+                    select_max: Union[int, None] = 1, repeats: bool = False, use_code_block: bool = True):
     keys, elems = [], []
     for k, e in d.items():
         keys.append(str(k).replace(',', ''))
         elems.append(e)
-    return await menu_wrapper(ctx, keys, elems, timeout=timeout, select_max=select_max, repeats=repeats)
+    return await menu_wrapper(
+        ctx,
+        keys,
+        elems,
+        heading=heading,
+        timeout=timeout,
+        select_max=select_max,
+        repeats=repeats,
+        use_code_block=use_code_block,
+    )
 
 
-def menu_str(keys: List, elements: List, page, items_per_page=20, select_max: Union[int, None] = 1):
+def menu_str(
+    keys: List,
+    elements: List,
+    page,
+    heading: str = None,
+    items_per_page=20,
+    select_max: Union[int, None] = 1,
+    use_code_block: bool = True
+):
     start, stop = page * items_per_page, (page + 1) * items_per_page
 
     max_len = 0
     for key in keys:
         max_len = max(len(str(key)), max_len)
 
-    output_str = ''
+    output_str = f"{heading}\n" if heading else ''
     for k, e in zip(keys[start:stop], elements[start:stop]):
-        output_str += f'{k!s:>{max_len}}- {e}\n'
-    output_str = f'```\n{output_str}\n```'
+        # if not use_code_block:
+        #     # Make it a bulleted list if not a code block
+        #     output_str += "- "
+        if use_code_block:
+            output_str += f'{k!s:>{max_len}}. {e}\n'
+        else:
+            # Use numbers
+            # TODO:
+            #  - plumb in "is it a menu dict" so that it can be formatted as a bulleted list instead
+            #  - fix zero-indexing
+            output_str += f'{k}. {e}\n'
+    if use_code_block:
+        output_str = f'```\n{output_str}\n```'
     select_str = 'an item'
     if select_max is None:
         select_str = 'one or more items, separated by commas,'
@@ -54,19 +93,36 @@ def menu_str(keys: List, elements: List, page, items_per_page=20, select_max: Un
     return output_str
 
 
-async def menu_wrapper(ctx: commands.Context, keys: List, elements: List, timeout: int = 600,
-                       select_max: Union[int, None] = 1, repeats: bool = False):
+async def menu_wrapper(ctx: commands.Context, keys: List, elements: List, heading: str = None, timeout: int = 600,
+                       select_max: Union[int, None] = 1, repeats: bool = False, use_code_block: bool = True):
     lock = (ctx.author.id, ctx.channel.id)
     if lock in _locks:
         raise RuntimeError("A menu instance in this channel already exists for this user.")
     _locks.add(lock)
     with ExitStack() as stack:
         stack.callback(_locks.remove, lock)
-        return await menu_loop(ctx, keys, elements, timeout=timeout, select_max=select_max, repeats=repeats)
+        return await menu_loop(
+            ctx,
+            keys,
+            elements,
+            heading=heading,
+            timeout=timeout,
+            select_max=select_max,
+            repeats=repeats,
+            use_code_block=use_code_block,
+        )
 
 
-async def menu_loop(ctx: commands.Context, keys: List, elements: List, timeout: int = 600,
-                    select_max: Union[int, None] = 1, repeats: bool = False):
+async def menu_loop(
+    ctx: commands.Context,
+    keys: List,
+    elements: List,
+    heading: str = None,
+    timeout: int = 600,
+    select_max: Union[int, None] = 1,
+    repeats: bool = False,
+    use_code_block: bool = True
+):
     NUM_ITEMS = 20
     ARROW_LEFT, ARROW_RIGHT = '\U000025c0', '\U000025b6'
 
@@ -90,7 +146,15 @@ async def menu_loop(ctx: commands.Context, keys: List, elements: List, timeout: 
 
     page = 0
 
-    initial_menu = menu_str(keys, elements, page, items_per_page=NUM_ITEMS, select_max=select_max)
+    initial_menu = menu_str(
+        keys,
+        elements,
+        page,
+        heading=heading,
+        items_per_page=NUM_ITEMS,
+        select_max=select_max,
+        use_code_block=use_code_block,
+    )
     selection = None  # type: Union[None, str, List[str]]
     assert None not in keys
 
@@ -118,9 +182,9 @@ async def menu_loop(ctx: commands.Context, keys: List, elements: List, timeout: 
         if event_type == 'message':
             # check for selection
             assert type(result) is discord.Message, f'result type was {type(result)}, expected discord.Message'
-            if result.content.lower() == 'cancel':
+            if result.content.lower() == CANCEL:
                 # exit menu loop
-                selection = 'cancel'
+                selection = CANCEL
                 break
             selection = result.content
             if multi_select:
@@ -140,7 +204,15 @@ async def menu_loop(ctx: commands.Context, keys: List, elements: List, timeout: 
                 page = max(0, page - 1)
             else:
                 page = min(int(len(keys) / NUM_ITEMS), page + 1)
-            new_menu = menu_str(keys, elements, page, items_per_page=NUM_ITEMS, select_max=select_max)
+            new_menu = menu_str(
+                keys,
+                elements,
+                page,
+                heading=heading,
+                items_per_page=NUM_ITEMS,
+                select_max=select_max,
+                use_code_block=use_code_block,
+            )
             await menu_msg.edit(content=new_menu)
 
     if ctx.me.permissions_in(ctx.channel).manage_messages:
