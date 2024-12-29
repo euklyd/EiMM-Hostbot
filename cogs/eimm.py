@@ -374,7 +374,6 @@ class EiMM(commands.Cog):
         await ctx.send(reply)
 
     @commands.command()
-    @commands.has_permissions(administrator=True)
     async def queueslots(self, ctx: commands.Context, n_hosts: int, *, jsonstr: str):
         """
         Assigns selected hosts to optimal slots for the next EiMM season.
