@@ -330,7 +330,6 @@ class EiMM(commands.Cog):
         return assignments
 
     @commands.command()
-    @commands.has_permissions(administrator=True)
     async def qselect(self, ctx: commands.Context, n_hosts: int, *, jsonstr: str):
         """
         Selects hosts to fill the next EiMM season.
