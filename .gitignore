@@ -3,3 +3,5 @@ conf/*.json
 databases/*
 __pycache__
 .DS_Store
+.venv/
+.env
