@@ -1,0 +1,37 @@
+services:
+  bot:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=eimm
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_NAME=eimm
+    volumes:
+      - ./conf:/app/conf:ro
+      - ./databases:/app/databases  # For SQLite compatibility during migration
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=eimm
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_DB=eimm
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"  # Expose for local dev tools
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U eimm -d eimm"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
