@@ -5,13 +5,12 @@ import json
 import pprint
 import random
 import re
-from typing import Any, Dict, List, Optional, Tuple
 
 import discord
 import yaml
 from discord.ext import commands
 from fuzzywuzzy import process
-from munkres import Munkres, DISALLOWED
+from munkres import DISALLOWED, Munkres
 
 from core.bot import Bot
 from utils import menu, spreadsheet
@@ -161,7 +160,7 @@ class EiMM(commands.Cog):
         self.passives = {}  # type: Dict[str, List]
         self.load()
 
-    def load(self) -> Dict[str, Dict]:
+    def load(self) -> dict[str, dict]:
         self.connection = spreadsheet.SheetConnection(SECRET, SCOPE)
         abilities = self.connection.get_page(SHEET_NAME, "Active Abilities")
         new_abilities = {row["Ability Name"]: row for row in abilities.get_all_records()}
@@ -257,8 +256,8 @@ class EiMM(commands.Cog):
 
     @staticmethod
     def _mod_bias_queue_algorithm(
-        hosts: Dict[str, dict], priority: int = 2, total: int = 6
-    ) -> Tuple[List[Host], List[Host]]:
+        hosts: dict[str, dict], priority: int = 2, total: int = 6
+    ) -> tuple[list[Host], list[Host]]:
         """
         Inputs:
         - dict of hosts, in the format specified at the top of this file.
@@ -276,7 +275,7 @@ class EiMM(commands.Cog):
         return assignments, picks
 
     @staticmethod
-    def _mod_bias_host_selection(hosts: Dict[str, dict], priority: int = 2) -> List[Host]:
+    def _mod_bias_host_selection(hosts: dict[str, dict], priority: int = 2) -> list[Host]:
         hosts = [Host(name, prefs["prefs"], prefs["priority"]) for name, prefs in hosts.items()]
 
         # Select n=2 hosts from the hosts with priority
@@ -307,7 +306,7 @@ class EiMM(commands.Cog):
         return picks
 
     @staticmethod
-    def _mod_bias_hungarian_algorithm(picks: List[Host], total: int = 6) -> List[Host]:
+    def _mod_bias_hungarian_algorithm(picks: list[Host], total: int = 6) -> list[Host]:
         """
         tl;dr Numbers go in, numbers come out.
 
@@ -360,7 +359,7 @@ class EiMM(commands.Cog):
         reply = "**The next season's host slots, in order, are...** 🥁 🥁 🥁"
         await ctx.send(reply)
         nums = ["First", "Second", "Third", "Fourth", "Fifth", "Finally"]
-        for num, host in zip(nums, assignments):
+        for num, host in zip(nums, assignments, strict=False):
             await asyncio.sleep(5.0)
             reply = f"**{num},** `{host.name}`, with preferences `{host.prefs}`!"
             await ctx.send(reply)

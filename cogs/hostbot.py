@@ -3,13 +3,12 @@ import pprint
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Callable, Union, Optional, Dict, List
 
 import discord
 import yaml
 from discord.ext import commands
-from sqlalchemy import create_engine, or_
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 
 import cogs.hostbot_schema as hbs
 from core.bot import Bot
@@ -22,7 +21,7 @@ cooldown_delta = timedelta(minutes=30)
 cooldown_max = 3
 
 MAX_CATEGORY_SIZE = 50
-LOCK_EMOJI = "\U0001F512"
+LOCK_EMOJI = "\U0001f512"
 
 
 class NotFoundMember:
@@ -40,7 +39,7 @@ class NotFoundMember:
         return f"{self.name}#{self.discriminator}"
 
 
-def has_role(ctx: commands.Context, allowed_roles: List[str]) -> bool:
+def has_role(ctx: commands.Context, allowed_roles: list[str]) -> bool:
     session = session_maker()
 
     allowed_role_ids = (
@@ -170,15 +169,9 @@ class HostBot(commands.Cog):
                 overwrites[ctx.guild.default_role] = discord.PermissionOverwrite(
                     read_messages=False, send_messages=None
                 )
-                overwrites[roles["dead"]["role"]] = discord.PermissionOverwrite(
-                    read_messages=True, send_messages=False
-                )
-                overwrites[roles["host"]["role"]] = discord.PermissionOverwrite(
-                    read_messages=True
-                )
-                overwrites[roles["spec"]["role"]] = discord.PermissionOverwrite(
-                    read_messages=True, send_messages=False
-                )
+                overwrites[roles["dead"]["role"]] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
+                overwrites[roles["host"]["role"]] = discord.PermissionOverwrite(read_messages=True)
+                overwrites[roles["spec"]["role"]] = discord.PermissionOverwrite(read_messages=True, send_messages=False)
                 logging.info(f"confessionals: creating {channel_name} for {key}")
 
             if key == "music":
@@ -238,7 +231,7 @@ class HostBot(commands.Cog):
             return
 
         if type(settings) is not dict:
-            await ctx.send(f"You messed up the formatting, try copying more exactly.")
+            await ctx.send("You messed up the formatting, try copying more exactly.")
             return
 
         channel_regex = r"<#(\d+)>"
@@ -378,7 +371,7 @@ class HostBot(commands.Cog):
             return
 
         spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="spec").one_or_none()
-        spec_role = ctx.guild.get_role(spec_role_id.id)
+        ctx.guild.get_role(spec_role_id.id)
 
         host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="host").one_or_none()
         host_role = ctx.guild.get_role(host_role_id.id)
@@ -502,8 +495,9 @@ class HostBot(commands.Cog):
         rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="rolepms").all()
         # the union maintains legacy support
         rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
-        role_pms: List[discord.CategoryChannel] = sorted(
-            [ctx.guild.get_channel(cid) for cid in rolepm_ids], key=lambda x: str(x),
+        role_pms: list[discord.CategoryChannel] = sorted(
+            [ctx.guild.get_channel(cid) for cid in rolepm_ids],
+            key=lambda x: str(x),
         )
 
         try:
@@ -563,7 +557,7 @@ class HostBot(commands.Cog):
         self,
         ctx: commands.Context,
         channel_type: str,
-        channel: Union[discord.CategoryChannel, discord.TextChannel],
+        channel: discord.CategoryChannel | discord.TextChannel,
     ):
         """
         Set the channels hostbot associates with each type.
@@ -647,7 +641,7 @@ class HostBot(commands.Cog):
                 inline=False,
             )
         else:
-            em.add_field(name="N/A (Hosts)", value=f"Host role not found", inline=False)
+            em.add_field(name="N/A (Hosts)", value="Host role not found", inline=False)
 
         for player_role in player_roles:
             em.add_field(name=f"{player_role} (Players)", value=f"{len(player_role.members)}")
@@ -659,7 +653,7 @@ class HostBot(commands.Cog):
                 inline=False,
             )
         else:
-            em.add_field(name=f"N/A (Specs)", value=f"Spec role not found", inline=False)
+            em.add_field(name="N/A (Specs)", value="Spec role not found", inline=False)
 
         if dead_role:
             em.add_field(
@@ -668,7 +662,7 @@ class HostBot(commands.Cog):
                 inline=False,
             )
         else:
-            em.add_field(name=f"N/A (Dead)", value="Dead role not found", inline=False)
+            em.add_field(name="N/A (Dead)", value="Dead role not found", inline=False)
 
         announcements_chan = (
             session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="announcements").one_or_none()
@@ -683,23 +677,23 @@ class HostBot(commands.Cog):
 
         em.add_field(
             name="Announcements",
-            value=f'{ctx.guild.get_channel(announcements_chan.id) if announcements_chan else "N/A"}',
+            value=f"{ctx.guild.get_channel(announcements_chan.id) if announcements_chan else 'N/A'}",
         )
         em.add_field(
             name="Flips",
-            value=f'{ctx.guild.get_channel(flips_chan.id) if flips_chan else "N/A"}',
+            value=f"{ctx.guild.get_channel(flips_chan.id) if flips_chan else 'N/A'}",
         )
         em.add_field(
             name="Gamechat",
-            value=f'{ctx.guild.get_channel(gamechat_chan.id) if gamechat_chan else "N/A"}',
+            value=f"{ctx.guild.get_channel(gamechat_chan.id) if gamechat_chan else 'N/A'}",
         )
         em.add_field(
             name="Graveyard",
-            value=f'{ctx.guild.get_channel(graveyard_chan.id) if graveyard_chan else "N/A"}',
+            value=f"{ctx.guild.get_channel(graveyard_chan.id) if graveyard_chan else 'N/A'}",
         )
         em.add_field(
             name="Confessionals",
-            value=f'{ctx.guild.get_channel(confs_chan.id) if confs_chan else "N/A"}',
+            value=f"{ctx.guild.get_channel(confs_chan.id) if confs_chan else 'N/A'}",
         )
         role_pms = sorted([str(ctx.guild.get_channel(cid)) for cid in rolepm_ids])
         role_pms = ", ".join(channel for channel in role_pms)
@@ -775,16 +769,10 @@ class HostBot(commands.Cog):
             await ctx.send("Your confessional is too long! Please keep it below 1900 characters.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        gy_channel = session.query(hbs.Channel).filter_by(type="graveyard", server_id=ctx.guild.id).one_or_none()
-        confs_channel = (
-            session.query(hbs.Channel)
-                .filter_by(type="confessionals", server_id=ctx.guild.id)
-                .one_or_none()
-        )
+        session.query(hbs.Channel).filter_by(type="graveyard", server_id=ctx.guild.id).one_or_none()
+        confs_channel = session.query(hbs.Channel).filter_by(type="confessionals", server_id=ctx.guild.id).one_or_none()
         confs_channel = ctx.guild.get_channel(confs_channel.id)  # type: discord.TextChannel
-        msg = msg.replace("@everyone", "@\u200beveryone").replace(
-            "@here", "@\u200bhere"
-        )  # \u200b aka zero-width space
+        msg = msg.replace("@everyone", "@\u200beveryone").replace("@here", "@\u200bhere")  # \u200b aka zero-width space
         conf = f"**Confessional from {ctx.author}:**\n>>> {msg}"
         await confs_channel.send(conf)
         await ctx.message.add_reaction(ctx.bot.greentick)
@@ -819,7 +807,7 @@ class HostBot(commands.Cog):
             if len(reply) > 1800:
                 replies.append(reply + "```")
                 reply = "```\n"
-            reply += f'{host}: {host.avatar_url_as(static_format="png")}\n'
+            reply += f"{host}: {host.avatar_url_as(static_format='png')}\n"
         if len(host_role.members) == 0:
             reply += " "
         reply += "```**Player avatars:**```\n"
@@ -828,7 +816,7 @@ class HostBot(commands.Cog):
                 if len(reply) > 1800:
                     replies.append(reply + "```")
                     reply = "```\n"
-                reply += f'{player}: {player.avatar_url_as(static_format="png")}\n'
+                reply += f"{player}: {player.avatar_url_as(static_format='png')}\n"
         reply += "```"
         replies.append(reply)
 
@@ -1091,8 +1079,9 @@ class HostBot(commands.Cog):
         # the union maintains legacy support
         rolepm_ids = {category.id for category in rolepms}.union({server.rolepms_id})
 
-        role_pms: List[discord.CategoryChannel] = sorted(
-            [ctx.guild.get_channel(cid) for cid in rolepm_ids], key=lambda x: str(x),
+        role_pms: list[discord.CategoryChannel] = sorted(
+            [ctx.guild.get_channel(cid) for cid in rolepm_ids],
+            key=lambda x: str(x),
         )
 
         try:

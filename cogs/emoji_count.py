@@ -2,19 +2,18 @@ import csv
 import json
 import re
 from collections import namedtuple
-from datetime import datetime, timedelta, date
+from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Union, Callable, Optional, List, Dict, Any
 
 import aiohttp
 import discord
 from discord.ext import commands
 from sqlalchemy import create_engine, func
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
 import cogs.emoji_schema as es
 import utils
-from utils.menu import menu_list, CANCEL
+from utils.menu import CANCEL, menu_list
 
 _EMOJI_RE = re.compile(r"<:(?P<name>\w\w+):(?P<id>\d+)>")
 MAX_ATTACHMENT_SIZE = 1e6
@@ -72,7 +71,7 @@ async def count_emoji(message: discord.Message):
         emoji_id = int(match.group("id"))  # type: int
         if emoji_id in emoji_ids:
             # only increment the count if it's an actual emoji that belongs to the server
-            count = increment_count(session, message.guild, emoji_id, message.author, today)
+            increment_count(session, message.guild, emoji_id, message.author, today)
             # await message.channel.send(f'Count for {emoji_ids[emoji_id]} is now {count}.')  # NOTE: Only for debug
 
 
@@ -80,8 +79,8 @@ def get_count(ctx: commands.Context, emoji_id: int, oldest: date) -> int:
     session = session_maker()
     entries = (
         session.query(es.EmojiCount)
-            .filter_by(server_id=ctx.guild.id, emoji_id=emoji_id)
-            .filter(func.DATE(es.EmojiCount.date) > oldest)
+        .filter_by(server_id=ctx.guild.id, emoji_id=emoji_id)
+        .filter(func.DATE(es.EmojiCount.date) > oldest)
     )  # type: List[es.EmojiCount]
     count = 0
     for entry in entries:
@@ -111,7 +110,7 @@ class Emoji(commands.Cog):
                 json.dump(enabled_servers, enabled, indent=4)
             await ctx.send(f"Emoji counting enabled on **{ctx.guild}**.")
         else:
-            await ctx.send(f"Emoji counting already enabled; use `disable` to turn it off.")
+            await ctx.send("Emoji counting already enabled; use `disable` to turn it off.")
 
     @emoji.command(name="disable")
     @commands.has_permissions(administrator=True)
@@ -126,11 +125,11 @@ class Emoji(commands.Cog):
                 json.dump(enabled_servers, enabled, indent=4)
             await ctx.send(f"Emoji counting disabled on **{ctx.guild}**.")
         else:
-            await ctx.send(f"Emoji counting not enabled; use `enable` to turn it on.")
+            await ctx.send("Emoji counting not enabled; use `enable` to turn it on.")
 
     @emoji.command(name="count")
     @commands.has_permissions(manage_emojis=True)
-    async def emoji_count(self, ctx: commands.Context, em: Union[discord.Emoji, int], days: Optional[int] = 30):
+    async def emoji_count(self, ctx: commands.Context, em: discord.Emoji | int, days: int | None = 30):
         """
         Count the times an emoji has been used in the last <days> days.
 
@@ -163,8 +162,8 @@ class Emoji(commands.Cog):
     async def emoji_stats(
         self,
         ctx: commands.Context,
-        em: Optional[Union[discord.Emoji, int]] = None,
-        days: Optional[int] = 30,
+        em: discord.Emoji | int | None = None,
+        days: int | None = 30,
         force: str = "",
     ):
         """
@@ -202,7 +201,7 @@ class Emoji(commands.Cog):
         # really it's a List[sqlalchemy.util._collections.result] but functionally it's a list of int tuples
 
         count = 0
-        for user, user_count in user_counts:
+        for _user, user_count in user_counts:
             count += user_count
 
         if len(user_counts) == 0:
@@ -221,7 +220,7 @@ class Emoji(commands.Cog):
             n_days = f"{days} days"
 
         if max_user is None:
-            freq = f"Most frequent user: `N/A`"
+            freq = "Most frequent user: `N/A`"
         else:
             freq = f"Most frequent user: `{max_user}` (`{user_counts[0][1]}` uses)"
         await ctx.send(f"{ctx.bot.get_emoji(emoji_id)} has been used `{n_times}` in the last `{n_days}`.\n{freq}.")
@@ -349,7 +348,7 @@ class Emoji(commands.Cog):
 
         reply = f"__**All used emojis in the past `{days}` days for {ctx.guild}:**__\n"
         emoji_ls = []
-        for i, entry in enumerate(total_counts):
+        for _i, entry in enumerate(total_counts):
             em = emoji_ids.get(entry[0])
             if em is None:
                 em = NoneEmoji()
@@ -416,21 +415,25 @@ class Emoji(commands.Cog):
         """Event Emoji command group."""
         pass
 
-    async def ditto_add(self, ctx: commands.Context, session: Session) -> Optional[str]:
+    async def ditto_add(self, ctx: commands.Context, session: Session) -> str | None:
         """Interactive menu to get or confirm the name of the most recent game."""
-        prev_emojis: List[es.EventEmoji] = []
-        prev_emojis = session.query(es.EventEmoji).filter_by(server_id=ctx.guild.id, active=True).order_by(
-            es.EventEmoji.date.desc()).all()
+        prev_emojis: list[es.EventEmoji] = []
+        prev_emojis = (
+            session.query(es.EventEmoji)
+            .filter_by(server_id=ctx.guild.id, active=True)
+            .order_by(es.EventEmoji.date.desc())
+            .all()
+        )
         if not prev_emojis:
             await ctx.send("No active previous event.")
             return None
         prev_event = prev_emojis[0].event
         await ctx.send(f"The previous event was {prev_event}. Confirm? [y/n]")
-        msg = await ctx.bot.wait_for(event='message', check=lambda m: m.author == ctx.author, timeout=60)
+        msg = await ctx.bot.wait_for(event="message", check=lambda m: m.author == ctx.author, timeout=60)
         if msg.content.lower() == "y":
             return prev_event
         print(msg.content.lower())
-        ls_events: List[str] = []
+        ls_events: list[str] = []
         for em in prev_emojis:
             if em.event not in ls_events:
                 ls_events.append(em.event)
@@ -448,10 +451,10 @@ class Emoji(commands.Cog):
         owner: discord.Member,
         emojiname: str,
         # emoji: Union[discord.Emoji, discord.Attachment],  # TODO(dpy2.0)
-        emoji: Union[discord.Emoji, discord.PartialEmoji, None],
+        emoji: discord.Emoji | discord.PartialEmoji | None,
     ):
         """Add a new Event Emoji."""
-        emoji_url: Optional[str] = None
+        emoji_url: str | None = None
         if emoji:
             emoji_url = str(emoji.url)
         elif len(ctx.message.attachments) == 1:
@@ -513,7 +516,9 @@ class Emoji(commands.Cog):
     ):
         """Remove an event emoji."""
         session = session_maker()
-        event_emoji: es.EventEmoji = session.query(es.EventEmoji).filter_by(emoji_id=emoji.id, server_id=ctx.guild.id).one_or_none()
+        event_emoji: es.EventEmoji = (
+            session.query(es.EventEmoji).filter_by(emoji_id=emoji.id, server_id=ctx.guild.id).one_or_none()
+        )
         if not event_emoji:
             await ctx.send(f"{emoji} is not registered as an Event Emoji.")
             await ctx.message.add_reaction(ctx.bot.redtick)
@@ -532,9 +537,9 @@ class Emoji(commands.Cog):
     async def evemoji_ls(
         self,
         ctx: commands.Context,
-        sort: Optional[str] = "alphabetical",
+        sort: str | None = "alphabetical",
         # active: Optional[bool] = True,
-        days: Optional[int] = 30,
+        days: int | None = 30,
     ):
         """
         List all (active) Event Emojis.
@@ -542,7 +547,7 @@ class Emoji(commands.Cog):
         Use days to limit the time window if you're counting by usage (default 30).
         """
         session = session_maker()
-        query_emojis: List[es.EventEmoji] = []
+        query_emojis: list[es.EventEmoji] = []
         # I don't think it makes sense to show inactive emojis atm, it clutters up the command invocation.
         active = True
         if active:
@@ -551,7 +556,7 @@ class Emoji(commands.Cog):
             query_emojis = session.query(es.EventEmoji).filter_by(server_id=ctx.guild.id).all()
 
         EmojiTuple = namedtuple("EmojiTuple", "discord db_entry count owner")
-        emojis: List[EmojiTuple] = []
+        emojis: list[EmojiTuple] = []
         for emoji in query_emojis:
             owner = ctx.guild.get_member(emoji.owner_id)
             oldest = datetime.utcnow().date() - timedelta(days=days)
@@ -591,7 +596,6 @@ class Emoji(commands.Cog):
             await ctx.send(f"Exit your currently running menu first with `{CANCEL}`.")
 
 
-
 def setup(bot: commands.Bot):
     global enabled_servers
     global session_maker
@@ -610,7 +614,7 @@ def setup(bot: commands.Bot):
         Path(needed_dir).mkdir(exist_ok=True)
 
     if Path(enabled_servers_path).exists():
-        with open(enabled_servers_path, "r") as enabled:
+        with open(enabled_servers_path) as enabled:
             enabled_servers = json.load(enabled)
     else:
         enabled_servers = []

@@ -1,10 +1,15 @@
-from typing import Dict, List
-
-
 class Conf:
-    def __init__(self, greentick_id: int = None, redtick_id: int = None, boostemoji_id: int = None,
-                 waitemoji_id: int = None, plugins: List[str] = None, imgur_keys: Dict[str, str] = None,
-                 trusted: List[int] = None, google_email: str = None):
+    def __init__(
+        self,
+        greentick_id: int = None,
+        redtick_id: int = None,
+        boostemoji_id: int = None,
+        waitemoji_id: int = None,
+        plugins: list[str] = None,
+        imgur_keys: dict[str, str] = None,
+        trusted: list[int] = None,
+        google_email: str = None,
+    ):
         self.greentick_id = greentick_id
         self.redtick_id = redtick_id
         self.boostemoji_id = boostemoji_id

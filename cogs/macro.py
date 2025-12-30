@@ -1,5 +1,4 @@
 import random
-from typing import List, Optional
 
 import discord
 from discord.ext import commands
@@ -16,13 +15,13 @@ class Macro(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot = bot
 
-    def _retrieve_images(self, album_ids: List[str]) -> List[Image]:
+    def _retrieve_images(self, album_ids: list[str]) -> list[Image]:
         images = []
         for album in album_ids:
             images += self.bot.imgur.get_album_images(album)
         return images
 
-    def _retrieve_album_image(self, album_ids: List[str], key: str = None) -> discord.Embed:
+    def _retrieve_album_image(self, album_ids: list[str], key: str = None) -> discord.Embed:
         images = self._retrieve_images(album_ids)
         image = random.choice(images)  # type: Image
         if key is not None:
@@ -34,16 +33,16 @@ class Macro(commands.Cog):
         return discord.Embed().set_image(url=image.link)
 
     @commands.command()
-    async def bidoof(self, ctx: commands.Context, key: Optional[str]):
+    async def bidoof(self, ctx: commands.Context, key: str | None):
         """
         I can't make a Mafia Bidoof bot *without* this command.
 
         God bless Mafia Bidoof.
         """
         if not ctx.bot.imgur:
-            await ctx.send('Imgur not enabled.')
+            await ctx.send("Imgur not enabled.")
             return
-        BIDOOF_ALBUM = 'kn6ieEv'
+        BIDOOF_ALBUM = "kn6ieEv"
         # bidoofs = self._retrieve_images([BIDOOF_ALBUM])
         # bidoof_img = random.choice(bidoofs)  # type: Image
         # if key is not None:
@@ -57,16 +56,16 @@ class Macro(commands.Cog):
         await ctx.send(embed=em)
 
     @commands.command()
-    async def sadcat(self, ctx: commands.Context, key: Optional[str]):
+    async def sadcat(self, ctx: commands.Context, key: str | None):
         """
         Post a random sadcat.
 
         Optional unique keys can be used to retrieve specific sadcats.
         """
         if not ctx.bot.imgur:
-            await ctx.send('Imgur not enabled.')
+            await ctx.send("Imgur not enabled.")
             return
-        SADCAT_ALBUM = ['tYiOD5a', 'kSwj6F5']
+        SADCAT_ALBUM = ["tYiOD5a", "kSwj6F5"]
         # sadcats = self._retrieve_images(SADCAT_ALBUM)
         # sadcat_img = random.choice(sadcats)  # type: Image
         # if key is not None:

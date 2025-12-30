@@ -1,22 +1,26 @@
-import asyncio
 import math
 import re
 from collections import OrderedDict
+from collections.abc import Iterable, MutableMapping
 from contextlib import ExitStack
-from typing import Iterable, MutableMapping, List, Set, Tuple, Union
 
 import discord
 from discord.ext import commands
-
-import core
 
 CANCEL = "cancel"
 
 _locks = set()  # type: Set[Tuple[int, int]]  # represents a tuple of user IDs and channel IDs
 
 
-async def menu_list(ctx: commands.Context, ls: Iterable, heading: str = None, timeout: int = 600,
-                    select_max: Union[int, None] = 1, repeats: bool = False, use_code_block: bool = True):
+async def menu_list(
+    ctx: commands.Context,
+    ls: Iterable,
+    heading: str = None,
+    timeout: int = 600,
+    select_max: int | None = 1,
+    repeats: bool = False,
+    use_code_block: bool = True,
+):
     keys, elems = [], []
     for i, e in enumerate(ls):
         keys.append(str(i))
@@ -33,11 +37,18 @@ async def menu_list(ctx: commands.Context, ls: Iterable, heading: str = None, ti
     )
 
 
-async def menu_dict(ctx: commands.Context, d: MutableMapping, heading: str = None, timeout: int = 600,
-                    select_max: Union[int, None] = 1, repeats: bool = False, use_code_block: bool = True):
+async def menu_dict(
+    ctx: commands.Context,
+    d: MutableMapping,
+    heading: str = None,
+    timeout: int = 600,
+    select_max: int | None = 1,
+    repeats: bool = False,
+    use_code_block: bool = True,
+):
     keys, elems = [], []
     for k, e in d.items():
-        keys.append(str(k).replace(',', ''))
+        keys.append(str(k).replace(",", ""))
         elems.append(e)
     return await menu_wrapper(
         ctx,
@@ -52,13 +63,13 @@ async def menu_dict(ctx: commands.Context, d: MutableMapping, heading: str = Non
 
 
 def menu_str(
-    keys: List,
-    elements: List,
+    keys: list,
+    elements: list,
     page,
     heading: str = None,
     items_per_page=20,
-    select_max: Union[int, None] = 1,
-    use_code_block: bool = True
+    select_max: int | None = 1,
+    use_code_block: bool = True,
 ):
     start, stop = page * items_per_page, (page + 1) * items_per_page
 
@@ -66,35 +77,45 @@ def menu_str(
     for key in keys:
         max_len = max(len(str(key)), max_len)
 
-    output_str = f"{heading}\n" if heading else ''
-    for k, e in zip(keys[start:stop], elements[start:stop]):
+    output_str = f"{heading}\n" if heading else ""
+    for k, e in zip(keys[start:stop], elements[start:stop], strict=False):
         # if not use_code_block:
         #     # Make it a bulleted list if not a code block
         #     output_str += "- "
         if use_code_block:
-            output_str += f'{k!s:>{max_len}}. {e}\n'
+            output_str += f"{k!s:>{max_len}}. {e}\n"
         else:
             # Use numbers
             # TODO:
             #  - plumb in "is it a menu dict" so that it can be formatted as a bulleted list instead
             #  - fix zero-indexing
-            output_str += f'{k}. {e}\n'
+            output_str += f"{k}. {e}\n"
     if use_code_block:
-        output_str = f'```\n{output_str}\n```'
-    select_str = 'an item'
+        output_str = f"```\n{output_str}\n```"
+    select_str = "an item"
     if select_max is None:
-        select_str = 'one or more items, separated by commas,'
+        select_str = "one or more items, separated by commas,"
     elif select_max > 1:
         select_str = f"up to {select_max} items, separated by commas,"
     if len(keys) > items_per_page:
-        output_str += f'*(Page {page + 1} of {math.ceil(len(keys) / items_per_page)}. Select {select_str} or `cancel`.)*'
+        output_str += (
+            f"*(Page {page + 1} of {math.ceil(len(keys) / items_per_page)}. Select {select_str} or `cancel`.)*"
+        )
     else:
-        output_str += f'*(Select {select_str} or `cancel`.)*'
+        output_str += f"*(Select {select_str} or `cancel`.)*"
     return output_str
 
 
-async def menu_wrapper(ctx: commands.Context, keys: List, elements: List, heading: str = None, timeout: int = 600,
-                       select_max: Union[int, None] = 1, repeats: bool = False, use_code_block: bool = True):
+async def menu_wrapper(
+    ctx: commands.Context,
+    keys: list,
+    elements: list,
+    heading: str = None,
+    timeout: int = 600,
+    select_max: int | None = 1,
+    repeats: bool = False,
+    use_code_block: bool = True,
+):
     lock = (ctx.author.id, ctx.channel.id)
     if lock in _locks:
         raise RuntimeError("A menu instance in this channel already exists for this user.")
@@ -115,21 +136,21 @@ async def menu_wrapper(ctx: commands.Context, keys: List, elements: List, headin
 
 async def menu_loop(
     ctx: commands.Context,
-    keys: List,
-    elements: List,
+    keys: list,
+    elements: list,
     heading: str = None,
     timeout: int = 600,
-    select_max: Union[int, None] = 1,
+    select_max: int | None = 1,
     repeats: bool = False,
-    use_code_block: bool = True
+    use_code_block: bool = True,
 ):
     NUM_ITEMS = 20
-    ARROW_LEFT, ARROW_RIGHT = '\U000025c0', '\U000025b6'
+    ARROW_LEFT, ARROW_RIGHT = "\U000025c0", "\U000025b6"
 
     def single_condition(s: str):
         return s in keys
 
-    def multi_condition(ls: List[str]):
+    def multi_condition(ls: list[str]):
         if ls is None:
             return False
         for elem in ls:
@@ -166,7 +187,7 @@ async def menu_loop(
 
     bot = ctx.bot  # type: core.bot.Bot
 
-    events = ['message', 'reaction_add', 'reaction_remove']
+    events = ["message", "reaction_add", "reaction_remove"]
     checks = [
         lambda msg: msg.author == ctx.author and msg.channel == ctx.channel,
         lambda rxn, usr: usr == ctx.author and rxn.message.id == menu_msg.id and rxn.emoji in [ARROW_LEFT, ARROW_RIGHT],
@@ -176,21 +197,21 @@ async def menu_loop(
     while not cond(selection):
         try:
             result, event_type = await bot.wait_for_first(events=events, checks=checks, timeout=timeout)
-        except asyncio.TimeoutError:
+        except TimeoutError:
             break
 
-        if event_type == 'message':
+        if event_type == "message":
             # check for selection
-            assert type(result) is discord.Message, f'result type was {type(result)}, expected discord.Message'
+            assert type(result) is discord.Message, f"result type was {type(result)}, expected discord.Message"
             if result.content.lower() == CANCEL:
                 # exit menu loop
                 selection = CANCEL
                 break
             selection = result.content
             if multi_select:
-                selection = re.split(r', *', selection)
+                selection = re.split(r", *", selection)
                 if select_max is not None and len(selection) > select_max:
-                    await ctx.send(f'ERR: select a maximum of {select_max} options.')
+                    await ctx.send(f"ERR: select a maximum of {select_max} options.")
                     selection = None
             # if result.content in keys:
             #     selection = result.content
@@ -199,7 +220,7 @@ async def menu_loop(
         else:
             # check for arrow direction
             reaction = result[0]
-            assert type(reaction) is discord.Reaction, f'result type was {type(reaction)}, expected discord.Reaction'
+            assert type(reaction) is discord.Reaction, f"result type was {type(reaction)}, expected discord.Reaction"
             if reaction.emoji == ARROW_LEFT:
                 page = max(0, page - 1)
             else:
@@ -221,13 +242,13 @@ async def menu_loop(
         await menu_msg.remove_reaction(ARROW_LEFT, member=ctx.bot.user)
         await menu_msg.remove_reaction(ARROW_RIGHT, member=ctx.bot.user)
 
-    if selection == 'cancel':
+    if selection == "cancel":
         await menu_msg.add_reaction(ctx.bot.redtick)
         return None
 
     if selection is None:
         await menu_msg.add_reaction(ctx.bot.redtick)
-        raise asyncio.TimeoutError
+        raise TimeoutError
 
     if multi_select:
         ret = [elements[keys.index(sel)] for sel in selection]

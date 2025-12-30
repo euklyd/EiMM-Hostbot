@@ -1,20 +1,18 @@
-from discord import Activity, ActivityType, Status
-
 from conf.conf import Conf
 
-name = 'mafia bidoof'
+name = "mafia bidoof"
 owner_id = 123456789012345678  # this is me! it is not you! change it to be you!
-client_token = 'your token here'
+client_token = "your token here"
 status = None
 # status = Status.idle
 
 cogs = [
-    'eimm',
-    'hostbot',
+    "eimm",
+    "hostbot",
     # Interview is a complex cog and is not part of the core utility; you're welcome to use it but it is complex.
     # 'interview',
-    'macro',
-    'profiles',
+    "macro",
+    "profiles",
     # Add more cogs here!
 ]
 
@@ -25,13 +23,13 @@ plugins = [
 ]
 
 imgur_keys = {
-    'id': 'your keys go here',
-    'secret': 'your keys go here',
-    'access': 'your keys go here',
-    'refresh': 'your keys go here',
+    "id": "your keys go here",
+    "secret": "your keys go here",
+    "access": "your keys go here",
+    "refresh": "your keys go here",
 }
 
-prefix = ['##']
+prefix = ["##"]
 
 conf = Conf(
     # NOTE: Emojis must be uploaded to your own server or add your bot to the discord.py server. They're used
@@ -44,7 +42,7 @@ conf = Conf(
     waitemoji_id=833565752035639316,  # change these to reflect your own emoji ID
     plugins=plugins,
     imgur_keys=imgur_keys,
-    google_email='your-bot-here@your-bot-here.iam.gserviceaccount.com',
+    google_email="your-bot-here@your-bot-here.iam.gserviceaccount.com",
 )
 
 activity = None

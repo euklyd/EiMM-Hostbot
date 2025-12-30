@@ -7,19 +7,19 @@ import re
 import urllib
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, List, Dict, Any
+from typing import Any
 
 import aiohttp
 import discord
 import requests
 from discord.ext import commands
 from fuzzywuzzy import process
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.future import select
 from sqlalchemy.orm import sessionmaker
 
 from core.bot import Bot
-from schemas.scryfall_schema import ScryfallText, Base
+from schemas.scryfall_schema import Base, ScryfallText
 
 API = "https://api.scryfall.com/"
 SCRYFALL_SEARCH_ENDPOINT = "https://api.scryfall.com/cards/search"
@@ -33,7 +33,7 @@ YGOPRO_ENDPOINT = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
 
 
 class ScryfallResponse:
-    def __init__(self, cards: dict, cardnames: List[str], card_map: Dict[str, dict]):
+    def __init__(self, cards: dict, cardnames: list[str], card_map: dict[str, dict]):
         self.cards = cards
         self.names = cardnames
         self.map = card_map
@@ -95,7 +95,7 @@ class Cards(commands.Cog):
         """
         mtg_regex = r"\[\[([^\[\]]*)]]"
         match = re.search(mtg_regex, message.content)
-        if type(message.channel) == discord.TextChannel:
+        if isinstance(message.channel, discord.TextChannel):
             for member in message.channel.members:  # type: discord.Member
                 if member.id == 558508371821723670:
                     if member.status == discord.Status.offline:
@@ -171,7 +171,7 @@ class Cards(commands.Cog):
         while True:
             try:
                 result, event_type = await ctx.bot.wait_for_first(events=events, checks=checks, timeout=180)
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 break
 
             reaction = result[0]
@@ -246,17 +246,17 @@ class Cards(commands.Cog):
         """
         await self._ygo(ctx, query, text_only=True)
 
-    async def _scryfall_search(self, query: str) -> Optional[List[discord.Embed]]:
+    async def _scryfall_search(self, query: str) -> list[discord.Embed] | None:
         resp = await self.session.get(SCRYFALL_SEARCH_ENDPOINT, params={"q": query})
         content = await resp.json()
-        cards: List[Dict[str, Any]] = content.get("data")
+        cards: list[dict[str, Any]] = content.get("data")
         if cards is None:
             # log an error
             return None
-        embeds: List[discord.Embed] = await asyncio.gather(*[self._mtg_embed(card) for card in cards])
+        embeds: list[discord.Embed] = await asyncio.gather(*[self._mtg_embed(card) for card in cards])
         return embeds
 
-    async def _mtg_text(self, card_id: str) -> Optional[str]:
+    async def _mtg_text(self, card_id: str) -> str | None:
         """
         Retrieve card as text format from own db cache if it exists, otherwise pull it and cache it.
         """
@@ -352,16 +352,16 @@ class Cards(commands.Cog):
                     em.add_field(name="Level", value=str(card["level"]), inline=False)
 
             em.add_field(name="Attribute", value=card["attribute"], inline=False)
-            em.add_field(name="Type", value=f'[{card["race"]} / {card["type"]}]', inline=False)
+            em.add_field(name="Type", value=f"[{card['race']} / {card['type']}]", inline=False)
 
             if "def" in card:
-                em.add_field(name="ATK/DEF", value=f'ATK/{card["atk"]},  DEF/{card["def"]}', inline=False)
+                em.add_field(name="ATK/DEF", value=f"ATK/{card['atk']},  DEF/{card['def']}", inline=False)
             elif "linkval" in card:
-                em.add_field(name="ATK/LINK", value=f'ATK/{card["atk"]},  LINK-{card["linkval"]}', inline=False)
+                em.add_field(name="ATK/LINK", value=f"ATK/{card['atk']},  LINK-{card['linkval']}", inline=False)
 
             if "scale" in card:
                 # for pendulum monsters
-                em.add_field(name="Pendulum Scale", value=f'{card["scale"]} / {card["scale"]}', inline=False)
+                em.add_field(name="Pendulum Scale", value=f"{card['scale']} / {card['scale']}", inline=False)
             if "linkmarkers" in card:
                 # for link monsters
                 em.add_field(name="Link Markers", value=card["linkmarkers"], inline=False)
@@ -371,13 +371,13 @@ class Cards(commands.Cog):
             em.add_field(name="Type", value=card["race"], inline=False)
         else:
             # something went wrong
-            em.description = f'Type info could not be found for `{card["name"]}`.'
+            em.description = f"Type info could not be found for `{card['name']}`."
             return em
 
         if "archetype" in card:
             archetype_url = Cards._ygo_archetype_url(card)
             if archetype_url:
-                em.add_field(name="Archetype", value=f'[{card["archetype"]}]({archetype_url})')
+                em.add_field(name="Archetype", value=f"[{card['archetype']}]({archetype_url})")
 
         baninfo = Cards._ygo_baninfo(card)
         if baninfo is not None:
@@ -435,14 +435,14 @@ class Cards(commands.Cog):
         return base_set_url + urllib.parse.quote(set_info["set_name"])
 
     @staticmethod
-    def _ygo_archetype_url(card: dict) -> Optional[str]:
+    def _ygo_archetype_url(card: dict) -> str | None:
         if "archetype" not in card:
             return None
         base_archetype_url = "https://db.ygoprodeck.com/search/?&archetype="
         return base_archetype_url + urllib.parse.quote(card["archetype"])
 
     @staticmethod
-    def _ygo_supertype(card: dict) -> Optional[str]:
+    def _ygo_supertype(card: dict) -> str | None:
         cardtype = card["type"]
         if "monster" in cardtype.lower():
             return "Monster"
@@ -453,7 +453,7 @@ class Cards(commands.Cog):
         return None
 
     @staticmethod
-    def _ygo_baninfo(card: dict) -> Optional[str]:
+    def _ygo_baninfo(card: dict) -> str | None:
         if "banlist_info" in card:
             bans = []
             if "ban_tcg" in card["banlist_info"]:
@@ -467,7 +467,7 @@ class Cards(commands.Cog):
         return None
 
     @staticmethod
-    def _ygocolor(card: dict) -> Optional[discord.Colour]:
+    def _ygocolor(card: dict) -> discord.Colour | None:
         """
         Unfortunately will never support Pendulums, as gradients are not a thing on Discord.
 
@@ -548,7 +548,7 @@ class Cards(commands.Cog):
         r_odds = 5 * 12
         sr_odds = 12
         ur_odds = 5
-        for i in range(num_cards):
+        for _i in range(num_cards):
             rand = random.randint(0, c_odds + r_odds + sr_odds + ur_odds)
 
             if rand < c_odds:
@@ -584,7 +584,7 @@ class Cards(commands.Cog):
                 "(DSPR)": "SR",
                 "(DUPR)": "UR",
             }[card["rarity"]]
-            result += f'{card["num"]}x {card["name"]} ({rarity})\n'
+            result += f"{card['num']}x {card['name']} ({rarity})\n"
 
         await ctx.send(result)
 
@@ -621,7 +621,7 @@ class Cards(commands.Cog):
             else:
                 try:
                     card = requests.get(ENDPOINT + f"?id={card_id}").json()["data"][0]
-                except Exception as e:
+                except Exception:
                     await ctx.send(f"Could not retrieve data for card ID: `{card_id}`.")
                     continue
 
@@ -659,7 +659,7 @@ class Cards(commands.Cog):
             writer.writerows(ls_collection)
             csv_out.seek(0)
             await ctx.send(
-                f"Processed your collection.", file=discord.File(csv_out, filename=f"{ctx.author} collection.csv")
+                "Processed your collection.", file=discord.File(csv_out, filename=f"{ctx.author} collection.csv")
             )
 
     @commands.command(name="sftext", aliases=["sftest"])

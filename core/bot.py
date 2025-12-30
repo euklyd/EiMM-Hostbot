@@ -1,9 +1,8 @@
 import asyncio
-import json
 import re
-import time
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import List, Optional, Callable, Union, Any, Tuple, Iterable
+from typing import Any
 
 import discord
 from discord.ext import commands
@@ -17,7 +16,7 @@ from core.imgur import Imgur
 class Bot(commands.Bot):
     def __init__(
         self,
-        command_prefix: Union[str, Iterable[str], Callable[["Bot", discord.Message], str]],
+        command_prefix: str | Iterable[str] | Callable[["Bot", discord.Message], str],
         conf: Conf,
         help_command=None,
         description: str = None,
@@ -106,8 +105,8 @@ class Bot(commands.Bot):
         await super().on_message(message)
 
     async def wait_for_first(
-        self, events: List[str], *, checks: Optional[List[Callable[..., bool]]] = None, timeout: float = None
-    ) -> Tuple[Any, str]:
+        self, events: list[str], *, checks: list[Callable[..., bool]] | None = None, timeout: float = None
+    ) -> tuple[Any, str]:
         """|coro|
 
         Waits for the first of multiple WebSocket events to be dispatched.
@@ -160,7 +159,7 @@ class Bot(commands.Bot):
 
         futures = []  # type: List[asyncio.Future]
 
-        for event, check in zip(events, checks):
+        for event, check in zip(events, checks, strict=False):
             future = self.loop.create_future()
             if check is None:
 
@@ -185,7 +184,7 @@ class Bot(commands.Bot):
         for future in pending:  # type: asyncio.Future
             future.cancel()
         if len(complete) == 0:
-            raise asyncio.TimeoutError
+            raise TimeoutError
         completed_future = complete.pop()  # type: asyncio.Future
         index = futures.index(completed_future)
         event_type = events[index]

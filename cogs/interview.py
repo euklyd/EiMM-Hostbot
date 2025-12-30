@@ -1,17 +1,16 @@
 import asyncio
 import logging
-import pprint
-from datetime import datetime
+from collections.abc import Generator
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union, Generator, Tuple
+from typing import Any
 
 import discord
 import gspread
 from discord.ext import commands
-from sqlalchemy import create_engine, event, desc
+from sqlalchemy import create_engine, desc, event
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
-from gspread.exceptions import SpreadsheetNotFound
 
 from cogs import interview_schema as schema
 from core.bot import Bot
@@ -58,7 +57,7 @@ class Candidate:
         self.voters = []
 
     def str(self, length: int) -> str:
-        return f'{_name_or_default(self.candidate) + ":" : <{length + 1}}'
+        return f"{_name_or_default(self.candidate) + ':': <{length + 1}}"
 
     def voters_str(self) -> str:
         # Hopefully it should never fall through to default! Preprocessing strips those out.
@@ -72,7 +71,7 @@ class Candidate:
     def full_str(self, length: int) -> str:
         return f"{self.str(length)} {len(self.voters)} ({self.voters_str()})"
 
-    def sortkey(self) -> Tuple[int, str]:
+    def sortkey(self) -> tuple[int, str]:
         """
         Sort first by number of votes, then alphabetically.
         Votes are negative so that sorting by votes (greatest to least) can be consistent with sorting
@@ -85,7 +84,7 @@ class Question:
     def __init__(
         self,
         interviewee: discord.Member,
-        asker: Union[discord.Member, discord.User],
+        asker: discord.Member | discord.User,
         question: str,
         question_num: int,
         server_id: int,
@@ -113,11 +112,11 @@ class Question:
         return f"https://discordapp.com/channels/{self.server_id}/{self.channel_id}/{self.message_id}"
 
     @staticmethod
-    async def from_row(ctx: commands.Context, row: Dict[str, Any]) -> "Question":
+    async def from_row(ctx: commands.Context, row: dict[str, Any]) -> "Question":
         """
         Translates a row from the Google sheet to an object.
         """
-        channel = ctx.bot.get_channel(row["Channel ID"])  # type: discord.TextChannel
+        ctx.bot.get_channel(row["Channel ID"])  # type: discord.TextChannel
 
         asker = ctx.guild.get_member(row["ID"])
         if asker is None:
@@ -163,7 +162,7 @@ class Question:
         ]
 
     @staticmethod
-    def upload_many(ctx: commands.Context, connection: spreadsheet.SheetConnection, questions: List["Question"]):
+    def upload_many(ctx: commands.Context, connection: spreadsheet.SheetConnection, questions: list["Question"]):
         """
         Upload a list of Questions to a spreadsheet.
 
@@ -214,7 +213,7 @@ class Question:
 class InterviewEmbed(discord.Embed):
     @staticmethod
     def blank(
-        interviewee: discord.Member, asker: Union[discord.Member, discord.User], avatar_url: str = None
+        interviewee: discord.Member, asker: discord.Member | discord.User, avatar_url: str = None
     ) -> "InterviewEmbed":
         if avatar_url is None:
             avatar_url = interviewee.avatar_url
@@ -391,6 +390,7 @@ def _ck_is_manager():
 
     Checked when doing routine interview management.
     """
+
     async def predicate(ctx: commands.Context):
         if ctx.author.guild_permissions.administrator:
             return True
@@ -469,8 +469,8 @@ class Interview(commands.Cog):
 
     @staticmethod
     def _generate_embeds(
-        interviewee: discord.Member, interview: schema.Interview, questions: List[Question], avatar_url: str = None
-    ) -> List[Union[discord.Embed, Question]]:
+        interviewee: discord.Member, interview: schema.Interview, questions: list[Question], avatar_url: str = None
+    ) -> list[discord.Embed | Question]:
         """
         Generate a list of discord.Embeds to be posted from a list of Questions.
         """
@@ -564,7 +564,7 @@ class Interview(commands.Cog):
         existing_server = session.query(schema.Server).filter_by(sheet_name=sheet_name).one_or_none()
         if existing_server is not None:
             await ctx.send(
-                f"A sheet with the name `{sheet_name}` has already been registered, " "please use a different one."
+                f"A sheet with the name `{sheet_name}` has already been registered, please use a different one."
             )
             await ctx.message.add_reaction(ctx.bot.redtick)
             return False
@@ -597,7 +597,7 @@ class Interview(commands.Cog):
         answers: discord.TextChannel,
         backstage: discord.TextChannel,
         sheet_name: str,
-        default_question: str = "Make sure to write an intro on stage before you start " "answering questions!",
+        default_question: str = "Make sure to write an intro on stage before you start answering questions!",
     ):
         """
         Set up the current server for interviews.
@@ -638,8 +638,7 @@ class Interview(commands.Cog):
         session.add(server)
         session.commit()
         await ctx.send(
-            f"Set up {ctx.guild} for interviews.\n"
-            f"Answers will be posted in {answers}, hidden channel is {backstage}."
+            f"Set up {ctx.guild} for interviews.\nAnswers will be posted in {answers}, hidden channel is {backstage}."
         )
         await ctx.message.add_reaction(ctx.bot.greentick)
 
@@ -672,7 +671,7 @@ class Interview(commands.Cog):
     @iv.command(name="next")
     @_ck_is_manager()
     @_ck_server_active()
-    async def iv_next(self, ctx: commands.Context, interviewee: discord.Member, *, email: Optional[str] = None):
+    async def iv_next(self, ctx: commands.Context, interviewee: discord.Member, *, email: str | None = None):
         """
         Set up the next interview for <interviewee>.
 
@@ -682,9 +681,7 @@ class Interview(commands.Cog):
 
         # set the old interview row to be not-current
         session = session_maker()
-        old_interview = (
-            session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
-        )  # type: schema.Interview
+        old_interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()  # type: schema.Interview
         if old_interview is not None:
             # if old_interview doesn't exist that just means it's the first interview!
             old_interview.current = False
@@ -876,7 +873,7 @@ class Interview(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
         if server.active is False:
-            await ctx.send(f"Interviews are already disabled.")
+            await ctx.send("Interviews are already disabled.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
         server.active = False
@@ -897,7 +894,7 @@ class Interview(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
         if server.active is True:
-            await ctx.send(f"Interviews are already enabled.")
+            await ctx.send("Interviews are already enabled.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
         server.active = True
@@ -919,7 +916,7 @@ class Interview(commands.Cog):
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         if date is None:
-            await ctx.send(f'The current reinterview limit is `{server.limit.strftime("%Y/%m/%d")}`.')
+            await ctx.send(f"The current reinterview limit is `{server.limit.strftime('%Y/%m/%d')}`.")
             return
         server.limit = datetime.strptime(date, "%Y/%m/%d")
         session.commit()
@@ -927,16 +924,14 @@ class Interview(commands.Cog):
 
     @iv.command(name="invite")
     @_ck_server_active()
-    async def iv_invite(self, ctx: commands.Context, user: Union[discord.Member, str], minutes=60):
+    async def iv_invite(self, ctx: commands.Context, user: discord.Member | str, minutes=60):
         """
         Temporarily open the interview stage to other people.
 
         Usable only by the current interviewee and administrators. Defaults to 60 minute invitation. Use 'all' for <user> to invite everyone.
         """
         session = session_maker()
-        interview = (
-            session.query(schema.Interview).filter_by(current=True, server_id=ctx.guild.id).one_or_none()
-        )  # type: Optional[schema.Interview]
+        interview = session.query(schema.Interview).filter_by(current=True, server_id=ctx.guild.id).one_or_none()  # type: Optional[schema.Interview]
         interviewee = ctx.guild.get_member(interview.interviewee_id)
         author_perms = ctx.channel.permissions_for(ctx.author)  # type: discord.Permissions
         stage = ctx.guild.get_channel(interview.server.answer_channel)
@@ -957,8 +952,7 @@ class Interview(commands.Cog):
 
         if minutes > 24 * 60:  # max at 24 hours
             await ctx.send(
-                "You can't add someone to the stage for more than 24 hours; if you want a longer duration, "
-                "ask a mod."
+                "You can't add someone to the stage for more than 24 hours; if you want a longer duration, ask a mod."
             )
             return
         await asyncio.sleep(60 * minutes)
@@ -968,16 +962,14 @@ class Interview(commands.Cog):
 
     @iv.command(name="stats")
     @_ck_server_active()
-    async def iv_stats(self, ctx: commands.Context, member: Optional[discord.Member]):
+    async def iv_stats(self, ctx: commands.Context, member: discord.Member | None):
         """
         View interview-related stats.
 
         If no user specified, view stats for the current interview.
         """
         session = session_maker()
-        interview = (
-            session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
-        )  # type: schema.Interview
+        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()  # type: schema.Interview
         if member is None:
             if interview is None:
                 await ctx.send("There is no currently ongoing interview.")
@@ -1045,15 +1037,13 @@ class Interview(commands.Cog):
 
     # == Questions ==
 
-    async def _ask_many(self, ctx: commands.Context, question_strs: List[str]):
+    async def _ask_many(self, ctx: commands.Context, question_strs: list[str]):
         """
         Ask a bunch of questions at once. Or just one. Either way, use the batch upload command rather than
         doing it one at a time.
         """
         session = session_maker()
-        interview = (
-            session.query(schema.Interview).filter_by(current=True, server_id=ctx.guild.id).one_or_none()
-        )  # type: Optional[schema.Interview]
+        interview = session.query(schema.Interview).filter_by(current=True, server_id=ctx.guild.id).one_or_none()  # type: Optional[schema.Interview]
         interviewee = ctx.guild.get_member(interview.interviewee_id)
         if interviewee is None:
             await ctx.send(f"Couldn't find server member `{interview.interviewee_id}`.")
@@ -1143,9 +1133,7 @@ class Interview(commands.Cog):
         """
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
-        interview = (
-            session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
-        )  # type: schema.Interview
+        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()  # type: schema.Interview
         interviewee = ctx.guild.get_member(interview.interviewee_id)
         sheet = self.connection.get_sheet(server.sheet_name).sheet1
 
@@ -1238,9 +1226,7 @@ class Interview(commands.Cog):
 
         session = session_maker()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
-        interview = (
-            session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
-        )  # type: schema.Interview
+        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()  # type: schema.Interview
         interviewee = ctx.guild.get_member(interview.interviewee_id)
         sheet = self.connection.get_sheet(server.sheet_name).sheet1
 
@@ -1279,7 +1265,7 @@ class Interview(commands.Cog):
     @commands.command()
     @_ck_server_active()
     @_ck_is_interviewee()
-    async def imganswer(self, ctx: commands.Context, row_num: int, url: str, preview: Optional[bool]):
+    async def imganswer(self, ctx: commands.Context, row_num: int, url: str, preview: bool | None):
         """
         Answer a single question row with an added image.
 
@@ -1351,13 +1337,11 @@ class Interview(commands.Cog):
             await ctx.send(f"No audience role set up for {ctx.guild}.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        members = "\n".join((str(member) for member in audience_role.members))
+        members = "\n".join(str(member) for member in audience_role.members)
         try:
             await ctx.send(f"```\n{members}\n```")
-        except:
-            await ctx.send(
-                f"Too many people on stage to list ({len(audience_role.members)}. Consider `clearstage`."
-            )
+        except Exception:
+            await ctx.send(f"Too many people on stage to list ({len(audience_role.members)}. Consider `clearstage`.")
 
     @commands.command()
     @_ck_server_active()
@@ -1382,7 +1366,7 @@ class Interview(commands.Cog):
     # == Votes ==
 
     @staticmethod
-    def _votes_footer(votes: List[discord.User], prefix: str = None):
+    def _votes_footer(votes: list[discord.User], prefix: str = None):
         if len(votes) == 0:
             return f"_You are not currently voting; vote with `{prefix}vote`._"
 
@@ -1395,7 +1379,7 @@ class Interview(commands.Cog):
         return f"_{response}_"
 
     @staticmethod
-    def _preprocess_votals(ctx: commands.Context, votes: List[schema.Vote]) -> List[Candidate]:
+    def _preprocess_votals(ctx: commands.Context, votes: list[schema.Vote]) -> list[Candidate]:
         """
         Returns a list of candidates and vote counts, sorted by (vote count, alphabetical name).
         """
@@ -1410,7 +1394,7 @@ class Interview(commands.Cog):
         return sorted(list(votals.values()), key=lambda x: x.sortkey())
 
     @staticmethod
-    def _votals_text_basic(ctx: commands.Context, votes: List[schema.Vote]) -> str:
+    def _votals_text_basic(ctx: commands.Context, votes: list[schema.Vote]) -> str:
         votals = Interview._preprocess_votals(ctx, votes)
         text = ""
         max_name_length = len(SERVER_LEFT_MSG)
@@ -1428,7 +1412,7 @@ class Interview(commands.Cog):
         return text
 
     @staticmethod
-    def _votals_text_full(ctx: commands.Context, votes: List[schema.Vote]) -> str:
+    def _votals_text_full(ctx: commands.Context, votes: list[schema.Vote]) -> str:
         votals = Interview._preprocess_votals(ctx, votes)
         text = ""
         max_name_length = len(SERVER_LEFT_MSG)
@@ -1619,7 +1603,7 @@ class Interview(commands.Cog):
         await ctx.send(response)
 
     async def _votals_in_channel(
-        self, ctx: commands.Context, flag: Optional[str] = None, channel: Optional[discord.TextChannel] = None
+        self, ctx: commands.Context, flag: str | None = None, channel: discord.TextChannel | None = None
     ) -> discord.Message:
         """
         The only reason this isn't votals() is because it also gets called by iv_next(), but that wants to place
@@ -1639,25 +1623,25 @@ class Interview(commands.Cog):
                 block_text = """
                         _  /)
                        mo / )
-                       |/)\)
-                        /\_
-                        \__|=
+                       |/)\\)
+                        /\\_
+                        \\__|=
                        (    )
                        __)(__
                  _____/      \\_____
                 |  _     ___   _   ||
-                | | \     |   | \  ||
+                | | \\     |   | \\  ||
                 | |  |    |   |  | ||
                 | |_/     |   |_/  ||
-                | | \     |   |    ||
-                | |  \    |   |    ||
-                | |   \. _|_. | .  ||
+                | | \\     |   |    ||
+                | |  \\    |   |    ||
+                | |   \\. _|_. | .  ||
                 |                  ||
                 |  PenguinBot3000  ||
                 |   2016 - 2020    ||
                 |                  ||
         *       | *   **    * **   |**      **
-         \))ejm97/.,(//,,..,,\||(,,.,\\,.((//"""
+         \\))ejm97/.,(//,,..,,\\||(,,.,\\,.((//"""
 
         else:
             # Do basic votals.
@@ -1671,7 +1655,7 @@ class Interview(commands.Cog):
 
     @commands.command()
     @_ck_server_active()
-    async def votals(self, ctx: commands.Context, flag: Optional[str] = None):
+    async def votals(self, ctx: commands.Context, flag: str | None = None):
         """
         View current vote standings.
 
@@ -1686,7 +1670,7 @@ class Interview(commands.Cog):
         Manage opting into or out of interview voting.
         """
         await ctx.send(
-            "Opt into or out of interview voting. " f"Use `{ctx.bot.default_command_prefix}help opt` for more info."
+            f"Opt into or out of interview voting. Use `{ctx.bot.default_command_prefix}help opt` for more info."
         )
 
     @opt.command(name="out")
@@ -1770,16 +1754,15 @@ async def populate(ctx: commands.Context, filename: str):
     "questions_answered": int
     """
     import json
-    from datetime import timezone
 
-    with open(filename, "r") as fp:
+    with open(filename) as fp:
         rows = json.load(fp)
 
     session = session_maker()
     ivs = []
     for row in rows:
         ts = row["start_time"]
-        timestamp = datetime.utcfromtimestamp(ts).replace(tzinfo=timezone.utc)
+        timestamp = datetime.utcfromtimestamp(ts).replace(tzinfo=UTC)
         iv = schema.Interview(
             server_id=row["server_id"],
             interviewee_id=row["interviewee_id"],

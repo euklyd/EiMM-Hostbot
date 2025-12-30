@@ -1,16 +1,12 @@
 import logging
-from collections import Counter
-from typing import Optional, List, Union
-
 import random
+
+import dice
 import discord
 import requests
-import dice
-from imgurpython.imgur.models.image import Image
 from discord.ext import commands
 
 from core.bot import Bot
-
 
 # from selenium import webdriver
 # from selenium.webdriver.common.keys import Keys
@@ -36,7 +32,7 @@ class Utility(commands.Cog):
         self.bot = bot
 
     @commands.command()
-    async def avatar(self, ctx: commands.Context, user: Optional[discord.User]):
+    async def avatar(self, ctx: commands.Context, user: discord.User | None):
         """
         Fetch the avatar URL for a user.
 
@@ -48,7 +44,7 @@ class Utility(commands.Cog):
 
     @commands.command()
     @commands.has_permissions(manage_messages=True)
-    async def bigmoji(self, ctx: commands.Context, emoji: Union[discord.PartialEmoji, discord.Emoji]):
+    async def bigmoji(self, ctx: commands.Context, emoji: discord.PartialEmoji | discord.Emoji):
         """
         Send an emoji, but big.
         """
@@ -70,29 +66,29 @@ class Utility(commands.Cog):
         e.g., "roll 1d4+2d8". Evaluates expressions using the syntax found at https://pypi.org/project/dice/.
         """
         result = list(dice.roll(expr))
-        await ctx.send(f'{sum(result)} = `{result}`')
+        await ctx.send(f"{sum(result)} = `{result}`")
 
     @commands.command()
     async def trunc(self, ctx: commands.Context, size: int, *, message: str):
         """
         Truncate a message to <size> characters.
         """
-        await ctx.send(f'`{message[:size]}`')
+        await ctx.send(f"`{message[:size]}`")
 
     @commands.command()
-    async def choose(self, ctx: commands.Context, n: Optional[int] = 1, *, message: str):
+    async def choose(self, ctx: commands.Context, n: int | None = 1, *, message: str):
         """
         Choose from a list of items.
 
         Separate items with commas. If a number is provided before the list, instead select that many items.
         """
-        ls = [s.strip() for s in message.split(',')]
+        ls = [s.strip() for s in message.split(",")]
         if n > len(ls):
-            await ctx.send('Number of choices must be less than or equal to the size of the list.')
+            await ctx.send("Number of choices must be less than or equal to the size of the list.")
             return
         choices = random.sample(ls, k=n)
-        choices = ', '.join(sorted(choices))
-        await ctx.send(f'Selected: {choices}')
+        choices = ", ".join(sorted(choices))
+        await ctx.send(f"Selected: {choices}")
 
 
 class Moderation(commands.Cog):
@@ -111,7 +107,7 @@ class Moderation(commands.Cog):
         """
         assert type(ctx.channel) is discord.TextChannel
         deleted = await ctx.channel.purge(limit=num + 1)  # num+1 because the trigger message is counted too
-        deletion_message = await ctx.send(f'*Cleared {len(deleted)} messages.*')
+        deletion_message = await ctx.send(f"*Cleared {len(deleted)} messages.*")
         await deletion_message.delete(delay=5)
 
 
@@ -124,7 +120,7 @@ class Management(commands.Cog):
         self.bot = bot
 
     @commands.command()
-    async def iam(self, ctx: commands.Context, user: Optional[discord.User]):
+    async def iam(self, ctx: commands.Context, user: discord.User | None):
         """
         Please don't abuse this command!
         """
@@ -149,7 +145,7 @@ class Management(commands.Cog):
             channel = ctx.bot.get_user(channel_id)  # type: discord.User
         if channel is None:
             # Not a text channel or a user.
-            await ctx.send('No matching channel found.')
+            await ctx.send("No matching channel found.")
         await channel.send(message)
         await ctx.message.add_reaction(ctx.bot.greentick)
 
@@ -164,7 +160,7 @@ class Management(commands.Cog):
             await ctx.bot.user.edit(avatar=response.content)
             await ctx.message.add_reaction(ctx.bot.greentick)
         except Exception as e:
-            await ctx.send(f'`Error: {e}`')
+            await ctx.send(f"`Error: {e}`")
             await ctx.message.add_reaction(ctx.bot.redtick)
 
     @commands.command()
@@ -174,12 +170,12 @@ class Management(commands.Cog):
             await ctx.bot.user.edit(nick=nick)
             await ctx.message.add_reaction(ctx.bot.greentick)
         except Exception as e:
-            await ctx.send(f'`Error: {e}`')
+            await ctx.send(f"`Error: {e}`")
             await ctx.message.add_reaction(ctx.bot.redtick)
 
     @commands.command()
     @commands.is_owner()
-    async def pin(self, ctx: commands.Context, msg_id: int, channel: Optional[discord.TextChannel]):
+    async def pin(self, ctx: commands.Context, msg_id: int, channel: discord.TextChannel | None):
         """
         Pin a message.
 
@@ -190,7 +186,7 @@ class Management(commands.Cog):
         else:
             message = await ctx.channel.fetch_message(msg_id)
         if message is None:
-            await ctx.send(f'Message `{msg_id}` not found.')
+            await ctx.send(f"Message `{msg_id}` not found.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
         await message.pin()
@@ -199,7 +195,8 @@ class Management(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_update(self, before: discord.Guild, after: discord.Guild):
         logging.debug(
-            f"that's a guild update! oldsubs: {before.premium_subscription_count}, newsubs: {after.premium_subscription_count}")
+            f"that's a guild update! oldsubs: {before.premium_subscription_count}, newsubs: {after.premium_subscription_count}"
+        )
         if before.id != 0:
             # TODO this should be removed and replaced w/ an actual opt-in db
             return
@@ -209,13 +206,14 @@ class Management(commands.Cog):
 
         if before.premium_subscription_count != after.premium_subscription_count:
             logging.debug(
-                f'change in nitro boosters! {before.premium_subscription_count} -> {after.premium_subscription_count}')
+                f"change in nitro boosters! {before.premium_subscription_count} -> {after.premium_subscription_count}"
+            )
             # nitro boost change
             before_subs = set(before.premium_subscribers)
             after_subs = set(after.premium_subscribers)
-            ls_boosters = ''
+            ls_boosters = ""
             for booster in sorted(list(after_subs), key=lambda x: str(x).lower()):
-                ls_boosters += f'{booster}\n'
+                ls_boosters += f"{booster}\n"
 
             # NOTE: You can't determine the number of times a single member has boosted so
             #  this is useless until that functionality is added to the API.
@@ -232,23 +230,23 @@ class Management(commands.Cog):
             if before.premium_subscription_count < after.premium_subscription_count:
                 # someone boosted
                 newsub = list(after_subs - before_subs)
-                ls_change = ', '.join(newsub)
+                ls_change = ", ".join(newsub)
 
                 if newsub:
-                    msg = f'{self.bot.boostemoji} `{ls_change}` just boosted the server!\n'
+                    msg = f"{self.bot.boostemoji} `{ls_change}` just boosted the server!\n"
                 else:
                     msg = f"{self.bot.boostemoji} Someone who was already boosting added another boost! We can't tell who! _(This is a Discord API problem)_\n"
 
             else:
                 # someone unboosted
                 formersub = list(set(after.premium_subscribers) - set(before.premium_subscribers))
-                ls_change = ', '.join(formersub)
+                ls_change = ", ".join(formersub)
                 if formersub:
-                    msg = f'{self.bot.boostemoji} `{ls_change}` just unboosted the server :(\n'
+                    msg = f"{self.bot.boostemoji} `{ls_change}` just unboosted the server :(\n"
                 else:
                     msg = f"{self.bot.boostemoji} Someone removed one but not both of their boosts! We can't tell who! _(This is a Discord API problem)_\n"
 
-            msg += f'New boosters ({after.premium_subscription_count}): ```ini\n{ls_boosters}```'
+            msg += f"New boosters ({after.premium_subscription_count}): ```ini\n{ls_boosters}```"
 
             await chan.send(msg)
 

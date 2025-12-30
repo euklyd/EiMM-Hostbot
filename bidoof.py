@@ -1,12 +1,11 @@
 import argparse
 import faulthandler
 import logging
-from datetime import datetime
 
+import conf.settings as settings
 import discord
 from discord.ext import commands
 
-import conf.settings as settings
 from core.bot import Bot
 
 
