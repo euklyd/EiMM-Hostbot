@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [master, e/longrunning/overhaul-v3]
+  pull_request:
+    branches: [master, e/longrunning/overhaul-v3]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Install dependencies
+        run: uv sync --frozen --dev
+      - name: Run ruff check
+        run: uv run ruff check .
+      - name: Run ruff format check
+        run: uv run ruff format --check .
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Install dependencies
+        run: uv sync --frozen --dev
+      - name: Run pyright
+        run: uv run pyright
+        # Currently has errors due to discord.py v1 API - will be fixed in Phase 6
+        continue-on-error: true
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+      - name: Set up Python
+        run: uv python install 3.11
+      - name: Install dependencies
+        run: uv sync --frozen --dev
+      - name: Run tests
+        run: uv run pytest -v
+        # No tests yet - will be added in Phase 7
+        continue-on-error: true
