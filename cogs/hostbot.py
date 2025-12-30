@@ -3,19 +3,22 @@ import pprint
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import discord
 import yaml
 from discord.ext import commands
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 import cogs.hostbot_schema as hbs
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 from core.bot import Bot
 from utils import spreadsheet
 
-session_maker = None  # type: Union[None, Callable[[], Session]]
-# connection = None  # type: Optional[spreadsheet.SheetConnection]
+session_maker: "Callable[[], Session] | None" = None
 
 cooldown_delta = timedelta(minutes=30)
 cooldown_max = 3
@@ -62,7 +65,7 @@ class HostBot(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot = bot
 
-        self.confessional_cooldowns = {}  # type: Dict[int, List]
+        self.confessional_cooldowns: dict[int, list] = {}
 
         self.connection = spreadsheet.SheetConnection(bot.google_creds, bot.google_scope)
 
@@ -398,7 +401,7 @@ class HostBot(commands.Cog):
 
         chunked_players = [players[i : i + MAX_CATEGORY_SIZE] for i in range(0, len(players), MAX_CATEGORY_SIZE)]
 
-        category = None  # type: Optional[discord.CategoryChannel]
+        category: discord.CategoryChannel | None = None
         categories = []
 
         for chunk in chunked_players:
@@ -771,7 +774,7 @@ class HostBot(commands.Cog):
             return
         session.query(hbs.Channel).filter_by(type="graveyard", server_id=ctx.guild.id).one_or_none()
         confs_channel = session.query(hbs.Channel).filter_by(type="confessionals", server_id=ctx.guild.id).one_or_none()
-        confs_channel = ctx.guild.get_channel(confs_channel.id)  # type: discord.TextChannel
+        confs_channel: discord.TextChannel = ctx.guild.get_channel(confs_channel.id)
         msg = msg.replace("@everyone", "@\u200beveryone").replace("@here", "@\u200bhere")  # \u200b aka zero-width space
         conf = f"**Confessional from {ctx.author}:**\n>>> {msg}"
         await confs_channel.send(conf)
@@ -797,13 +800,13 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        player_roles = []  # type: List[discord.Role]
+        player_roles: list[discord.Role] = []
         for row in player_role_rows:
             player_roles.append(ctx.guild.get_role(row.id))
-        host_role = ctx.guild.get_role(host_role.id)  # type: discord.Role
+        host_role: discord.Role = ctx.guild.get_role(host_role.id)
         replies = []
         reply = "**Host avatars:**```\n"
-        for host in sorted(host_role.members, key=lambda x: x.name.lower()):  # type: discord.Member
+        for host in sorted(host_role.members, key=lambda x: x.name.lower()):
             if len(reply) > 1800:
                 replies.append(reply + "```")
                 reply = "```\n"
@@ -812,7 +815,7 @@ class HostBot(commands.Cog):
             reply += " "
         reply += "```**Player avatars:**```\n"
         for player_role in player_roles:
-            for player in sorted(player_role.members, key=lambda x: x.name.lower()):  # type: discord.Member
+            for player in sorted(player_role.members, key=lambda x: x.name.lower()):
                 if len(reply) > 1800:
                     replies.append(reply + "```")
                     reply = "```\n"

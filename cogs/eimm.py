@@ -155,9 +155,9 @@ class EiMM(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot = bot
         self.connection = None
-        self.abilities = {}  # type: Dict[str, List]
-        self.keywords = {}  # type: Dict[str, List]
-        self.passives = {}  # type: Dict[str, List]
+        self.abilities: dict[str, list] = {}
+        self.keywords: dict[str, list] = {}
+        self.passives: dict[str, list] = {}
         self.load()
 
     def load(self) -> dict[str, dict]:
@@ -215,7 +215,7 @@ class EiMM(commands.Cog):
         if matches[0][1] == 100:
             match = matches[0][0]
         else:
-            matches = [match[0] for match in matches]  # type: List[str]
+            matches = [match[0] for match in matches]
             try:
                 await ctx.send("Which ability did you mean?")
                 match = await menu.menu_list(ctx, matches)
@@ -316,13 +316,13 @@ class EiMM(commands.Cog):
         """
         random.shuffle(picks)
 
-        matrix = []  # type: List[List[int]]
+        matrix: list[list[int]] = []
         for pick in picks:
             matrix.append(pick.prefs)
         m = Munkres()
         indices = m.compute(matrix)
 
-        assignments = [None] * total  # type: List[Optional[Host]]
+        assignments: list[Host | None] = [None] * total
         for row, col in indices:
             assignments[col] = picks[row]
 

@@ -140,9 +140,9 @@ class Management(commands.Cog):
 
         Also works for whispering to users. Please don't abuse this!
         """
-        channel = ctx.bot.get_channel(channel_id)  # type: discord.TextChannel
+        channel: discord.TextChannel | None = ctx.bot.get_channel(channel_id)
         if channel is None:
-            channel = ctx.bot.get_user(channel_id)  # type: discord.User
+            channel: discord.User | None = ctx.bot.get_user(channel_id)
         if channel is None:
             # Not a text channel or a user.
             await ctx.send("No matching channel found.")
@@ -202,7 +202,7 @@ class Management(commands.Cog):
             return
 
         # TODO: replace with a db channel entry
-        chan = after.get_channel(0)  # type: discord.TextChannel
+        chan: discord.TextChannel = after.get_channel(0)
 
         if before.premium_subscription_count != after.premium_subscription_count:
             logging.debug(

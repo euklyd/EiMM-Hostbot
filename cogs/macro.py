@@ -23,7 +23,7 @@ class Macro(commands.Cog):
 
     def _retrieve_album_image(self, album_ids: list[str], key: str = None) -> discord.Embed:
         images = self._retrieve_images(album_ids)
-        image = random.choice(images)  # type: Image
+        image: Image = random.choice(images)
         if key is not None:
             # if a key is specified, attempt to override the randomly selected image
             for img in images:

@@ -1,3 +1,5 @@
+from collections.abc import Iterable
+
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -14,8 +16,8 @@ class Server(Base):
     addspec_on = Column(Boolean)  # allows players to add specs to their own role pm
     players_can_lock = Column(Boolean)  # allows players to lock their own role pm
     lock_emoji = Column(String)
-    roles = relationship("Role", back_populates="server")  # type: Iterable[Role]
-    channels = relationship("Channel", back_populates="server")  # type: Iterable[Channel]
+    roles: "Iterable[Role]" = relationship("Role", back_populates="server")
+    channels: "Iterable[Channel]" = relationship("Channel", back_populates="server")
 
     # rolepms = relationship('RolePMs', back_populates='server', uselist=False)
 

@@ -1,3 +1,5 @@
+from collections.abc import Iterable
+
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
@@ -19,9 +21,9 @@ class Server(Base):
     audience_role_id = Column(Integer)  # role id that can speak on stage
 
     # I'm typing the relationships manually, since type hinting is getting messed up elsewhere without it.
-    interviews = relationship("Interview", back_populates="server")  # type: Iterable[Interview]
-    votes = relationship("Vote", back_populates="server")  # type: Iterable[Vote]
-    opt_outs = relationship("OptOut", back_populates="server")  # type: Iterable[OptOut]
+    interviews: "Iterable[Interview]" = relationship("Interview", back_populates="server")
+    votes: "Iterable[Vote]" = relationship("Vote", back_populates="server")
+    opt_outs: "Iterable[OptOut]" = relationship("OptOut", back_populates="server")
 
     def __repr__(self):
         return (
@@ -52,8 +54,8 @@ class Interview(Base):
     # TODO: oh god there's so much more
     #  later edit: is there??? i think it may be good now
 
-    server = relationship("Server", back_populates="interviews")  # type: Server
-    askers = relationship("Asker", back_populates="interview")  # type: Iterable[Asker]
+    server: "Server" = relationship("Server", back_populates="interviews")
+    askers: "Iterable[Asker]" = relationship("Asker", back_populates="interview")
 
     def __repr__(self):
         # TODO: update
@@ -96,7 +98,7 @@ class Asker(Base):
     asker_id = Column(Integer, primary_key=True)
     num_questions = Column(Integer)
 
-    interview = relationship("Interview", back_populates="askers")  # type: Interview
+    interview: "Interview" = relationship("Interview", back_populates="askers")
 
     def __repr__(self):
         return f"<Asker interview_id={self.interview_id}, asker_id={self.asker_id}, num_questions={self.num_questions}"

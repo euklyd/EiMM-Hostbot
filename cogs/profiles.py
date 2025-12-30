@@ -63,7 +63,7 @@ class ProfileValidation:
         "Smogon",
         "Zelda Universe",
     ]
-    legal_countries = [c.name for c in pycountry.countries]  # type: List[str]
+    legal_countries: list[str] = [c.name for c in pycountry.countries]
     legal_age_ranges = [
         "Under 18",
         "18 to 24",

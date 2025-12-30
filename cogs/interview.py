@@ -3,7 +3,7 @@ import logging
 from collections.abc import Generator
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import discord
 import gspread
@@ -13,6 +13,9 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker
 
 from cogs import interview_schema as schema
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 from core.bot import Bot
 from utils import spreadsheet, utils
 
@@ -35,7 +38,7 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.close()
 
 
-session_maker = None  # type: Optional[sessionmaker]
+session_maker: "Callable[[], sessionmaker] | None" = None
 
 # Google sheets API constants
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -116,7 +119,7 @@ class Question:
         """
         Translates a row from the Google sheet to an object.
         """
-        ctx.bot.get_channel(row["Channel ID"])  # type: discord.TextChannel
+        ctx.bot.get_channel(row["Channel ID"])
 
         asker = ctx.guild.get_member(row["ID"])
         if asker is None:
@@ -450,7 +453,7 @@ class Interview(commands.Cog):
 
     def __init__(self, bot: Bot):
         self.bot = bot
-        self.connection = None  # type: Optional[spreadsheet.SheetConnection]
+        self.connection: spreadsheet.SheetConnection | None = None
         self.load()
 
     def load(self):
@@ -492,11 +495,11 @@ class Interview(commands.Cog):
             length = 0
             return InterviewEmbed.blank(interviewee, asker, avatar_url=avatar_url)  # TODO: update avatar url?
 
-        last_asker = None  # type: Optional[discord.Member]
+        last_asker: discord.Member | None = None
 
         ls_embeds = []
 
-        em = None  # type: Optional[discord.Embed]
+        em: discord.Embed | None = None
         for question in questions:
             # Three cases where we need to start a new embed:
             # 1. If the total length of the embed is > max message size
@@ -681,7 +684,9 @@ class Interview(commands.Cog):
 
         # set the old interview row to be not-current
         session = session_maker()
-        old_interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()  # type: schema.Interview
+        old_interview: schema.Interview | None = (
+            session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
+        )
         if old_interview is not None:
             # if old_interview doesn't exist that just means it's the first interview!
             old_interview.current = False
@@ -746,7 +751,7 @@ class Interview(commands.Cog):
 
         audience_role: discord.Role = ctx.guild.get_role(server.audience_role_id)
         if audience_role:
-            for member in audience_role.members:  # type: discord.Member
+            for member in audience_role.members:
                 await member.remove_roles(audience_role, reason="interview rollover")
 
         await ctx.message.add_reaction(ctx.bot.greentick)
@@ -761,7 +766,7 @@ class Interview(commands.Cog):
         Check current settings for this server's interviews.
         """
         session = session_maker()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         answer = ctx.guild.get_channel(server.answer_channel)
         backstage = ctx.guild.get_channel(server.back_channel)
         em = discord.Embed(title=f"{ctx.guild} interview settings", color=ctx.bot.user.color)
@@ -931,9 +936,11 @@ class Interview(commands.Cog):
         Usable only by the current interviewee and administrators. Defaults to 60 minute invitation. Use 'all' for <user> to invite everyone.
         """
         session = session_maker()
-        interview = session.query(schema.Interview).filter_by(current=True, server_id=ctx.guild.id).one_or_none()  # type: Optional[schema.Interview]
+        interview: schema.Interview | None = (
+            session.query(schema.Interview).filter_by(current=True, server_id=ctx.guild.id).one_or_none()
+        )
         interviewee = ctx.guild.get_member(interview.interviewee_id)
-        author_perms = ctx.channel.permissions_for(ctx.author)  # type: discord.Permissions
+        author_perms: discord.Permissions = ctx.channel.permissions_for(ctx.author)
         stage = ctx.guild.get_channel(interview.server.answer_channel)
 
         if ctx.author.id is not interviewee.id and not author_perms.administrator:
@@ -969,17 +976,19 @@ class Interview(commands.Cog):
         If no user specified, view stats for the current interview.
         """
         session = session_maker()
-        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()  # type: schema.Interview
+        interview: schema.Interview | None = (
+            session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
+        )
         if member is None:
             if interview is None:
                 await ctx.send("There is no currently ongoing interview.")
                 return
             interviewee = ctx.guild.get_member(interview.interviewee_id)
-            past_interviews = (
+            past_interviews: list[schema.Interview] = (
                 session.query(schema.Interview)
                 .filter_by(server_id=ctx.guild.id, interviewee_id=interview.interviewee_id)
                 .all()
-            )  # type: List[schema.Interview]
+            )
 
             # view general stats
             em = discord.Embed(
@@ -1001,9 +1010,9 @@ class Interview(commands.Cog):
             await ctx.send(embed=em)
             return
 
-        past_interviews = (
+        past_interviews: list[schema.Interview] = (
             session.query(schema.Interview).filter_by(server_id=ctx.guild.id, interviewee_id=member.id).all()
-        )  # type: List[schema.Interview]
+        )
 
         em = discord.Embed(
             title=f"Interview stats for {member}",
@@ -1043,7 +1052,9 @@ class Interview(commands.Cog):
         doing it one at a time.
         """
         session = session_maker()
-        interview = session.query(schema.Interview).filter_by(current=True, server_id=ctx.guild.id).one_or_none()  # type: Optional[schema.Interview]
+        interview: schema.Interview | None = (
+            session.query(schema.Interview).filter_by(current=True, server_id=ctx.guild.id).one_or_none()
+        )
         interviewee = ctx.guild.get_member(interview.interviewee_id)
         if interviewee is None:
             await ctx.send(f"Couldn't find server member `{interview.interviewee_id}`.")
@@ -1132,8 +1143,10 @@ class Interview(commands.Cog):
         Greedily dumps as many answered questions into embeds as possible, and posts them to the specified channel.
         """
         session = session_maker()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
-        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()  # type: schema.Interview
+        server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        interview: schema.Interview | None = (
+            session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
+        )
         interviewee = ctx.guild.get_member(interview.interviewee_id)
         sheet = self.connection.get_sheet(server.sheet_name).sheet1
 
@@ -1196,7 +1209,7 @@ class Interview(commands.Cog):
         If an answer is too long to be posted, the interviewee may have to post it manually.
         """
         session = session_maker()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         channel = ctx.guild.get_channel(server.answer_channel)
 
         try:
@@ -1225,8 +1238,10 @@ class Interview(commands.Cog):
             preview_flag = True
 
         session = session_maker()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
-        interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()  # type: schema.Interview
+        server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
+        interview: schema.Interview | None = (
+            session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
+        )
         interviewee = ctx.guild.get_member(interview.interviewee_id)
         sheet = self.connection.get_sheet(server.sheet_name).sheet1
 
@@ -1272,7 +1287,7 @@ class Interview(commands.Cog):
         Use the row as indicated on the sheet sidebar. If the preview flag is set to true, will post in the current channel.
         """
         session = session_maker()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         if preview is True:
             channel = ctx.channel
         else:
@@ -1291,13 +1306,13 @@ class Interview(commands.Cog):
         Usable only by the current interviewee.
         """
         session = session_maker()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         audience_role = ctx.guild.get_role(server.audience_role_id)
         if not audience_role:
             await ctx.send(f"No audience role set up for {ctx.guild}.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        for mention in mentions:  # type: discord.Member
+        for mention in mentions:
             await mention.add_roles(audience_role, reason=f"enroled by grantstage command used by {ctx.author}.")
         await ctx.message.add_reaction(ctx.bot.greentick)
 
@@ -1311,13 +1326,13 @@ class Interview(commands.Cog):
         Usable only by the current interviewee.
         """
         session = session_maker()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         audience_role = ctx.guild.get_role(server.audience_role_id)
         if not audience_role:
             await ctx.send(f"No audience role set up for {ctx.guild}.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        for mention in mentions:  # type: discord.Member
+        for mention in mentions:
             await mention.remove_roles(audience_role, reason=f"revoked by revokestage command used by {ctx.author}.")
         await ctx.message.add_reaction(ctx.bot.greentick)
 
@@ -1331,7 +1346,7 @@ class Interview(commands.Cog):
         Usable only by the current interviewee.
         """
         session = session_maker()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         audience_role = ctx.guild.get_role(server.audience_role_id)
         if not audience_role:
             await ctx.send(f"No audience role set up for {ctx.guild}.")
@@ -1353,13 +1368,13 @@ class Interview(commands.Cog):
         Usable only by the current interviewee.
         """
         session = session_maker()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         audience_role = ctx.guild.get_role(server.audience_role_id)
         if not audience_role:
             await ctx.send(f"No audience role set up for {ctx.guild}.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        for member in audience_role.members:  # type: discord.Member
+        for member in audience_role.members:
             await member.remove_roles(audience_role, reason=f"clearstage used by {ctx.author}")
         await ctx.message.add_reaction(ctx.bot.greentick)
 
@@ -1451,7 +1466,7 @@ class Interview(commands.Cog):
 
         session = session_maker()
         iv_meta = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
-        server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()  # type: schema.Server
+        server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
 
         # Note: Not completely confident in vote legality checking, so these checks are a living document.
 
@@ -1528,12 +1543,12 @@ class Interview(commands.Cog):
 
         # 4. Cannot vote for anyone who's been interviewed too recently.
         for mention in mentions:
-            old = (
+            old: schema.Interview | None = (
                 session.query(schema.Interview)
                 .filter_by(server_id=ctx.guild.id, interviewee_id=mention.id)
                 .order_by(desc("start_time"))
                 .first()
-            )  # type: schema.Interview
+            )
             if old and old.start_time > server.limit:
                 vote_error.too_recent.append(mention)
         for mention in vote_error.too_recent:

@@ -4,6 +4,7 @@ import re
 from collections import namedtuple
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import aiohttp
 import discord
@@ -12,14 +13,17 @@ from sqlalchemy import create_engine, func
 from sqlalchemy.orm import Session, sessionmaker
 
 import cogs.emoji_schema as es
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 import utils
 from utils.menu import CANCEL, menu_list
 
 _EMOJI_RE = re.compile(r"<:(?P<name>\w\w+):(?P<id>\d+)>")
 MAX_ATTACHMENT_SIZE = 1e6
 
-session_maker = None  # type: Union[None, Callable[[], Session]]
-enabled_servers = []  # type: List[int]  # discord server IDs
+session_maker: "Callable[[], Session] | None" = None
+enabled_servers: list[int] = []  # discord server IDs
 needed_dirs = [
     "databases/conf/",
 ]
@@ -43,7 +47,7 @@ def increment_count(
         session.query(es.EmojiCount)
         .filter_by(server_id=server.id, emoji_id=emoji_id, user_id=user.id, date=today)
         .one_or_none()
-    )  # type: Optional[es.EmojiCount]
+    )
     if entry is not None:
         entry.count += 1
     else:
@@ -63,12 +67,12 @@ async def count_emoji(message: discord.Message):
         return
     session = session_maker()
 
-    emoji_ids = {e.id: e for e in message.guild.emojis}  # type: Dict[int, discord.Emoji]
+    emoji_ids: dict[int, discord.Emoji] = {e.id: e for e in message.guild.emojis}
 
     today = datetime.utcnow().date()
 
     for match in _EMOJI_RE.finditer(message.content):
-        emoji_id = int(match.group("id"))  # type: int
+        emoji_id = int(match.group("id"))
         if emoji_id in emoji_ids:
             # only increment the count if it's an actual emoji that belongs to the server
             increment_count(session, message.guild, emoji_id, message.author, today)
@@ -81,7 +85,7 @@ def get_count(ctx: commands.Context, emoji_id: int, oldest: date) -> int:
         session.query(es.EmojiCount)
         .filter_by(server_id=ctx.guild.id, emoji_id=emoji_id)
         .filter(func.DATE(es.EmojiCount.date) > oldest)
-    )  # type: List[es.EmojiCount]
+    )
     count = 0
     for entry in entries:
         count += entry.count
@@ -197,7 +201,7 @@ class Emoji(commands.Cog):
             .group_by(es.EmojiCount.user_id)
             .order_by(func.sum(es.EmojiCount.count).desc())
             .all()
-        )  # type: List[int, int]
+        )
         # really it's a List[sqlalchemy.util._collections.result] but functionally it's a list of int tuples
 
         count = 0
@@ -233,7 +237,7 @@ class Emoji(commands.Cog):
         """
         oldest = datetime.utcnow().date() - timedelta(days=days)
 
-        emoji_ids = {e.id: e for e in ctx.guild.emojis}  # type: Dict[int, discord.Emoji]
+        emoji_ids: dict[int, discord.Emoji] = {e.id: e for e in ctx.guild.emojis}
         animated_emojis = {e.id for e in ctx.guild.emojis if e.animated}
 
         session = session_maker()
@@ -245,11 +249,11 @@ class Emoji(commands.Cog):
             .group_by(es.EmojiCount.emoji_id)
             .order_by(func.sum(es.EmojiCount.count).desc())
             .all()
-        )  # type: List[int, int]
+        )
 
         # total_counts = total_counts[:num]
 
-        emoji_counts = {em: ct for em, ct in total_counts}  # type: Dict[int, int]
+        emoji_counts: dict[int, int] = {em: ct for em, ct in total_counts}
         for em_id in emoji_ids:
             if em_id not in emoji_counts:
                 emoji_counts[em_id] = 0
@@ -278,7 +282,7 @@ class Emoji(commands.Cog):
         #  Add as a flag, probably.
         oldest = datetime.utcnow().date() - timedelta(days=days)
 
-        emoji_ids = {e.id: e for e in ctx.guild.emojis}  # type: Dict[int, discord.Emoji]
+        emoji_ids: dict[int, discord.Emoji] = {e.id: e for e in ctx.guild.emojis}
         animated_emojis = {e.id for e in ctx.guild.emojis if e.animated}
 
         session = session_maker()
@@ -290,11 +294,11 @@ class Emoji(commands.Cog):
             .group_by(es.EmojiCount.emoji_id)
             .order_by(func.sum(es.EmojiCount.count).asc())
             .all()
-        )  # type: List[int, int]
+        )
 
         # total_counts = total_counts[:num]
 
-        emoji_counts = {em: ct for em, ct in total_counts}  # type: Dict[int, int]
+        emoji_counts: dict[int, int] = {em: ct for em, ct in total_counts}
         for em_id in emoji_ids:
             if em_id not in emoji_counts:
                 emoji_counts[em_id] = 0
@@ -321,7 +325,7 @@ class Emoji(commands.Cog):
         """
         oldest = datetime.utcnow().date() - timedelta(days=days)
 
-        emoji_ids = {e.id: e for e in ctx.guild.emojis}  # type: Dict[int, discord.Emoji]
+        emoji_ids: dict[int, discord.Emoji] = {e.id: e for e in ctx.guild.emojis}
         animated_emojis = {e.id for e in ctx.guild.emojis if e.animated}
 
         session = session_maker()
@@ -333,11 +337,11 @@ class Emoji(commands.Cog):
             .group_by(es.EmojiCount.emoji_id)
             .order_by(func.sum(es.EmojiCount.count).desc())
             .all()
-        )  # type: List[int, int]
+        )
 
         # total_counts = total_counts[:num]
 
-        emoji_counts = {em: ct for em, ct in total_counts}  # type: Dict[int, int]
+        emoji_counts: dict[int, int] = {em: ct for em, ct in total_counts}
         for em_id in emoji_ids:
             if em_id not in emoji_counts:
                 emoji_counts[em_id] = 0
@@ -362,8 +366,8 @@ class Emoji(commands.Cog):
         """
         Export the emoji usage data for the current server to a CSV.
         """
-        emojis = {}  # type: Dict[int, discord.Emoji]
-        for em in ctx.guild.emojis:  # type: discord.Emoji
+        emojis: dict[int, discord.Emoji] = {}
+        for em in ctx.guild.emojis:
             # api call unfortunately required for getting detailed emoji info
             emojis[em.id] = await ctx.guild.fetch_emoji(em.id)
 
@@ -387,8 +391,8 @@ class Emoji(commands.Cog):
 
             session = session_maker()
 
-            for entry in session.query(es.EmojiCount).filter_by(server_id=ctx.guild.id).all():  # type: es.EmojiCount
-                em = emojis.get(entry.emoji_id)  # type: Union[discord.Emoji, NoneEmoji]
+            for entry in session.query(es.EmojiCount).filter_by(server_id=ctx.guild.id).all():
+                em: discord.Emoji | NoneEmoji | None = emojis.get(entry.emoji_id)
                 if em is None:
                     em = NoneEmoji()
                 out.writerow(

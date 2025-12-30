@@ -9,7 +9,7 @@ from discord.ext import commands
 
 CANCEL = "cancel"
 
-_locks = set()  # type: Set[Tuple[int, int]]  # represents a tuple of user IDs and channel IDs
+_locks: set[tuple[int, int]] = set()  # represents a tuple of user IDs and channel IDs
 
 
 async def menu_list(
@@ -176,16 +176,16 @@ async def menu_loop(
         select_max=select_max,
         use_code_block=use_code_block,
     )
-    selection = None  # type: Union[None, str, List[str]]
+    selection: str | list[str] | None = None
     assert None not in keys
 
-    menu_msg = await ctx.send(initial_menu)  # type: discord.Message
+    menu_msg: discord.Message = await ctx.send(initial_menu)
 
     if len(keys) > NUM_ITEMS:
         await menu_msg.add_reaction(ARROW_LEFT)
         await menu_msg.add_reaction(ARROW_RIGHT)
 
-    bot = ctx.bot  # type: core.bot.Bot
+    bot = ctx.bot
 
     events = ["message", "reaction_add", "reaction_remove"]
     checks = [

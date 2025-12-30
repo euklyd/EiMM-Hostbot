@@ -26,11 +26,11 @@ class Bot(commands.Bot):
             super().__init__(command_prefix, description=description, **options)
         else:
             super().__init__(command_prefix, help_command=help_command, description=description, **options)
-        self.conf = conf  # type: Conf
-        self._greentick = self.get_emoji(conf.greentick_id)  # type: discord.Emoji
-        self._redtick = self.get_emoji(conf.redtick_id)  # type: discord.Emoji
-        self._boostemoji = self.get_emoji(conf.boostemoji_id)  # type: discord.Emoji
-        self._waitemoji = self.get_emoji(conf.waitemoji_id)  # type: discord.Emoji
+        self.conf: Conf = conf
+        self._greentick: discord.Emoji | None = self.get_emoji(conf.greentick_id)
+        self._redtick: discord.Emoji | None = self.get_emoji(conf.redtick_id)
+        self._boostemoji: discord.Emoji | None = self.get_emoji(conf.boostemoji_id)
+        self._waitemoji: discord.Emoji | None = self.get_emoji(conf.waitemoji_id)
 
         if Path("conf/google_creds.json").exists():
             self.google_creds = "conf/google_creds.json"
@@ -53,19 +53,19 @@ class Bot(commands.Bot):
     @property
     def greentick(self) -> discord.Emoji:
         if self._greentick is None:
-            self._greentick = self.get_emoji(self.conf.greentick_id)  # type: discord.Emoji
+            self._greentick = self.get_emoji(self.conf.greentick_id)
         return self._greentick
 
     @property
     def redtick(self) -> discord.Emoji:
         if self._redtick is None:
-            self._redtick = self.get_emoji(self.conf.redtick_id)  # type: discord.Emoji
+            self._redtick = self.get_emoji(self.conf.redtick_id)
         return self._redtick
 
     @property
     def boostemoji(self) -> discord.Emoji:
         if self._boostemoji is None:
-            self._boostemoji = self.get_emoji(self.conf.boostemoji_id)  # type: discord.Emoji
+            self._boostemoji = self.get_emoji(self.conf.boostemoji_id)
         return self._boostemoji
 
     @property
@@ -157,7 +157,7 @@ class Bot(commands.Bot):
 
         assert len(events) == len(checks), "number of events and checks must be equal"
 
-        futures = []  # type: List[asyncio.Future]
+        futures: list[asyncio.Future] = []
 
         for event, check in zip(events, checks, strict=False):
             future = self.loop.create_future()
@@ -181,11 +181,11 @@ class Bot(commands.Bot):
         complete, pending = await asyncio.wait(
             futures, timeout=timeout, loop=self.loop, return_when=asyncio.FIRST_COMPLETED
         )
-        for future in pending:  # type: asyncio.Future
+        for future in pending:
             future.cancel()
         if len(complete) == 0:
             raise TimeoutError
-        completed_future = complete.pop()  # type: asyncio.Future
+        completed_future: asyncio.Future = complete.pop()
         index = futures.index(completed_future)
         event_type = events[index]
         return completed_future.result(), event_type

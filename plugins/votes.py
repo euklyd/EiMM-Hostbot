@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import discord
 from discord.ext import commands
@@ -8,9 +9,14 @@ from sqlalchemy.orm import sessionmaker
 
 from core.bot import Bot
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from sqlalchemy.orm import Session
+
 Base = declarative_base()
 
-session_maker = None  # type: Union[None, Callable[[], Session]]
+session_maker: "Callable[[], Session] | None" = None
 
 
 # TODO: Fix multi-channel voting. Right now there is a bug, so don't open multiple channels at once.
@@ -160,14 +166,14 @@ async def vote_totals(ctx: commands.Context):
         return
     votes = session.query(Vote).filter_by(channel_id=ctx.channel.id).all()
     tally = {}
-    for ballot in votes:  # type: Vote
+    for ballot in votes:
         if ballot.voted_id in tally:
             tally[ballot.voted_id] += 1
         else:
             tally[ballot.voted_id] = 1
     sorted_tally = sorted(tally.items(), key=lambda x: x[1], reverse=True)
     reply = "**Votals:**```\n"
-    for ballot in sorted_tally:  # type: Tuple[int, int]
+    for ballot in sorted_tally:
         reply += f"{ballot[0]}: {ballot[1]}\n"
     reply += "```"
     await ctx.send(reply)
@@ -183,7 +189,7 @@ async def vote_voters(ctx: commands.Context):
         return
     votes = session.query(Vote).filter_by(channel_id=ctx.channel.id).all()
     tally = {}
-    for ballot in votes:  # type: Vote
+    for ballot in votes:
         if ballot.voted_id in tally:
             tally[ballot.voted_id] += [ballot.voter_id]
         else:
@@ -191,7 +197,7 @@ async def vote_voters(ctx: commands.Context):
 
     sorted_tally = sorted(tally.items(), key=lambda x: len(x[1]), reverse=True)
     reply = "**Votals:**```\n"
-    for votee in sorted_tally:  # type: Tuple[int, int]
+    for votee in sorted_tally:
         voters = [str(ctx.guild.get_member(voter_id)) for voter_id in votee[1]]
         reply += f"{votee[0]}: {voters}\n"
     reply += "```"

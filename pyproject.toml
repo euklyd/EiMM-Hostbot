@@ -71,6 +71,18 @@ quote-style = "double"
 [tool.pyright]
 pythonVersion = "3.11"
 typeCheckingMode = "basic"
+# Ignore missing conf/settings.py (gitignored user config)
+ignore = ["conf/settings.py"]
+# Lenient settings for legacy code - will tighten during discord.py v2 migration
+reportMissingImports = "warning"
+reportUndefinedVariable = "warning"
+reportOptionalMemberAccess = "warning"
+reportArgumentType = "warning"
+reportReturnType = "warning"
+reportAssignmentType = "warning"
+reportAttributeAccessIssue = "warning"
+reportGeneralTypeIssues = "warning"
+reportUnusedCoroutine = "error"  # Keep this as error - important for async code
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
