@@ -11,7 +11,6 @@ extensions = [
     "eimm",
     "hostbot",
     "macro",
-    "profiles",
     # Interview is a complex cog and is not part of the core utility; you're welcome to use it but it is complex.
     # "interview",
     # Utility cogs (formerly plugins)
