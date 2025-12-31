@@ -6,20 +6,19 @@ client_token = "your token here"
 status = None
 # status = Status.idle
 
-cogs = [
+extensions = [
+    # Core cogs
     "eimm",
     "hostbot",
-    # Interview is a complex cog and is not part of the core utility; you're welcome to use it but it is complex.
-    # 'interview',
     "macro",
     "profiles",
-    # Add more cogs here!
-]
-
-plugins = [
-    # Add more plugins here!
-    # Plugins are used mostly for simple, one-off commands, rather than groups, which are best done as cogs!
-    # (These may be phased out in the future, they're not nearly as useful as cogs.)
+    # Interview is a complex cog and is not part of the core utility; you're welcome to use it but it is complex.
+    # "interview",
+    # Utility cogs (formerly plugins)
+    # "fun",
+    # "scryfall",
+    # "utility",
+    # "votes",
 ]
 
 imgur_keys = {
@@ -40,7 +39,6 @@ conf = Conf(
     redtick_id=632481525979676712,  # change these to reflect your own emoji ID
     boostemoji_id=797974971137654845,  # change these to reflect your own emoji ID
     waitemoji_id=833565752035639316,  # change these to reflect your own emoji ID
-    plugins=plugins,
     imgur_keys=imgur_keys,
     google_email="your-bot-here@your-bot-here.iam.gserviceaccount.com",
 )

@@ -5,7 +5,6 @@ class Conf:
         redtick_id: int = None,
         boostemoji_id: int = None,
         waitemoji_id: int = None,
-        plugins: list[str] = None,
         imgur_keys: dict[str, str] = None,
         trusted: list[int] = None,
         google_email: str = None,
@@ -14,7 +13,6 @@ class Conf:
         self.redtick_id = redtick_id
         self.boostemoji_id = boostemoji_id
         self.waitemoji_id = waitemoji_id
-        self.plugins = plugins
 
         self.imgur_keys = imgur_keys
 

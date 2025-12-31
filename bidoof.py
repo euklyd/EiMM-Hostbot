@@ -11,44 +11,36 @@ from core.bot import Bot
 
 @commands.command()
 @commands.is_owner()
-async def reload(ctx: commands.Context, plugin: str):
+async def reload(ctx: commands.Context, extension: str):
     """
-    Reload the specified plugin.
+    Reload the specified extension.
 
-    If it is not loaded yet, load it. Only works for plugins (extensions), NOT cogs.
+    If it is not loaded yet, load it.
     """
-    if f"plugins.{plugin}" in ctx.bot.extensions:
-        ctx.bot.reload_extension(f"plugins.{plugin}")
-        await ctx.send(f"Reloaded plugin `{plugin}`.")
-        logging.warning(f"reloaded plugins.{plugin}")
-    elif f"cogs.{plugin}" in ctx.bot.extensions:
-        ctx.bot.reload_extension(f"cogs.{plugin}")
-        await ctx.send(f"Reloaded cog `{plugin}`.")
-        logging.warning(f"reloaded cogs.{plugin}")
+    if f"cogs.{extension}" in ctx.bot.extensions:
+        ctx.bot.reload_extension(f"cogs.{extension}")
+        await ctx.send(f"Reloaded extension `{extension}`.")
+        logging.warning(f"reloaded cogs.{extension}")
     else:
         try:
-            ctx.bot.load_extension(f"plugins.{plugin}")
-            await ctx.send(f"Loaded plugin `{plugin}`.")
+            ctx.bot.load_extension(f"cogs.{extension}")
+            await ctx.send(f"Loaded extension `{extension}`.")
         except commands.errors.ExtensionNotFound:
-            await ctx.send(f"Could not find plugin `{plugin}`.")
+            await ctx.send(f"Could not find extension `{extension}`.")
 
 
 @commands.command()
 @commands.is_owner()
-async def unload(ctx: commands.Context, plugin: str):
+async def unload(ctx: commands.Context, extension: str):
     """
-    Unload the specified plugin.
+    Unload the specified extension.
     """
-    if f"plugins.{plugin}" in ctx.bot.extensions:
-        ctx.bot.unload_extension(f"plugins.{plugin}")
-        await ctx.send(f"Unloaded plugin `{plugin}`.")
-        logging.warning(f"reloaded plugins.{plugin}")
-    elif f"cogs.{plugin}" in ctx.bot.extensions:
-        ctx.bot.unload_extension(f"cogs.{plugin}")
-        await ctx.send(f"Unloaded cog `{plugin}`.")
-        logging.warning(f"reloaded cogs.{plugin}")
+    if f"cogs.{extension}" in ctx.bot.extensions:
+        ctx.bot.unload_extension(f"cogs.{extension}")
+        await ctx.send(f"Unloaded extension `{extension}`.")
+        logging.warning(f"unloaded cogs.{extension}")
     else:
-        await ctx.send(f"Plugin `{plugin}` not loaded.")
+        await ctx.send(f"Extension `{extension}` not loaded.")
 
 
 @commands.command()
@@ -87,13 +79,9 @@ def run():
         case_insensitive=True,  # unfortunately this doesn't help with "help <cogname>"
     )
 
-    for cog in settings.cogs:
-        bot.load_extension(f"cogs.{cog}")
-        logging.warning(f"loaded cogs.{cog}")
-
-    for plugin in settings.plugins:
-        bot.load_extension(f"plugins.{plugin}")
-        logging.warning(f"loaded plugins.{plugin}")
+    for ext in settings.extensions:
+        bot.load_extension(f"cogs.{ext}")
+        logging.warning(f"loaded cogs.{ext}")
 
     bot.add_command(shutdown)
     bot.add_command(reload)
