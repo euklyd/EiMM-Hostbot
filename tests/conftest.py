@@ -1,8 +1,15 @@
 """Shared pytest fixtures for EiMM-Hostbot tests."""
 
+from collections.abc import Generator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from sqlalchemy import Engine, create_engine
+from sqlalchemy.orm import Session, sessionmaker
+
+from cogs.emoji_schema import Base as EmojiBase
+from cogs.hostbot_schema import Base as HostbotBase
+from schemas.scryfall_schema import Base as ScryfallBase
 
 
 @pytest.fixture
@@ -59,3 +66,71 @@ def mock_ctx(mock_bot: MagicMock, mock_member: MagicMock, mock_channel: MagicMoc
     ctx.me = MagicMock()
     ctx.me.permissions_in = MagicMock(return_value=MagicMock(manage_messages=True))
     return ctx
+
+
+# =============================================================================
+# Database fixtures (in-memory SQLite, works identically with PostgreSQL)
+# =============================================================================
+
+
+@pytest.fixture
+def hostbot_engine() -> Generator[Engine, None, None]:
+    """Create an in-memory SQLite engine for hostbot schema."""
+    engine = create_engine("sqlite:///:memory:", echo=False)
+    HostbotBase.metadata.create_all(engine)
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture
+def hostbot_session(hostbot_engine: Engine) -> Generator[Session, None, None]:
+    """Create a session for hostbot schema tests."""
+    session_factory = sessionmaker(bind=hostbot_engine)
+    session = session_factory()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
+
+
+@pytest.fixture
+def emoji_engine() -> Generator[Engine, None, None]:
+    """Create an in-memory SQLite engine for emoji schema."""
+    engine = create_engine("sqlite:///:memory:", echo=False)
+    EmojiBase.metadata.create_all(engine)
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture
+def emoji_session(emoji_engine: Engine) -> Generator[Session, None, None]:
+    """Create a session for emoji schema tests."""
+    session_factory = sessionmaker(bind=emoji_engine)
+    session = session_factory()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
+
+
+@pytest.fixture
+def scryfall_engine() -> Generator[Engine, None, None]:
+    """Create an in-memory SQLite engine for scryfall schema."""
+    engine = create_engine("sqlite:///:memory:", echo=False)
+    ScryfallBase.metadata.create_all(engine)
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture
+def scryfall_session(scryfall_engine: Engine) -> Generator[Session, None, None]:
+    """Create a session for scryfall schema tests."""
+    session_factory = sessionmaker(bind=scryfall_engine)
+    session = session_factory()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
