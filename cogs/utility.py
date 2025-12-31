@@ -65,7 +65,7 @@ class Utility(commands.Cog):
 
         e.g., "roll 1d4+2d8". Evaluates expressions using the syntax found at https://pypi.org/project/dice/.
         """
-        result = list(dice.roll(expr))
+        result: list[int] = list(dice.roll(expr))
         await ctx.send(f"{sum(result)} = `{result}`")
 
     @commands.command()
@@ -76,7 +76,7 @@ class Utility(commands.Cog):
         await ctx.send(f"`{message[:size]}`")
 
     @commands.command()
-    async def choose(self, ctx: commands.Context, n: int | None = 1, *, message: str):
+    async def choose(self, ctx: commands.Context, n: int = 1, *, message: str):
         """
         Choose from a list of items.
 
@@ -87,8 +87,8 @@ class Utility(commands.Cog):
             await ctx.send("Number of choices must be less than or equal to the size of the list.")
             return
         choices = random.sample(ls, k=n)
-        choices = ", ".join(sorted(choices))
-        await ctx.send(f"Selected: {choices}")
+        result = ", ".join(sorted(choices))
+        await ctx.send(f"Selected: {result}")
 
 
 class Moderation(commands.Cog):
@@ -140,13 +140,14 @@ class Management(commands.Cog):
 
         Also works for whispering to users. Please don't abuse this!
         """
-        channel: discord.TextChannel | None = ctx.bot.get_channel(channel_id)
-        if channel is None:
-            channel: discord.User | None = ctx.bot.get_user(channel_id)
-        if channel is None:
+        target: discord.TextChannel | discord.User | None = ctx.bot.get_channel(channel_id)
+        if target is None:
+            target = ctx.bot.get_user(channel_id)
+        if target is None:
             # Not a text channel or a user.
             await ctx.send("No matching channel found.")
-        await channel.send(message)
+            return
+        await target.send(message)
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.command()
@@ -230,7 +231,7 @@ class Management(commands.Cog):
             if before.premium_subscription_count < after.premium_subscription_count:
                 # someone boosted
                 newsub = list(after_subs - before_subs)
-                ls_change = ", ".join(newsub)
+                ls_change = ", ".join(str(m) for m in newsub)
 
                 if newsub:
                     msg = f"{self.bot.boostemoji} `{ls_change}` just boosted the server!\n"
@@ -240,7 +241,7 @@ class Management(commands.Cog):
             else:
                 # someone unboosted
                 formersub = list(set(after.premium_subscribers) - set(before.premium_subscribers))
-                ls_change = ", ".join(formersub)
+                ls_change = ", ".join(str(m) for m in formersub)
                 if formersub:
                     msg = f"{self.bot.boostemoji} `{ls_change}` just unboosted the server :(\n"
                 else:

@@ -20,6 +20,13 @@ from utils import spreadsheet
 
 session_maker: "Callable[[], Session] | None" = None
 
+
+def get_session() -> Session:
+    """Get a database session, asserting that the database has been initialized."""
+    assert session_maker is not None, "Database not initialized - HostBot cog not loaded"
+    return session_maker()
+
+
 cooldown_delta = timedelta(minutes=30)
 cooldown_max = 3
 
@@ -43,7 +50,7 @@ class NotFoundMember:
 
 
 def has_role(ctx: commands.Context, allowed_roles: list[str]) -> bool:
-    session = session_maker()
+    session = get_session()
 
     allowed_role_ids = (
         session.query(hbs.Role).filter(hbs.Role.server_id == ctx.guild.id, hbs.Role.type.in_(allowed_roles)).all()
@@ -99,7 +106,7 @@ class HostBot(commands.Cog):
         For instructions and examples, see:
         https://github.com/euklyd/EiMM-Hostbot/blob/master/cogs/hostbot_readme.md
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is not None:
             await ctx.send("This server has already been set up; duplicates setups aren't going to work.")
@@ -205,7 +212,7 @@ class HostBot(commands.Cog):
         """
         Provides a way to initialize a server late for people who don't read the manual.
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is not None:
             await ctx.send("This server has already been set up; duplicates setups aren't going to work.")
@@ -285,7 +292,7 @@ class HostBot(commands.Cog):
     #     Must be used after "init server".
     #     If a player is not on the server, or their name is typo'd on the sheet, will create the channel without enroling the player in the player role.
     #     """
-    #     session = session_maker()
+    #     session = get_session()
     #
     #     server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
     #
@@ -366,7 +373,7 @@ class HostBot(commands.Cog):
         Must be used after "init server".
         Unlike "init rolepms", passes in a linebreak-separated list as the playerlist argument.
         """
-        session = session_maker()
+        session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is None:
@@ -455,7 +462,7 @@ class HostBot(commands.Cog):
 
         If Role PMs and Roles have been created using 'init rolepms', deletes those too.
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is None:
             await ctx.send("This server has not been set up; nothing to reset.")
@@ -538,7 +545,7 @@ class HostBot(commands.Cog):
         """
         valid_types = {"host", "player", "dead", "spec"}
 
-        session = session_maker()
+        session = get_session()
 
         role_type = role_type.lower()
         if role_type not in valid_types:
@@ -577,7 +584,7 @@ class HostBot(commands.Cog):
         """
         valid_types = {"announcements", "flips", "gamechat", "graveyard", "confessionals", "rolepms"}
 
-        session = session_maker()
+        session = get_session()
 
         channel_type = channel_type.lower()
         if channel_type not in valid_types:
@@ -615,7 +622,7 @@ class HostBot(commands.Cog):
         """
         List game server info and number of people in each game-related role.
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is None:
             await ctx.send("This server has not been set up; no status exists.")
@@ -731,7 +738,7 @@ class HostBot(commands.Cog):
         if "@everyone" in ctx.message.content.lower():
             await ctx.send(ctx.author.mention)
             return
-        session = session_maker()
+        session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         # This should never have multiple roles in it, unless I'm manually overriding something for a game,
         # in which case, that is important to be able to support!
@@ -787,7 +794,7 @@ class HostBot(commands.Cog):
         """
         List all avatar URLs for all players and hosts.
         """
-        session = session_maker()
+        session = get_session()
         player_role_rows = session.query(hbs.Role).filter_by(type="player", server_id=ctx.guild.id).all()
         host_role = session.query(hbs.Role).filter_by(type="host", server_id=ctx.guild.id).one_or_none()
         gamechat_channel = session.query(hbs.Channel).filter_by(type="gamechat", server_id=ctx.guild.id).one_or_none()
@@ -869,7 +876,7 @@ class HostBot(commands.Cog):
 
         Usable by players and hosts, and only from your Role PM channel.
         """
-        session = session_maker()
+        session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if not server:
@@ -916,7 +923,7 @@ class HostBot(commands.Cog):
 
         Usable by players and hosts, and only from your Role PM channel. @mention a user, or provide their full Discord username or server nick exactly (case-sensitive). If it's multiple words, "use quotes".
         """
-        session = session_maker()
+        session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if not server:
@@ -953,7 +960,7 @@ class HostBot(commands.Cog):
 
         Usable by players and hosts, and only from your Role PM channel.
         """
-        session = session_maker()
+        session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if not server:
@@ -993,7 +1000,7 @@ class HostBot(commands.Cog):
 
         Usable by hosts only.
         """
-        session = session_maker()
+        session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if not server:
@@ -1020,7 +1027,7 @@ class HostBot(commands.Cog):
 
         Usable by hosts only.
         """
-        session = session_maker()
+        session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if not server:
@@ -1041,7 +1048,7 @@ class HostBot(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     async def _lockunlock(self, ctx: commands.Context, lock=True):
-        session = session_maker()
+        session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
 
@@ -1062,6 +1069,7 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
+        assert isinstance(ctx.channel, discord.TextChannel), "Expected guild TextChannel"
         if lock and ctx.channel.name[0] != LOCK_EMOJI:
             await ctx.channel.edit(name=f"{LOCK_EMOJI}{ctx.channel.name}")
             await ctx.message.add_reaction(ctx.bot.greentick)
@@ -1077,7 +1085,7 @@ class HostBot(commands.Cog):
 
     @staticmethod
     async def _unlock_all(ctx: commands.Context):
-        session = session_maker()
+        session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="rolepms").all()
         # the union maintains legacy support
@@ -1105,7 +1113,7 @@ class HostBot(commands.Cog):
             await ctx.send("Only hosts may enable locking.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        session = session_maker()
+        session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         server.players_can_lock = True
         session.commit()
@@ -1184,7 +1192,7 @@ class HostBot(commands.Cog):
     #     """
     #     Unlock the gamechat channel.
     #     """
-    #     session = session_maker()
+    #     session = get_session()
     #     gamechat_channel = session.query(hbs.Channel).filter_by(type='gamechat', server_id=ctx.guild.id).one_or_none()
     #     gamechat = ctx.guild.get_channel(gamechat_channel.id)
     #

@@ -19,6 +19,12 @@ Base = declarative_base()
 session_maker: "Callable[[], Session] | None" = None
 
 
+def get_session() -> Session:
+    """Get a database session, asserting that the database has been initialized."""
+    assert session_maker is not None, "Database not initialized - Votes cog not loaded"
+    return session_maker()
+
+
 # TODO: Fix multi-channel voting. Right now there is a bug, so don't open multiple channels at once.
 
 # NOTE: Deprecated until I've renamed this so it doesn't conflict with interviews, a far more important module.
@@ -65,7 +71,7 @@ async def vote_setup(ctx: commands.Context):
     """
     Set up a channel for voting.
     """
-    session = session_maker()
+    session = get_session()
     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
     if old_channel is not None:
         await ctx.send("This channel is already setup.")
@@ -82,7 +88,7 @@ async def vote_unsetup(ctx: commands.Context):
     """
     Un-set up a channel for voting.
     """
-    session = session_maker()
+    session = get_session()
     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
     if old_channel is None:
         await ctx.send("This channel was never setup for votes.")
@@ -99,7 +105,7 @@ async def vote_clear(ctx: commands.Context):
     """
     Clear all votes for a channel.
     """
-    session = session_maker()
+    session = get_session()
     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
     if old_channel is None:
         await ctx.send("This channel was never setup for votes.")
@@ -116,7 +122,7 @@ async def vote_for(ctx: commands.Context, votee: discord.Member):
     """
     Vote.
     """
-    session = session_maker()
+    session = get_session()
     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
     if old_channel is None:
         await ctx.send("This channel hasn't been set up for voting.")
@@ -136,7 +142,7 @@ async def vote_for(ctx: commands.Context, votee: discord.Member):
 #     """
 #     Vote.
 #     """
-#     session = session_maker()
+#     session = get_session()
 #     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
 #     if old_channel is None:
 #         await ctx.send("This channel hasn't been set up for voting.")
@@ -159,7 +165,7 @@ async def vote_totals(ctx: commands.Context):
     """
     Current votecounts.
     """
-    session = session_maker()
+    session = get_session()
     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
     if old_channel is None:
         await ctx.send("This channel hasn't been set up for voting.")
@@ -182,7 +188,7 @@ async def vote_totals(ctx: commands.Context):
 @vote.command(name="voters")
 @commands.has_permissions(administrator=True)
 async def vote_voters(ctx: commands.Context):
-    session = session_maker()
+    session = get_session()
     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
     if old_channel is None:
         await ctx.send("This channel hasn't been set up for voting.")

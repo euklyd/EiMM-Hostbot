@@ -10,7 +10,7 @@ import gspread
 from discord.ext import commands
 from sqlalchemy import create_engine, desc, event
 from sqlalchemy.engine import Engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import Session, sessionmaker
 
 from cogs import interview_schema as schema
 
@@ -38,7 +38,14 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor.close()
 
 
-session_maker: "Callable[[], sessionmaker] | None" = None
+session_maker: "Callable[[], Session] | None" = None
+
+
+def get_session() -> Session:
+    """Get a database session, asserting that the database has been initialized."""
+    assert session_maker is not None, "Database not initialized - Interview cog not loaded"
+    return session_maker()
+
 
 # Google sheets API constants
 SCOPE = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
@@ -59,7 +66,7 @@ class Candidate:
         self.candidate = ctx.guild.get_member(candidate_id)
         self.voters = []
 
-    def str(self, length: int) -> str:
+    def name_str(self, length: int) -> str:
         return f"{_name_or_default(self.candidate) + ':': <{length + 1}}"
 
     def voters_str(self) -> str:
@@ -69,10 +76,10 @@ class Candidate:
         return ", ".join(voters)
 
     def basic_str(self, length: int) -> str:
-        return f"{self.str(length)} {len(self.voters)}"
+        return f"{self.name_str(length)} {len(self.voters)}"
 
     def full_str(self, length: int) -> str:
-        return f"{self.str(length)} {len(self.voters)} ({self.voters_str()})"
+        return f"{self.name_str(length)} {len(self.voters)} ({self.voters_str()})"
 
     def sortkey(self) -> tuple[int, str]:
         """
@@ -143,7 +150,7 @@ class Question:
         """
         Convert this Question to a row for uploading to Sheets.
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is None:
             raise ValueError("No server found on this guild.")
@@ -172,7 +179,7 @@ class Question:
         This would normally be a normal method, but there's a separate command (append_rows vs append_row) for
         bulk upload, and we need to use that to dodge Sheets API rate limits.
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
 
         rows = [q.to_row(ctx) for q in questions]
@@ -345,7 +352,7 @@ def _server_active(ctx: commands.Context):
     """
     Exposed so that it can be checked in help commands.
     """
-    session = session_maker()
+    session = get_session()
     server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
     return server is not None
 
@@ -361,7 +368,7 @@ def _ck_server_active():
         if _DEBUG_FLAG:
             return True
         active = _server_active(ctx)
-        if not active and not ctx.message.content.startswith(ctx.prefix + "help"):
+        if not active and not ctx.message.content.startswith((ctx.prefix or "") + "help"):
             await ctx.send("Server is not set up for interviews.")
             await ctx.message.add_reaction(ctx.bot.redtick)
         return active
@@ -379,9 +386,9 @@ def _ck_interview_enabled():
     async def predicate(ctx: commands.Context):
         if ctx.guild is None:
             return False
-        session = session_maker()
+        session = get_session()
         result = session.query(schema.Server).filter_by(id=ctx.guild.id, active=True).one_or_none()
-        if result is None and not ctx.message.content.startswith(ctx.prefix + "help"):
+        if result is None and not ctx.message.content.startswith((ctx.prefix or "") + "help"):
             await ctx.send("Interviews are currently disabled.")
             await ctx.message.add_reaction(ctx.bot.redtick)
         return result is not None
@@ -399,7 +406,7 @@ def _ck_is_manager():
     async def predicate(ctx: commands.Context):
         if ctx.author.guild_permissions.administrator:
             return True
-        session = session_maker()
+        session = get_session()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         return server is not None and server.manager_role_id in {role.id for role in ctx.author.roles}
 
@@ -416,13 +423,13 @@ def _ck_is_interviewee():
     async def predicate(ctx: commands.Context):
         if ctx.guild is None:
             return False
-        session = session_maker()
+        session = get_session()
         result = (
             session.query(schema.Interview)
             .filter_by(server_id=ctx.guild.id, interviewee_id=ctx.author.id, current=True)
             .one_or_none()
         )
-        if result is None and not ctx.message.content.startswith(ctx.prefix + "help"):
+        if result is None and not ctx.message.content.startswith((ctx.prefix or "") + "help"):
             await ctx.send(f"**{ctx.author}**, you are not the interviewee.")
             await ctx.message.add_reaction(ctx.bot.redtick)
         return result is not None
@@ -565,7 +572,7 @@ class Interview(commands.Cog):
         """
         Check if the specified sheet name is legal.
         """
-        session = session_maker()
+        session = get_session()
         existing_server = session.query(schema.Server).filter_by(sheet_name=sheet_name).one_or_none()
         if existing_server is not None:
             await ctx.send(
@@ -619,7 +626,7 @@ class Interview(commands.Cog):
         on your own.
         """
 
-        session = session_maker()
+        session = get_session()
 
         existing_server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         if existing_server is not None:
@@ -654,7 +661,7 @@ class Interview(commands.Cog):
         """
         Set the interview maanger role.
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         server.manager_role_id = role.id
         session.commit()
@@ -667,7 +674,7 @@ class Interview(commands.Cog):
         """
         Set the interview on-stage audience role.
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         server.audience_role_id = audience_role.id
         session.commit()
@@ -685,7 +692,7 @@ class Interview(commands.Cog):
         """
 
         # set the old interview row to be not-current
-        session = session_maker()
+        session = get_session()
         old_interview: schema.Interview | None = (
             session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
         )
@@ -767,7 +774,7 @@ class Interview(commands.Cog):
         """
         Check current settings for this server's interviews.
         """
-        session = session_maker()
+        session = get_session()
         server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         answer = ctx.guild.get_channel(server.answer_channel)
         backstage = ctx.guild.get_channel(server.back_channel)
@@ -798,7 +805,7 @@ class Interview(commands.Cog):
         """
         TODO: Update metadata for the current interview as possible from the sheet.
         """
-        session = session_maker()
+        session = get_session()
         interview = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
         old_count = interview.questions_answered
         old_total = interview.questions_asked
@@ -826,7 +833,7 @@ class Interview(commands.Cog):
 
         channel_type must be 'answer' or 'backstage'.
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         answer = ctx.guild.get_channel(server.answer_channel)
         backstage = ctx.guild.get_channel(server.back_channel)
@@ -857,7 +864,7 @@ class Interview(commands.Cog):
         if sheet_name is not None and await self._check_sheet(ctx, sheet_name) is False:
             return
 
-        session = session_maker()
+        session = get_session()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         if sheet_name is None:
             await ctx.send(f"The current interview sheet name is `{server.sheet_name}`.")
@@ -873,7 +880,7 @@ class Interview(commands.Cog):
         """
         Disable voting and question asking for the current interview.
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is None:
             await ctx.send(f"Interviews are not set up for {ctx.guild}.")
@@ -894,7 +901,7 @@ class Interview(commands.Cog):
         """
         Re-enable voting and question asking for the current interview.
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is None:
             await ctx.send(f"Interviews are not set up for {ctx.guild}.")
@@ -920,7 +927,7 @@ class Interview(commands.Cog):
 
         If no date specified, prints the current limit.
         """
-        session = session_maker()
+        session = get_session()
         server = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         if date is None:
             await ctx.send(f"The current reinterview limit is `{server.limit.strftime('%Y/%m/%d')}`.")
@@ -937,7 +944,7 @@ class Interview(commands.Cog):
 
         Usable only by the current interviewee and administrators. Defaults to 60 minute invitation. Use 'all' for <user> to invite everyone.
         """
-        session = session_maker()
+        session = get_session()
         interview: schema.Interview | None = (
             session.query(schema.Interview).filter_by(current=True, server_id=ctx.guild.id).one_or_none()
         )
@@ -977,7 +984,7 @@ class Interview(commands.Cog):
 
         If no user specified, view stats for the current interview.
         """
-        session = session_maker()
+        session = get_session()
         interview: schema.Interview | None = (
             session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
         )
@@ -1053,7 +1060,7 @@ class Interview(commands.Cog):
         Ask a bunch of questions at once. Or just one. Either way, use the batch upload command rather than
         doing it one at a time.
         """
-        session = session_maker()
+        session = get_session()
         interview: schema.Interview | None = (
             session.query(schema.Interview).filter_by(current=True, server_id=ctx.guild.id).one_or_none()
         )
@@ -1144,7 +1151,7 @@ class Interview(commands.Cog):
         Command wrapped by Interview.answer() and Interview.preview().
         Greedily dumps as many answered questions into embeds as possible, and posts them to the specified channel.
         """
-        session = session_maker()
+        session = get_session()
         server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         interview: schema.Interview | None = (
             session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
@@ -1179,15 +1186,15 @@ class Interview(commands.Cog):
 
         n_sent = 0
         embeds = Interview._generate_embeds(interviewee=interviewee, interview=interview, questions=questions)
-        for embed in embeds:
-            if type(embed) is Question:
+        for item in embeds:
+            if isinstance(item, Question):
                 # question was too long
                 await channel.send(
-                    f"Question #{embed.question_num} or its answer from {embed.asker} was too long "
+                    f"Question #{item.question_num} or its answer from {item.asker} was too long "
                     f"to embed, please split it up and answer it manually."
                 )
-            else:
-                await channel.send(embed=embed)
+            elif isinstance(item, discord.Embed):
+                await channel.send(embed=item)
                 n_sent += 1
                 logging.debug(f"sent {n_sent} answer embeds")
         logging.debug("done sending answers")
@@ -1210,7 +1217,7 @@ class Interview(commands.Cog):
         Questions posted in chronological order, grouped by asker.
         If an answer is too long to be posted, the interviewee may have to post it manually.
         """
-        session = session_maker()
+        session = get_session()
         server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         channel = ctx.guild.get_channel(server.answer_channel)
 
@@ -1239,7 +1246,7 @@ class Interview(commands.Cog):
         if channel == ctx.channel:
             preview_flag = True
 
-        session = session_maker()
+        session = get_session()
         server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         interview: schema.Interview | None = (
             session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
@@ -1288,7 +1295,7 @@ class Interview(commands.Cog):
 
         Use the row as indicated on the sheet sidebar. If the preview flag is set to true, will post in the current channel.
         """
-        session = session_maker()
+        session = get_session()
         server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         if preview is True:
             channel = ctx.channel
@@ -1307,7 +1314,7 @@ class Interview(commands.Cog):
 
         Usable only by the current interviewee.
         """
-        session = session_maker()
+        session = get_session()
         server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         audience_role = ctx.guild.get_role(server.audience_role_id)
         if not audience_role:
@@ -1327,7 +1334,7 @@ class Interview(commands.Cog):
 
         Usable only by the current interviewee.
         """
-        session = session_maker()
+        session = get_session()
         server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         audience_role = ctx.guild.get_role(server.audience_role_id)
         if not audience_role:
@@ -1347,7 +1354,7 @@ class Interview(commands.Cog):
 
         Usable only by the current interviewee.
         """
-        session = session_maker()
+        session = get_session()
         server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         audience_role = ctx.guild.get_role(server.audience_role_id)
         if not audience_role:
@@ -1369,7 +1376,7 @@ class Interview(commands.Cog):
 
         Usable only by the current interviewee.
         """
-        session = session_maker()
+        session = get_session()
         server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
         audience_role = ctx.guild.get_role(server.audience_role_id)
         if not audience_role:
@@ -1466,7 +1473,7 @@ class Interview(commands.Cog):
         none of your votes will count.
         """
 
-        session = session_maker()
+        session = get_session()
         iv_meta = session.query(schema.Interview).filter_by(server_id=ctx.guild.id, current=True).one_or_none()
         server: schema.Server | None = session.query(schema.Server).filter_by(id=ctx.guild.id).one_or_none()
 
@@ -1601,7 +1608,7 @@ class Interview(commands.Cog):
         """
         Delete your current votes.
         """
-        session = session_maker()
+        session = get_session()
         session.query(schema.Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).delete()
         session.commit()
         await ctx.message.add_reaction(self.bot.greentick)
@@ -1612,7 +1619,7 @@ class Interview(commands.Cog):
         """
         Check who you're voting for.
         """
-        session = session_maker()
+        session = get_session()
         votes = session.query(schema.Vote).filter_by(server_id=ctx.guild.id, voter_id=ctx.author.id).all()
         member_votes = [ctx.guild.get_member(vote.candidate_id) for vote in votes]
 
@@ -1626,7 +1633,7 @@ class Interview(commands.Cog):
         The only reason this isn't votals() is because it also gets called by iv_next(), but that wants to place
         the votals reply in a different channel.
         """
-        session = session_maker()
+        session = get_session()
         votes = session.query(schema.Vote).filter_by(server_id=ctx.guild.id).all()
 
         # Filter only the invoker's own votes when generating the footer
@@ -1699,7 +1706,7 @@ class Interview(commands.Cog):
 
         When opting out, all votes for you are deleted.
         """
-        session = session_maker()
+        session = get_session()
         status = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id, opt_id=ctx.author.id).one_or_none()
         if status is None:
             optout = schema.OptOut(server_id=ctx.guild.id, opt_id=ctx.author.id)
@@ -1721,7 +1728,7 @@ class Interview(commands.Cog):
         """
         Opt into voting.
         """
-        session = session_maker()
+        session = get_session()
         status = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id, opt_id=ctx.author.id).one_or_none()
         if status is None:
             await ctx.send("You are already opted into interviews.")
@@ -1738,7 +1745,7 @@ class Interview(commands.Cog):
         """
         Check who's opted out of interview voting.
         """
-        session = session_maker()
+        session = get_session()
         opts = session.query(schema.OptOut).filter_by(server_id=ctx.guild.id).all()
         cowards = [ctx.guild.get_member(opt.opt_id) for opt in opts]
         cowards = [coward for coward in cowards if coward is not None]
@@ -1775,7 +1782,7 @@ async def populate(ctx: commands.Context, filename: str):
     with open(filename) as fp:
         rows = json.load(fp)
 
-    session = session_maker()
+    session = get_session()
     ivs = []
     for row in rows:
         ts = row["start_time"]

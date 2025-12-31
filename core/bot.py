@@ -76,7 +76,12 @@ class Bot(commands.Bot):
 
     @property
     def default_command_prefix(self) -> str:
-        return self.command_prefix[0]
+        prefix = self.command_prefix
+        if isinstance(prefix, str):
+            return prefix
+        if callable(prefix):
+            raise TypeError("Cannot get default prefix from callable")
+        return list(prefix)[0]
 
     async def on_message(self, message: discord.Message):
         """

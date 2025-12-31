@@ -163,7 +163,8 @@ class ProfileValidation:
 
     @classmethod
     def fave_game(cls, game: str) -> str:
-        pass
+        # TODO: Implement validation
+        return game
 
     @staticmethod
     def fave_role(role: str) -> str:
@@ -171,7 +172,8 @@ class ProfileValidation:
 
     @classmethod
     def fave_game_type(cls, game_type: str) -> str:
-        pass
+        # TODO: Implement validation
+        return game_type
 
 
 class Profiles(commands.Cog):
@@ -206,7 +208,7 @@ class Profiles(commands.Cog):
             checked = ProfileValidation.primary_name(name)
             await ctx.send(checked)
         except InputError as ie:
-            await ctx.send(ie)
+            await ctx.send(str(ie))
 
     @set.group(name="aka")
     async def set_aka(self, ctx: commands.Context, aka: str):
@@ -218,7 +220,7 @@ class Profiles(commands.Cog):
             checked = ProfileValidation.primary_name(aka)
             await ctx.send(checked)
         except InputError as ie:
-            await ctx.send(ie)
+            await ctx.send(str(ie))
 
     @set.group(name="pronouns")
     async def set_pronouns(self, ctx: commands.Context):
@@ -272,7 +274,7 @@ class Profiles(commands.Cog):
         await ctx.send("Enter the UTC offset for your timezone (i.e., `UTC±HH:MM`).")
         answer = None
         while answer is None:
-            msg = await self.bot.wait_for(event="message", check=lambda m: m.author == ctx.author, timeout=600)
+            msg = await self.bot.wait_for("message", check=lambda m: m.author == ctx.author, timeout=600)
             if msg.content.lower() == "cancel":
                 answer = "cancel"
                 break

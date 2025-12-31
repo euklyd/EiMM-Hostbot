@@ -23,6 +23,14 @@ _EMOJI_RE = re.compile(r"<:(?P<name>\w\w+):(?P<id>\d+)>")
 MAX_ATTACHMENT_SIZE = 1e6
 
 session_maker: "Callable[[], Session] | None" = None
+
+
+def get_session() -> Session:
+    """Get a database session, asserting that the database has been initialized."""
+    assert session_maker is not None, "Database not initialized - emoji_count setup() not called"
+    return session_maker()
+
+
 enabled_servers: list[int] = []  # discord server IDs
 needed_dirs = [
     "databases/conf/",
@@ -41,7 +49,7 @@ class NoneEmoji:
 
 
 def increment_count(
-    session: Session, server: discord.guild, emoji_id: int, user: discord.user, today: datetime.date
+    session: Session, server: discord.Guild, emoji_id: int, user: discord.User, today: date
 ) -> int:
     entry = (
         session.query(es.EmojiCount)
@@ -55,7 +63,7 @@ def increment_count(
         entry = es.EmojiCount(server_id=server.id, emoji_id=emoji_id, user_id=user.id, date=today, count=1)
         session.add(entry)
     session.commit()
-    return entry.count
+    return int(entry.count)  # Cast Column[int] to int for type checker
 
 
 # TODO: add to cog? idk
@@ -65,7 +73,7 @@ async def count_emoji(message: discord.Message):
     if message.author.bot:
         # nope
         return
-    session = session_maker()
+    session = get_session()
 
     emoji_ids: dict[int, discord.Emoji] = {e.id: e for e in message.guild.emojis}
 
@@ -80,7 +88,7 @@ async def count_emoji(message: discord.Message):
 
 
 def get_count(ctx: commands.Context, emoji_id: int, oldest: date) -> int:
-    session = session_maker()
+    session = get_session()
     entries = (
         session.query(es.EmojiCount)
         .filter_by(server_id=ctx.guild.id, emoji_id=emoji_id)
@@ -191,7 +199,7 @@ class Emoji(commands.Cog):
 
         oldest = datetime.utcnow().date() - timedelta(days=days)
 
-        session = session_maker()
+        session = get_session()
 
         # list of tuples of users and how many time each has used this emoji, ordered by uses
         user_counts = (
@@ -240,7 +248,7 @@ class Emoji(commands.Cog):
         emoji_ids: dict[int, discord.Emoji] = {e.id: e for e in ctx.guild.emojis}
         animated_emojis = {e.id for e in ctx.guild.emojis if e.animated}
 
-        session = session_maker()
+        session = get_session()
 
         total_counts = (
             session.query(es.EmojiCount.emoji_id, func.sum(es.EmojiCount.count))
@@ -285,7 +293,7 @@ class Emoji(commands.Cog):
         emoji_ids: dict[int, discord.Emoji] = {e.id: e for e in ctx.guild.emojis}
         animated_emojis = {e.id for e in ctx.guild.emojis if e.animated}
 
-        session = session_maker()
+        session = get_session()
 
         total_counts = (
             session.query(es.EmojiCount.emoji_id, func.sum(es.EmojiCount.count))
@@ -328,7 +336,7 @@ class Emoji(commands.Cog):
         emoji_ids: dict[int, discord.Emoji] = {e.id: e for e in ctx.guild.emojis}
         animated_emojis = {e.id for e in ctx.guild.emojis if e.animated}
 
-        session = session_maker()
+        session = get_session()
 
         total_counts = (
             session.query(es.EmojiCount.emoji_id, func.sum(es.EmojiCount.count))
@@ -389,7 +397,7 @@ class Emoji(commands.Cog):
             ]
             out.writerow(labels)
 
-            session = session_maker()
+            session = get_session()
 
             for entry in session.query(es.EmojiCount).filter_by(server_id=ctx.guild.id).all():
                 em: discord.Emoji | NoneEmoji | None = emojis.get(entry.emoji_id)
@@ -491,7 +499,7 @@ class Emoji(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
-        session = session_maker()
+        session = get_session()
 
         if event.lower() == "ditto" or not event:
             prev_game = await self.ditto_add(ctx, session)
@@ -519,7 +527,7 @@ class Emoji(commands.Cog):
         emoji: discord.Emoji,
     ):
         """Remove an event emoji."""
-        session = session_maker()
+        session = get_session()
         event_emoji: es.EventEmoji = (
             session.query(es.EventEmoji).filter_by(emoji_id=emoji.id, server_id=ctx.guild.id).one_or_none()
         )
@@ -527,8 +535,8 @@ class Emoji(commands.Cog):
             await ctx.send(f"{emoji} is not registered as an Event Emoji.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return
-        emoji: discord.Emoji = await ctx.guild.fetch_emoji(event_emoji.emoji_id)
-        if emoji:
+        fetched_emoji = await ctx.guild.fetch_emoji(event_emoji.emoji_id)
+        if fetched_emoji:
             await emoji.delete(reason="Deleted Event Emoji")
         else:
             await ctx.send("Emoji not found so cannot delete, but will be set inactive.")
@@ -550,7 +558,7 @@ class Emoji(commands.Cog):
         Sort options: alphabetical, usage, date, owner, event
         Use days to limit the time window if you're counting by usage (default 30).
         """
-        session = session_maker()
+        session = get_session()
         query_emojis: list[es.EventEmoji] = []
         # I don't think it makes sense to show inactive emojis atm, it clutters up the command invocation.
         active = True

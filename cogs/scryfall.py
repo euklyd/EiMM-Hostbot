@@ -14,9 +14,8 @@ import discord
 import requests
 from discord.ext import commands
 from fuzzywuzzy import process
-from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.future import select
-from sqlalchemy.orm import sessionmaker
 
 from core.bot import Bot
 from schemas.scryfall_schema import Base, ScryfallText
@@ -38,12 +37,14 @@ class ScryfallResponse:
         self.names = cardnames
         self.map = card_map
 
-    def closest(self, query: str) -> dict:
+    def closest(self, query: str) -> dict | None:
         match = process.extractOne(query, self.names)
+        if match is None:
+            return None
         return self.map[match[0]]
 
 
-def scryfall_search(expr: str) -> ScryfallResponse:
+def scryfall_search(expr: str) -> ScryfallResponse | None:
     ENDPOINT = "cards/search?"
     query = f"{API}{ENDPOINT}q={expr}"
     with requests.get(query) as response:
@@ -76,7 +77,7 @@ class Cards(commands.Cog):
         self.db: AsyncEngine = create_async_engine(f"sqlite+aiosqlite:///{db_file}")
 
     def db_session(self):
-        return sessionmaker(self.db, expire_on_commit=False, class_=AsyncSession)
+        return async_sessionmaker(self.db, expire_on_commit=False, class_=AsyncSession)
 
     @commands.command()
     async def oracle(self, ctx: commands.Context, *, expr: str):
@@ -109,16 +110,19 @@ class Cards(commands.Cog):
         else:
             return False
         resp = scryfall_search(expr)
-        if len(resp.cards) == 0:
+        if resp is None or len(resp.cards) == 0:
             return False
         card = resp.closest(message.content)
         for c in resp.cards:
             if c["name"].lower() == expr.lower():
                 card = c
+        if card is None:
+            return False
         if "image_uris" in card:
             await message.channel.send(card["image_uris"]["normal"])
         else:
             await message.channel.send(f"`'image_uris'` not present ( `{card['uri']}` ). Try: {card['scryfall_uri']}")
+        return True
 
     async def _ygo_inline(self, message: discord.Message) -> bool:
         """
@@ -271,7 +275,7 @@ class Cards(commands.Cog):
         if not text:
             return None
 
-        async_session = sessionmaker(
+        async_session = async_sessionmaker(
             self.db,
             expire_on_commit=False,
             class_=AsyncSession,
@@ -665,7 +669,10 @@ class Cards(commands.Cog):
     @commands.command(name="sftext", aliases=["sftest"])
     async def sftest(self, ctx: commands.Context, *, expr: str):
         embeds = await self._scryfall_search(expr)
-        await ctx.send(embed=embeds[0])
+        if embeds:
+            await ctx.send(embed=embeds[0])
+        else:
+            await ctx.send("No results found.")
 
 
 async def create_metadata(db):

@@ -37,16 +37,18 @@ def get_headings_to_columns(ws: Worksheet) -> dict[str, int]:
     return {k: i + 1 for i, k in enumerate(ws.row_values(1))}
 
 
-def find_row(records: list[dict[str, Any]], lookup_value, search_heading) -> int:
+def find_row(records: list[dict[str, Any]], lookup_value, search_heading) -> int | None:
     for i, record in enumerate(records):
         if record[search_heading] == lookup_value:
             return i + 2
+    return None
 
 
-def find_record(records: list[dict[str, Any]], lookup_value, search_heading) -> dict:
+def find_record(records: list[dict[str, Any]], lookup_value, search_heading) -> dict | None:
     for record in records:
         if record[search_heading] == lookup_value:
             return record
+    return None
 
 
 # def vlookup_column(ws: List[Dict[str, Any]], lookup_value, search_col, return_col):
