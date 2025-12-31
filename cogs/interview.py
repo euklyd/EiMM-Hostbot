@@ -219,7 +219,7 @@ class InterviewEmbed(discord.Embed):
         interviewee: discord.Member, asker: discord.Member | discord.User, avatar_url: str = None
     ) -> "InterviewEmbed":
         if avatar_url is None:
-            avatar_url = interviewee.avatar_url
+            avatar_url = interviewee.display_avatar.url
         em = InterviewEmbed(
             title=f"**{interviewee}**'s interview",
             description=" ",
@@ -228,10 +228,12 @@ class InterviewEmbed(discord.Embed):
         em.set_thumbnail(url=avatar_url)
         em.set_author(
             name=f"Asked by {asker}",
-            icon_url=asker.avatar_url,
+            icon_url=asker.display_avatar.url,
         )
         # +100 length as a buffer for the metadata fields
-        em.length = len(f"**{interviewee}**'s interview" + " " + f"Asked by {asker}") + len(asker.avatar_url) + 100
+        em.length = (
+            len(f"**{interviewee}**'s interview" + " " + f"Asked by {asker}") + len(asker.display_avatar.url) + 100
+        )
         return em
 
 
@@ -478,7 +480,7 @@ class Interview(commands.Cog):
         Generate a list of discord.Embeds to be posted from a list of Questions.
         """
         if avatar_url is None:
-            avatar_url = interviewee.avatar_url
+            avatar_url = interviewee.display_avatar.url
 
         n_answered = 0
         n_asked = interview.questions_asked
@@ -995,7 +997,7 @@ class Interview(commands.Cog):
                 title=f"{interviewee}'s interview",
                 color=interviewee.color,
             )
-            em.set_thumbnail(url=interviewee.avatar_url)
+            em.set_thumbnail(url=interviewee.display_avatar.url)
             if len(past_interviews) > 1:
                 description = f"{interviewee}'s past interviews were:\n"
                 for iv in past_interviews:
@@ -1024,7 +1026,7 @@ class Interview(commands.Cog):
                 url = utils.jump_url(iv.server_id, iv.op_channel_id, iv.op_message_id)
                 description += f"• [{iv.start_time}]({url}): {iv.questions_answered} out of {iv.questions_asked}\n"
             em.description = description
-        em.set_thumbnail(url=member.avatar_url)
+        em.set_thumbnail(url=member.display_avatar.url)
         if interview is None:
             # No questions could have been asked if there's no current interview
             await ctx.send(embed=em)
@@ -1104,7 +1106,7 @@ class Interview(commands.Cog):
         )
         em.set_author(
             name=f"New question from {ctx.author}",
-            icon_url=ctx.author.avatar_url,
+            icon_url=ctx.author.display_avatar.url,
         )
         backstage = ctx.guild.get_channel(interview.server.back_channel)
         if backstage is None:
@@ -1796,6 +1798,6 @@ async def populate(ctx: commands.Context, filename: str):
     await ctx.message.add_reaction(ctx.bot.greentick)
 
 
-def setup(bot: commands.Bot):
-    bot.add_cog(Interview(bot))
+async def setup(bot: commands.Bot):
+    await bot.add_cog(Interview(bot))
     bot.add_command(populate)  # TODO: Remove before release.

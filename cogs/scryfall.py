@@ -674,36 +674,13 @@ async def create_metadata(db):
         # await conn.run_sync(meta.create_all)
 
 
-def setup_sync(bot: Bot):
+async def setup(bot: Bot):
     db_dir = "databases/"
     db_file = f"{db_dir}/scryfall.db"
     if not Path(db_file).exists():
         Path(db_dir).mkdir(exist_ok=True)
 
-    session = aiohttp.ClientSession(loop=bot.loop)
+    session = aiohttp.ClientSession()
     cog = Cards(bot, session, db_file)
-
-    asyncio.run(create_metadata(cog.db))
-    bot.add_cog(cog)
-
-
-async def setup_async(bot: Bot):
-    db_dir = "databases/"
-    db_file = f"{db_dir}/scryfall.db"
-    if not Path(db_file).exists():
-        Path(db_dir).mkdir(exist_ok=True)
-
-    async with aiohttp.ClientSession as session:
-        cog = Cards(bot, session, db_file)
     await create_metadata(cog.db)
     await bot.add_cog(cog)
-
-
-__discord_major_version = int(discord.__version__.split(".")[0])
-
-if __discord_major_version == 1:
-    setup = setup_sync
-elif __discord_major_version >= 2:
-    setup = setup_async
-else:
-    raise Exception(f"UNHANDLED discord.py VERSION: {discord.__version__}")

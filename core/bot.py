@@ -158,9 +158,10 @@ class Bot(commands.Bot):
         assert len(events) == len(checks), "number of events and checks must be equal"
 
         futures: list[asyncio.Future] = []
+        loop = asyncio.get_event_loop()
 
         for event, check in zip(events, checks, strict=False):
-            future = self.loop.create_future()
+            future = loop.create_future()
             if check is None:
 
                 def _check(*args):
@@ -178,9 +179,7 @@ class Bot(commands.Bot):
             listeners.append((future, check))
             futures.append(future)
 
-        complete, pending = await asyncio.wait(
-            futures, timeout=timeout, loop=self.loop, return_when=asyncio.FIRST_COMPLETED
-        )
+        complete, pending = await asyncio.wait(futures, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
         for future in pending:
             future.cancel()
         if len(complete) == 0:

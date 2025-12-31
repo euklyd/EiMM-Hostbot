@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import faulthandler
 import logging
 
@@ -18,12 +19,12 @@ async def reload(ctx: commands.Context, extension: str):
     If it is not loaded yet, load it.
     """
     if f"cogs.{extension}" in ctx.bot.extensions:
-        ctx.bot.reload_extension(f"cogs.{extension}")
+        await ctx.bot.reload_extension(f"cogs.{extension}")
         await ctx.send(f"Reloaded extension `{extension}`.")
         logging.warning(f"reloaded cogs.{extension}")
     else:
         try:
-            ctx.bot.load_extension(f"cogs.{extension}")
+            await ctx.bot.load_extension(f"cogs.{extension}")
             await ctx.send(f"Loaded extension `{extension}`.")
         except commands.errors.ExtensionNotFound:
             await ctx.send(f"Could not find extension `{extension}`.")
@@ -36,7 +37,7 @@ async def unload(ctx: commands.Context, extension: str):
     Unload the specified extension.
     """
     if f"cogs.{extension}" in ctx.bot.extensions:
-        ctx.bot.unload_extension(f"cogs.{extension}")
+        await ctx.bot.unload_extension(f"cogs.{extension}")
         await ctx.send(f"Unloaded extension `{extension}`.")
         logging.warning(f"unloaded cogs.{extension}")
     else:
@@ -50,7 +51,7 @@ async def shutdown(ctx: commands.Context):
     Zzz.
     """
     await ctx.send("I'll be back.")
-    await ctx.bot.logout()
+    await ctx.bot.close()
 
 
 def parse_args():
@@ -59,15 +60,16 @@ def parse_args():
     return parser.parse_args()
 
 
-def run():
+async def main():
     args = parse_args()
     logging.basicConfig(level=args.loglevel, format="[%(asctime)s] %(message)s", datefmt="%Y/%m/%d %T:%M:%S")
     faulthandler.enable()
 
-    # At least, needs: members=True, emojis=True, invites=True, messages=True, reactions=True
-    # All of these but members are defaults.
+    # Intents: members=True, emojis=True, invites=True, messages=True, reactions=True, message_content=True
     intents = discord.Intents.default()
     intents.members = True
+    intents.message_content = True  # Required for reading message content in v2
+
     bot = Bot(
         command_prefix=settings.prefix,
         description="https://board8.fandom.com/wiki/Mafia_Bidoof",
@@ -76,20 +78,24 @@ def run():
         owner_id=settings.owner_id,
         status=settings.status,
         intents=intents,
-        case_insensitive=True,  # unfortunately this doesn't help with "help <cogname>"
     )
 
-    for ext in settings.extensions:
-        bot.load_extension(f"cogs.{ext}")
-        logging.warning(f"loaded cogs.{ext}")
+    async with bot:
+        for ext in settings.extensions:
+            await bot.load_extension(f"cogs.{ext}")
+            logging.warning(f"loaded cogs.{ext}")
 
-    bot.add_command(shutdown)
-    bot.add_command(reload)
-    bot.add_command(unload)
+        bot.add_command(shutdown)
+        bot.add_command(reload)
+        bot.add_command(unload)
 
-    print("doot")
-    logging.warning("starting bot")
-    bot.run(settings.client_token)
+        print("doot")
+        logging.warning("starting bot")
+        await bot.start(settings.client_token)
+
+
+def run():
+    asyncio.run(main())
 
 
 if __name__ == "__main__":

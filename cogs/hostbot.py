@@ -635,7 +635,8 @@ class HostBot(commands.Cog):
             em = discord.Embed(title=server.name, color=host_role.color)
         else:
             em = discord.Embed(title=server.name)
-        em.set_thumbnail(url=ctx.guild.icon_url)
+        if ctx.guild.icon:
+            em.set_thumbnail(url=ctx.guild.icon.url)
 
         if host_role:
             em.add_field(
@@ -810,7 +811,7 @@ class HostBot(commands.Cog):
             if len(reply) > 1800:
                 replies.append(reply + "```")
                 reply = "```\n"
-            reply += f"{host}: {host.avatar_url_as(static_format='png')}\n"
+            reply += f"{host}: {host.display_avatar.with_static_format('png')}\n"
         if len(host_role.members) == 0:
             reply += " "
         reply += "```**Player avatars:**```\n"
@@ -819,7 +820,7 @@ class HostBot(commands.Cog):
                 if len(reply) > 1800:
                     replies.append(reply + "```")
                     reply = "```\n"
-                reply += f"{player}: {player.avatar_url_as(static_format='png')}\n"
+                reply += f"{player}: {player.display_avatar.with_static_format('png')}\n"
         reply += "```"
         replies.append(reply)
 
@@ -1199,7 +1200,7 @@ class HostBot(commands.Cog):
 #     # TODO
 
 
-def setup(bot: Bot):
+async def setup(bot: Bot):
     # global connection
     # connection = spreadsheet.SheetConnection(bot.google_creds, bot.google_scope)
     #
@@ -1208,7 +1209,7 @@ def setup(bot: Bot):
     # bot.add_command(confessional)
     # bot.add_command(gameavatars)
     # bot.add_command(enrole)
-    bot.add_cog(HostBot(bot))
+    await bot.add_cog(HostBot(bot))
 
     # db_dir = 'databases/'
     # db_file = f'{db_dir}/hostbot.db'

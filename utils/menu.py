@@ -236,7 +236,7 @@ async def menu_loop(
             )
             await menu_msg.edit(content=new_menu)
 
-    if ctx.me.permissions_in(ctx.channel).manage_messages:
+    if ctx.channel.permissions_for(ctx.me).manage_messages:
         await menu_msg.clear_reactions()
     else:
         await menu_msg.remove_reaction(ARROW_LEFT, member=ctx.bot.user)

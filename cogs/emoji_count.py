@@ -600,7 +600,7 @@ class Emoji(commands.Cog):
             await ctx.send(f"Exit your currently running menu first with `{CANCEL}`.")
 
 
-def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot):
     global enabled_servers
     global session_maker
 
@@ -624,4 +624,4 @@ def setup(bot: commands.Bot):
         enabled_servers = []
 
     bot.add_listener(count_emoji, "on_message")
-    bot.add_cog(Emoji(bot))
+    await bot.add_cog(Emoji(bot))
