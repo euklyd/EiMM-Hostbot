@@ -12,12 +12,18 @@ from sqlalchemy import pool
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-# Import the Base from our models so Alembic can detect schema changes
-from db.base import Base
-
 # Import all models here so they're registered with Base.metadata
 # This is required for autogenerate to work
-# from db.models.interview import Server, Interview, Question, Vote, OptOut  # noqa: F401
+from cogs.interview.models import (  # noqa: F401
+    Interview,
+    InterviewServer,
+    OptOut,
+    Question,
+    Vote,
+)
+
+# Import the Base from our models so Alembic can detect schema changes
+from db.base import Base
 
 config = context.config
 

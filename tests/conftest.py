@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from cogs.emoji_schema import Base as EmojiBase
 from cogs.hostbot_schema import Base as HostbotBase
+from db.base import Base as InterviewBase
 from schemas.scryfall_schema import Base as ScryfallBase
 
 
@@ -128,6 +129,36 @@ def scryfall_engine() -> Generator[Engine, None, None]:
 def scryfall_session(scryfall_engine: Engine) -> Generator[Session, None, None]:
     """Create a session for scryfall schema tests."""
     session_factory = sessionmaker(bind=scryfall_engine)
+    session = session_factory()
+    try:
+        yield session
+    finally:
+        session.rollback()
+        session.close()
+
+
+@pytest.fixture
+def interview_engine() -> Generator[Engine, None, None]:
+    """Create an in-memory SQLite engine for interview schema."""
+    # Import models to register them with the Base
+    from cogs.interview.models import (  # noqa: F401
+        Interview,
+        InterviewServer,
+        OptOut,
+        Question,
+        Vote,
+    )
+
+    engine = create_engine("sqlite:///:memory:", echo=False)
+    InterviewBase.metadata.create_all(engine)
+    yield engine
+    engine.dispose()
+
+
+@pytest.fixture
+def interview_session(interview_engine: Engine) -> Generator[Session, None, None]:
+    """Create a session for interview schema tests."""
+    session_factory = sessionmaker(bind=interview_engine)
     session = session_factory()
     try:
         yield session
