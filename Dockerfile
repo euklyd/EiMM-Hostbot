@@ -2,11 +2,12 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install system dependencies for voice support and PostgreSQL
+# Install system dependencies for voice support, PostgreSQL client (for pg_dump)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     libopus0 \
     libffi-dev \
+    postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
 # Install uv
@@ -21,9 +22,16 @@ RUN uv sync --frozen --no-dev
 # Copy application code
 COPY . .
 
+# Make entrypoint executable
+RUN chmod +x scripts/entrypoint.sh
+
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash botuser && \
     chown -R botuser:botuser /app
+
 USER botuser
 
-CMD ["uv", "run", "bidoof"]
+# Default backup directory (mount a volume here)
+ENV BACKUP_DIR=/backups
+
+ENTRYPOINT ["scripts/entrypoint.sh"]

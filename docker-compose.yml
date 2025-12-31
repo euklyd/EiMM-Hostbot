@@ -6,14 +6,21 @@ services:
         condition: service_healthy
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      # Database connection for the app
+      - DATABASE_URL=postgresql+asyncpg://eimm:${DB_PASSWORD}@postgres:5432/eimm
+      # Legacy env vars (can remove after full migration)
       - DB_HOST=postgres
       - DB_PORT=5432
       - DB_USER=eimm
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=eimm
+      # Backup settings
+      - BACKUP_DIR=/backups
+      - BACKUP_RETENTION_DAYS=7
     volumes:
       - ./conf:/app/conf:ro
       - ./databases:/app/databases  # For SQLite compatibility during migration
+      - backups:/backups
     restart: unless-stopped
 
   postgres:
@@ -35,3 +42,4 @@ services:
 
 volumes:
   postgres_data:
+  backups:
