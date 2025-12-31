@@ -18,7 +18,7 @@ class Imgur(ImgurClient):
         self.set_user_auth(access_token, refresh_token)
 
     # stolen from https://github.com/Imgur/imgurpython
-    def upload(self, bytes_str: bytes, config=None, anon=True):
+    def upload(self, bytes_str: bytes, config: dict | None = None, anon: bool = True) -> dict:
         """
         Takes a file-like object (bytes) and uploads to imgur
         """

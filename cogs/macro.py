@@ -33,7 +33,7 @@ class Macro(commands.Cog):
         return discord.Embed().set_image(url=image.link)
 
     @commands.command()
-    async def bidoof(self, ctx: commands.Context, key: str | None):
+    async def bidoof(self, ctx: commands.Context, key: str | None) -> None:
         """
         I can't make a Mafia Bidoof bot *without* this command.
 
@@ -56,7 +56,7 @@ class Macro(commands.Cog):
         await ctx.send(embed=em)
 
     @commands.command()
-    async def sadcat(self, ctx: commands.Context, key: str | None):
+    async def sadcat(self, ctx: commands.Context, key: str | None) -> None:
         """
         Post a random sadcat.
 
@@ -79,5 +79,5 @@ class Macro(commands.Cog):
         await ctx.send(embed=em)
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Macro(bot))

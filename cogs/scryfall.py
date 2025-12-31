@@ -32,7 +32,7 @@ YGOPRO_ENDPOINT = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
 
 
 class ScryfallResponse:
-    def __init__(self, cards: dict, cardnames: list[str], card_map: dict[str, dict]):
+    def __init__(self, cards: dict, cardnames: list[str], card_map: dict[str, dict]) -> None:
         self.cards = cards
         self.names = cardnames
         self.map = card_map
@@ -71,16 +71,16 @@ class Cards(commands.Cog):
     Use [[MtG card name]] or {{Yu-Gi-Oh card name}} to search for cards inline.
     """
 
-    def __init__(self, bot: Bot, session: aiohttp.ClientSession, db_file: str):
+    def __init__(self, bot: Bot, session: aiohttp.ClientSession, db_file: str) -> None:
         self.bot = bot
         self.session = session
         self.db: AsyncEngine = create_async_engine(f"sqlite+aiosqlite:///{db_file}")
 
-    def db_session(self):
+    def db_session(self) -> async_sessionmaker[AsyncSession]:
         return async_sessionmaker(self.db, expire_on_commit=False, class_=AsyncSession)
 
     @commands.command()
-    async def oracle(self, ctx: commands.Context, *, expr: str):
+    async def oracle(self, ctx: commands.Context, *, expr: str) -> None:
         """
         Search Scryfall for Magic: The Gathering cards.
 
@@ -136,7 +136,7 @@ class Cards(commands.Cog):
         return await self._ygo(ctx, match.group(1), text_only=True)
 
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
+    async def on_message(self, message: discord.Message) -> None:
         if message.author.id == self.bot.user.id:
             return
 
@@ -146,7 +146,10 @@ class Cards(commands.Cog):
         if await self._ygo_inline(message):
             return
 
-    async def _card_menu(self, ctx: commands.Context, card_embeds) -> bool:
+    async def _card_menu(self, ctx: commands.Context, card_embeds: list[discord.Embed] | None) -> bool:
+        if not card_embeds:
+            return False
+
         ARROW_LEFT, ARROW_RIGHT = "\U000025c0", "\U000025b6"
 
         for i, em in enumerate(card_embeds):
@@ -158,7 +161,7 @@ class Cards(commands.Cog):
             await msg.add_reaction(ARROW_LEFT)
             await msg.add_reaction(ARROW_RIGHT)
 
-        def check(rxn, user):
+        def check(rxn: discord.Reaction, user: discord.User) -> bool:
             if user != ctx.author:
                 return False
             if rxn.message.id != msg.id:
@@ -233,7 +236,7 @@ class Cards(commands.Cog):
         return await self._card_menu(ctx, card_embeds)
 
     @commands.command()
-    async def ygo(self, ctx: commands.Context, *, query):
+    async def ygo(self, ctx: commands.Context, *, query: str) -> None:
         """
         Search YGOPro for Yu-Gi-Oh cards, as images.
 
@@ -242,7 +245,7 @@ class Cards(commands.Cog):
         await self._ygo(ctx, query, text_only=False)
 
     @commands.command()
-    async def ygot(self, ctx: commands.Context, *, query):
+    async def ygot(self, ctx: commands.Context, *, query: str) -> None:
         """
         Search YGOPro for Yu-Gi-Oh cards, as text.
 
@@ -290,7 +293,7 @@ class Cards(commands.Cog):
         # TODO: Insert mana symbols, etc.
         return text.replace("(", "_(").replace(")", ")_")
 
-    async def _mtg_embed(self, card: dict, session=None) -> discord.Embed:
+    async def _mtg_embed(self, card: dict, session: aiohttp.ClientSession | None = None) -> discord.Embed:
         """
         Returns a text embed for a Scryfall card dictionary.
         """
@@ -391,7 +394,7 @@ class Cards(commands.Cog):
         return em
 
     @staticmethod
-    def _ygo_embed_field_sets(em: discord.Embed, card: dict, maxlen: int = 4000):
+    def _ygo_embed_field_sets(em: discord.Embed, card: dict, maxlen: int = 4000) -> None:
         if "card_sets" not in card:
             return
 
@@ -500,7 +503,7 @@ class Cards(commands.Cog):
         return None
 
     @commands.command(name="dt")
-    async def duel_terminal(self, ctx: commands.Context, dt_num: str, num_cards: int = 1):
+    async def duel_terminal(self, ctx: commands.Context, dt_num: str, num_cards: int = 1) -> None:
         """
         Pull Duel Terminal cards.
 
@@ -593,7 +596,7 @@ class Cards(commands.Cog):
         await ctx.send(result)
 
     @commands.command(name="ygocsv")
-    async def collection_to_csv(self, ctx: commands.Context):
+    async def collection_to_csv(self, ctx: commands.Context) -> None:
         """
         Exports a YGOProDeck collection CSV to something more detailed.
 
@@ -667,7 +670,7 @@ class Cards(commands.Cog):
             )
 
     @commands.command(name="sftext", aliases=["sftest"])
-    async def sftest(self, ctx: commands.Context, *, expr: str):
+    async def sftest(self, ctx: commands.Context, *, expr: str) -> None:
         embeds = await self._scryfall_search(expr)
         if embeds:
             await ctx.send(embed=embeds[0])
@@ -675,13 +678,13 @@ class Cards(commands.Cog):
             await ctx.send("No results found.")
 
 
-async def create_metadata(db):
+async def create_metadata(db: AsyncEngine) -> None:
     async with db.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         # await conn.run_sync(meta.create_all)
 
 
-async def setup(bot: Bot):
+async def setup(bot: Bot) -> None:
     db_dir = "databases/"
     db_file = f"{db_dir}/scryfall.db"
     if not Path(db_file).exists():

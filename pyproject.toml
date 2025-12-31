@@ -56,6 +56,10 @@ select = [
     "B",      # flake8-bugbear
     "UP",     # pyupgrade
     "ASYNC",  # flake8-async (important for discord.py)
+    "ANN001", # missing type annotations for function arguments
+    "ANN201", # missing return type for public functions
+    "ANN202", # missing return type for private functions
+    "ANN205", # missing return type for static methods
 ]
 ignore = [
     "E501",     # line length handled by formatter
@@ -64,6 +68,10 @@ ignore = [
     "ASYNC210", # blocking HTTP - will fix during interview overhaul
     "ASYNC230", # blocking file I/O - will fix during interview overhaul
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# interview.py will be overhauled in Phase 8 - defer annotations until then
+"cogs/interview.py" = ["ANN"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -82,6 +90,7 @@ reportReturnType = "warning"
 reportAssignmentType = "warning"
 reportAttributeAccessIssue = "warning"
 reportGeneralTypeIssues = "warning"
+reportOptionalSubscript = "warning"
 reportUnusedCoroutine = "error"  # Keep this as error - important for async code
 
 [tool.pytest.ini_options]

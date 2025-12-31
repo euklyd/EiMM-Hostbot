@@ -29,7 +29,7 @@ DB_FILE = f"{DB_DIR}/interviews.db"
 # This is the fix.
 # TODO: Move this to a SQL utility file so it gets run globally every time :)
 @event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
+def set_sqlite_pragma(dbapi_connection: Any, connection_record: Any) -> None:
     # Some examples online would have you only run this if the SQLite version is high enough to
     # support foreign keys. That isn't a concern here. If your SQLite doesn't support foreign keys,
     # it can crash and burn.
@@ -61,7 +61,7 @@ class Candidate:
     Utility class, used only for votals.
     """
 
-    def __init__(self, ctx: commands.Context, candidate_id: int):
+    def __init__(self, ctx: commands.Context, candidate_id: int) -> None:
         self._ctx = ctx
         self.candidate = ctx.guild.get_member(candidate_id)
         self.voters = []
@@ -102,7 +102,7 @@ class Question:
         message_id: int,
         answer: str = None,
         timestamp: datetime = None,
-    ):
+    ) -> None:
         self.interviewee = interviewee
         self.asker = asker
         self.question = str(question)
@@ -172,7 +172,9 @@ class Question:
         ]
 
     @staticmethod
-    def upload_many(ctx: commands.Context, connection: spreadsheet.SheetConnection, questions: list["Question"]):
+    def upload_many(
+        ctx: commands.Context, connection: spreadsheet.SheetConnection, questions: list["Question"]
+    ) -> None:
         """
         Upload a list of Questions to a spreadsheet.
 
@@ -348,7 +350,7 @@ def add_question(em: discord.Embed, question: Question, current_length: int) -> 
     return text_length
 
 
-def _server_active(ctx: commands.Context):
+def _server_active(ctx: commands.Context) -> bool:
     """
     Exposed so that it can be checked in help commands.
     """
@@ -357,12 +359,12 @@ def _server_active(ctx: commands.Context):
     return server is not None
 
 
-def _ck_server_active():
+def _ck_server_active() -> commands.check:
     """
     Command check to make sure the server is set up for interviews.
     """
 
-    async def predicate(ctx: commands.Context):
+    async def predicate(ctx: commands.Context) -> bool:
         if ctx.guild is None:
             return False
         if _DEBUG_FLAG:
@@ -376,14 +378,14 @@ def _ck_server_active():
     return commands.check(predicate)
 
 
-def _ck_interview_enabled():
+def _ck_interview_enabled() -> commands.check:
     """
     Command check to make sure the interview is not disabled.
 
     Checked when voting, opting in or out, and asking questions.
     """
 
-    async def predicate(ctx: commands.Context):
+    async def predicate(ctx: commands.Context) -> bool:
         if ctx.guild is None:
             return False
         session = get_session()
@@ -396,14 +398,14 @@ def _ck_interview_enabled():
     return commands.check(predicate)
 
 
-def _ck_is_manager():
+def _ck_is_manager() -> commands.check:
     """
     Command check to make sure the invoker is an interview manager.
 
     Checked when doing routine interview management.
     """
 
-    async def predicate(ctx: commands.Context):
+    async def predicate(ctx: commands.Context) -> bool:
         if ctx.author.guild_permissions.administrator:
             return True
         session = get_session()

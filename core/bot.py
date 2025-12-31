@@ -18,10 +18,10 @@ class Bot(commands.Bot):
         self,
         command_prefix: str | Iterable[str] | Callable[["Bot", discord.Message], str],
         conf: Conf,
-        help_command=None,
-        description: str = None,
-        **options,
-    ):
+        help_command: commands.HelpCommand | None = None,
+        description: str | None = None,
+        **options: Any,
+    ) -> None:
         if help_command is None:
             super().__init__(command_prefix, description=description, **options)
         else:
@@ -83,7 +83,7 @@ class Bot(commands.Bot):
             raise TypeError("Cannot get default prefix from callable")
         return list(prefix)[0]
 
-    async def on_message(self, message: discord.Message):
+    async def on_message(self, message: discord.Message) -> None:
         """
         Override parent class on_message with author spoofing.
 
@@ -169,7 +169,7 @@ class Bot(commands.Bot):
             future = loop.create_future()
             if check is None:
 
-                def _check(*args):
+                def _check(*args: Any) -> bool:
                     return True
 
                 check = _check

@@ -32,7 +32,7 @@ class Utility(commands.Cog):
         self.bot = bot
 
     @commands.command()
-    async def avatar(self, ctx: commands.Context, user: discord.User | None):
+    async def avatar(self, ctx: commands.Context, user: discord.User | None) -> None:
         """
         Fetch the avatar URL for a user.
 
@@ -44,7 +44,7 @@ class Utility(commands.Cog):
 
     @commands.command()
     @commands.has_permissions(manage_messages=True)
-    async def bigmoji(self, ctx: commands.Context, emoji: discord.PartialEmoji | discord.Emoji):
+    async def bigmoji(self, ctx: commands.Context, emoji: discord.PartialEmoji | discord.Emoji) -> None:
         """
         Send an emoji, but big.
         """
@@ -52,14 +52,14 @@ class Utility(commands.Cog):
         await ctx.message.delete()
 
     @commands.command()
-    async def ping(self, ctx: commands.Context):
+    async def ping(self, ctx: commands.Context) -> None:
         """
         Call-and-response to check if the bot is alive.
         """
         await ctx.send("pong")
 
     @commands.command()
-    async def roll(self, ctx: commands.Context, expr: str):
+    async def roll(self, ctx: commands.Context, expr: str) -> None:
         """
         Roll dice.
 
@@ -69,14 +69,14 @@ class Utility(commands.Cog):
         await ctx.send(f"{sum(result)} = `{result}`")
 
     @commands.command()
-    async def trunc(self, ctx: commands.Context, size: int, *, message: str):
+    async def trunc(self, ctx: commands.Context, size: int, *, message: str) -> None:
         """
         Truncate a message to <size> characters.
         """
         await ctx.send(f"`{message[:size]}`")
 
     @commands.command()
-    async def choose(self, ctx: commands.Context, n: int = 1, *, message: str):
+    async def choose(self, ctx: commands.Context, n: int = 1, *, message: str) -> None:
         """
         Choose from a list of items.
 
@@ -101,7 +101,7 @@ class Moderation(commands.Cog):
 
     @commands.command()
     @commands.has_permissions(administrator=True)
-    async def clear(self, ctx: commands.Context, num: int):
+    async def clear(self, ctx: commands.Context, num: int) -> None:
         """
         Clear messages en masse.
         """
@@ -120,7 +120,7 @@ class Management(commands.Cog):
         self.bot = bot
 
     @commands.command()
-    async def iam(self, ctx: commands.Context, user: discord.User | None):
+    async def iam(self, ctx: commands.Context, user: discord.User | None) -> None:
         """
         Please don't abuse this command!
         """
@@ -134,7 +134,7 @@ class Management(commands.Cog):
 
     @commands.command()
     @commands.is_owner()
-    async def msg(self, ctx: commands.Context, channel_id: int, *, message: str):
+    async def msg(self, ctx: commands.Context, channel_id: int, *, message: str) -> None:
         """
         Send a message to the specified channel.
 
@@ -152,7 +152,7 @@ class Management(commands.Cog):
 
     @commands.command()
     @commands.is_owner()
-    async def chavi(self, ctx: commands.Context, *, url: str):
+    async def chavi(self, ctx: commands.Context, *, url: str) -> None:
         """
         Change the bot's avatar.
         """
@@ -166,7 +166,7 @@ class Management(commands.Cog):
 
     @commands.command()
     @commands.is_owner()
-    async def chnick(self, ctx: commands.Context, *, nick: str):
+    async def chnick(self, ctx: commands.Context, *, nick: str) -> None:
         try:
             await ctx.bot.user.edit(nick=nick)
             await ctx.message.add_reaction(ctx.bot.greentick)
@@ -176,7 +176,7 @@ class Management(commands.Cog):
 
     @commands.command()
     @commands.is_owner()
-    async def pin(self, ctx: commands.Context, msg_id: int, channel: discord.TextChannel | None):
+    async def pin(self, ctx: commands.Context, msg_id: int, channel: discord.TextChannel | None) -> None:
         """
         Pin a message.
 
@@ -194,7 +194,7 @@ class Management(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @commands.Cog.listener()
-    async def on_guild_update(self, before: discord.Guild, after: discord.Guild):
+    async def on_guild_update(self, before: discord.Guild, after: discord.Guild) -> None:
         logging.debug(
             f"that's a guild update! oldsubs: {before.premium_subscription_count}, newsubs: {after.premium_subscription_count}"
         )
@@ -254,7 +254,7 @@ class Management(commands.Cog):
             return
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Utility(bot))
     await bot.add_cog(Moderation(bot))
     await bot.add_cog(Management(bot))

@@ -44,13 +44,11 @@ class NoneEmoji:
     user = ""
     created_at = ""
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.name}"
 
 
-def increment_count(
-    session: Session, server: discord.Guild, emoji_id: int, user: discord.User, today: date
-) -> int:
+def increment_count(session: Session, server: discord.Guild, emoji_id: int, user: discord.User, today: date) -> int:
     entry = (
         session.query(es.EmojiCount)
         .filter_by(server_id=server.id, emoji_id=emoji_id, user_id=user.id, date=today)
@@ -67,7 +65,7 @@ def increment_count(
 
 
 # TODO: add to cog? idk
-async def count_emoji(message: discord.Message):
+async def count_emoji(message: discord.Message) -> None:
     if message.guild is None:
         return
     if message.author.bot:
@@ -105,13 +103,13 @@ class Emoji(commands.Cog):
 
     @commands.group(invoke_without_command=True)
     @commands.has_permissions(manage_emojis=True)
-    async def emoji(self, ctx: commands.Context):
+    async def emoji(self, ctx: commands.Context) -> None:
         await ctx.send("nah")
         # await emoji_head(ctx)  # if you wanted to do this by default? idk
 
     @emoji.command(name="enable")
     @commands.has_permissions(administrator=True)
-    async def emoji_enable(self, ctx: commands.Context):
+    async def emoji_enable(self, ctx: commands.Context) -> None:
         """
         Enable emoji counting on the current server.
         """
@@ -126,7 +124,7 @@ class Emoji(commands.Cog):
 
     @emoji.command(name="disable")
     @commands.has_permissions(administrator=True)
-    async def emoji_disable(self, ctx: commands.Context):
+    async def emoji_disable(self, ctx: commands.Context) -> None:
         """
         Disable emoji counting on the current server.
         """
@@ -141,7 +139,7 @@ class Emoji(commands.Cog):
 
     @emoji.command(name="count")
     @commands.has_permissions(manage_emojis=True)
-    async def emoji_count(self, ctx: commands.Context, em: discord.Emoji | int, days: int | None = 30):
+    async def emoji_count(self, ctx: commands.Context, em: discord.Emoji | int, days: int | None = 30) -> None:
         """
         Count the times an emoji has been used in the last <days> days.
 
@@ -177,7 +175,7 @@ class Emoji(commands.Cog):
         em: discord.Emoji | int | None = None,
         days: int | None = 30,
         force: str = "",
-    ):
+    ) -> None:
         """
         More detailed stats for a given emoji over the last <days> days.
 
@@ -239,7 +237,7 @@ class Emoji(commands.Cog):
 
     @emoji.command(name="head")
     @commands.has_permissions(manage_emojis=True)
-    async def emoji_head(self, ctx: commands.Context, days: int = 30, num: int = 5, anim: bool = False):
+    async def emoji_head(self, ctx: commands.Context, days: int = 30, num: int = 5, anim: bool = False) -> None:
         """
         Display the most frequently emojis for the current server.
         """
@@ -282,7 +280,7 @@ class Emoji(commands.Cog):
 
     @emoji.command(name="tail")
     @commands.has_permissions(manage_emojis=True)
-    async def emoji_tail(self, ctx: commands.Context, days: int = 30, num: int = 5, anim: bool = False):
+    async def emoji_tail(self, ctx: commands.Context, days: int = 30, num: int = 5, anim: bool = False) -> None:
         """
         Display the least frequently emojis for the current server.
         """
@@ -327,7 +325,7 @@ class Emoji(commands.Cog):
 
     @emoji.command(name="all")
     @commands.has_permissions(manage_emojis=True)
-    async def emoji_all(self, ctx: commands.Context, days: int = 30, anim: bool = False):
+    async def emoji_all(self, ctx: commands.Context, days: int = 30, anim: bool = False) -> None:
         """
         Display counts for all emojis for the current server.
         """
@@ -370,7 +368,7 @@ class Emoji(commands.Cog):
 
     @emoji.command(name="export")
     @commands.has_permissions(manage_emojis=True)
-    async def emoji_export(self, ctx: commands.Context):
+    async def emoji_export(self, ctx: commands.Context) -> None:
         """
         Export the emoji usage data for the current server to a CSV.
         """
@@ -423,7 +421,7 @@ class Emoji(commands.Cog):
 
     @commands.group(invoke_without_command=True)
     @commands.has_permissions(manage_emojis=True)
-    async def evemoji(self, ctx: commands.Context):
+    async def evemoji(self, ctx: commands.Context) -> None:
         """Event Emoji command group."""
         pass
 
@@ -464,7 +462,7 @@ class Emoji(commands.Cog):
         emojiname: str,
         # emoji: Union[discord.Emoji, discord.Attachment],  # TODO(dpy2.0)
         emoji: discord.Emoji | discord.PartialEmoji | None,
-    ):
+    ) -> None:
         """Add a new Event Emoji."""
         emoji_url: str | None = None
         if emoji:
@@ -525,7 +523,7 @@ class Emoji(commands.Cog):
         self,
         ctx: commands.Context,
         emoji: discord.Emoji,
-    ):
+    ) -> None:
         """Remove an event emoji."""
         session = get_session()
         event_emoji: es.EventEmoji = (
@@ -552,7 +550,7 @@ class Emoji(commands.Cog):
         sort: str | None = "alphabetical",
         # active: Optional[bool] = True,
         days: int | None = 30,
-    ):
+    ) -> None:
         """
         List all (active) Event Emojis.
         Sort options: alphabetical, usage, date, owner, event
@@ -608,7 +606,7 @@ class Emoji(commands.Cog):
             await ctx.send(f"Exit your currently running menu first with `{CANCEL}`.")
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot) -> None:
     global enabled_servers
     global session_maker
 

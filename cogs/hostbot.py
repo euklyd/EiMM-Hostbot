@@ -35,7 +35,7 @@ LOCK_EMOJI = "\U0001f512"
 
 
 class NotFoundMember:
-    def __init__(self, name_and_discriminator: str):
+    def __init__(self, name_and_discriminator: str) -> None:
         regex = r"(?P<name>.+)#(?P<disc>\d+)"
         matches = re.match(regex, name_and_discriminator)
         if matches is None:
@@ -45,7 +45,7 @@ class NotFoundMember:
             self.name = matches.group("name")
             self.discriminator = int(matches.group("disc"))
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.name}#{self.discriminator}"
 
 
@@ -69,7 +69,7 @@ class HostBot(commands.Cog):
     https://github.com/euklyd/EiMM-Hostbot/blob/master/cogs/hostbot_readme.md
     """
 
-    def __init__(self, bot: Bot):
+    def __init__(self, bot: Bot) -> None:
         self.bot = bot
 
         self.confessional_cooldowns: dict[int, list] = {}
@@ -91,7 +91,7 @@ class HostBot(commands.Cog):
 
     @commands.group(invoke_without_command=True)
     @commands.has_permissions(administrator=True)
-    async def init(self, ctx: commands.Context):
+    async def init(self, ctx: commands.Context) -> None:
         """
         HostBot server initialization commandgroup.
         """
@@ -99,7 +99,7 @@ class HostBot(commands.Cog):
 
     @init.command(name="server")
     @commands.has_permissions(administrator=True)
-    async def init_server(self, ctx: commands.Context, *, yml_config: str):
+    async def init_server(self, ctx: commands.Context, *, yml_config: str) -> None:
         """
         Initialize a game server with channels and roles.
 
@@ -208,7 +208,7 @@ class HostBot(commands.Cog):
 
     @init.command(name="badly")
     @commands.has_permissions(administrator=True)
-    async def init_badly(self, ctx: commands.Context):
+    async def init_badly(self, ctx: commands.Context) -> None:
         """
         Provides a way to initialize a server late for people who don't read the manual.
         """
@@ -276,7 +276,7 @@ class HostBot(commands.Cog):
         await ctx.send("Registered channels and roles. Use `init setchan` to configure further channels.")
 
     @staticmethod
-    def _player_channel_name(player: discord.Member):
+    def _player_channel_name(player: discord.Member) -> str:
         name = player.name
         name = re.sub(r"[\W_ -]+", "", name)
         name = re.sub(r" ", "-", name)
@@ -366,7 +366,7 @@ class HostBot(commands.Cog):
 
     @init.command(name="pmlist")
     @commands.has_permissions(administrator=True)
-    async def init_pmlist(self, ctx: commands.Context, *, playerlist: str):
+    async def init_pmlist(self, ctx: commands.Context, *, playerlist: str) -> None:
         """
         Create Role PM channels for players and enrole each, no sheet involved.
 
@@ -456,7 +456,7 @@ class HostBot(commands.Cog):
 
     @init.command(name="reset")
     @commands.is_owner()
-    async def init_reset(self, ctx: commands.Context):
+    async def init_reset(self, ctx: commands.Context) -> None:
         """
         Delete previously created channels and roles.
 
@@ -533,7 +533,7 @@ class HostBot(commands.Cog):
         ctx: commands.Context,
         role_type: str,
         role: discord.Role,
-    ):
+    ) -> None:
         """
         Set the roles hostbot associates with each type.
 
@@ -568,7 +568,7 @@ class HostBot(commands.Cog):
         ctx: commands.Context,
         channel_type: str,
         channel: discord.CategoryChannel | discord.TextChannel,
-    ):
+    ) -> None:
         """
         Set the channels hostbot associates with each type.
 
@@ -618,7 +618,7 @@ class HostBot(commands.Cog):
     #     ...
 
     @init.command(name="status")
-    async def init_status(self, ctx: commands.Context):
+    async def init_status(self, ctx: commands.Context) -> None:
         """
         List game server info and number of people in each game-related role.
         """
@@ -712,7 +712,7 @@ class HostBot(commands.Cog):
 
         await ctx.send(embed=em)
 
-    def _inc_cooldown(self, user: discord.Member):
+    def _inc_cooldown(self, user: discord.Member) -> bool:
         if user.id not in self.confessional_cooldowns:
             self.confessional_cooldowns[user.id] = [datetime.utcnow()]
             return True
@@ -729,7 +729,7 @@ class HostBot(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    async def confessional(self, ctx: commands.Context, *, msg):
+    async def confessional(self, ctx: commands.Context, *, msg: str) -> None:
         """
         Send a confessional from your Role PM to the graveyard.
 
@@ -790,7 +790,7 @@ class HostBot(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    async def gameavatars(self, ctx: commands.Context):
+    async def gameavatars(self, ctx: commands.Context) -> None:
         """
         List all avatar URLs for all players and hosts.
         """
@@ -842,7 +842,7 @@ class HostBot(commands.Cog):
         ctx: commands.Context,
         role: discord.Role,
         mentions: commands.Greedy[discord.Member],
-    ):
+    ) -> None:
         """
         Add members to a role en masse.
 
@@ -870,7 +870,7 @@ class HostBot(commands.Cog):
         return ctx.channel.category.id in [c.id for c in server.channels if c.type == "rolepms"]
 
     @commands.group(invoke_without_command=True)
-    async def addspec(self, ctx: commands.Context, specs: commands.Greedy[discord.Member]):
+    async def addspec(self, ctx: commands.Context, specs: commands.Greedy[discord.Member]) -> None:
         """
         Add a spectator to your Role PM.
 
@@ -917,7 +917,7 @@ class HostBot(commands.Cog):
             await ctx.send(f"Failed to add {badspec_msg}: only spectators can be added to a role PM!")
 
     @addspec.command(name="all")
-    async def addspec_all(self, ctx: commands.Context):
+    async def addspec_all(self, ctx: commands.Context) -> None:
         """
         Add all spectators to your Role PM.
 
@@ -954,7 +954,7 @@ class HostBot(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @addspec.command(name="rm")
-    async def addspec_rm(self, ctx: commands.Context, specs: commands.Greedy[discord.Member]):
+    async def addspec_rm(self, ctx: commands.Context, specs: commands.Greedy[discord.Member]) -> None:
         """
         Remove one or more spectators from your role PM.
 
@@ -994,7 +994,7 @@ class HostBot(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @addspec.command(name="off")
-    async def addspec_off(self, ctx: commands.Context):
+    async def addspec_off(self, ctx: commands.Context) -> None:
         """
         Disables players from being able to add spectators to their Role PMs.
 
@@ -1021,7 +1021,7 @@ class HostBot(commands.Cog):
         await ctx.message.add_reaction(ctx.bot.greentick)
 
     @addspec.command(name="on")
-    async def addspec_on(self, ctx: commands.Context):
+    async def addspec_on(self, ctx: commands.Context) -> None:
         """
         Enables players to add spectators to their Role PMs.
 
@@ -1047,7 +1047,7 @@ class HostBot(commands.Cog):
 
         await ctx.message.add_reaction(ctx.bot.greentick)
 
-    async def _lockunlock(self, ctx: commands.Context, lock=True):
+    async def _lockunlock(self, ctx: commands.Context, lock: bool = True) -> None:
         session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
@@ -1084,7 +1084,7 @@ class HostBot(commands.Cog):
             await ctx.message.add_reaction(ctx.bot.redtick)
 
     @staticmethod
-    async def _unlock_all(ctx: commands.Context):
+    async def _unlock_all(ctx: commands.Context) -> None:
         session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         rolepms = session.query(hbs.Channel).filter_by(server_id=ctx.guild.id, type="rolepms").all()
@@ -1108,7 +1108,7 @@ class HostBot(commands.Cog):
             await ctx.send("Insufficient permissions to delete Role PMs.")
 
     @staticmethod
-    async def _enable_locking(ctx: commands.Context):
+    async def _enable_locking(ctx: commands.Context) -> None:
         if not has_role(ctx, ["host"]):
             await ctx.send("Only hosts may enable locking.")
             await ctx.message.add_reaction(ctx.bot.redtick)
@@ -1121,7 +1121,7 @@ class HostBot(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    async def lock(self, ctx: commands.Context, str_that_might_be_on: str = ""):
+    async def lock(self, ctx: commands.Context, str_that_might_be_on: str = "") -> None:
         """Lock your actions."""
         if str_that_might_be_on.lower() == "on":
             # I don't love this way of adding "lock on" in the same vein as "addspec on",
@@ -1132,7 +1132,7 @@ class HostBot(commands.Cog):
 
     @commands.command()
     @commands.guild_only()
-    async def unlock(self, ctx: commands.Context, all: str = "not all"):
+    async def unlock(self, ctx: commands.Context, all: str = "not all") -> None:
         """Unlock your actions."""
         if all.lower() != "all":
             await self._lockunlock(ctx, False)
@@ -1208,7 +1208,7 @@ class HostBot(commands.Cog):
 #     # TODO
 
 
-async def setup(bot: Bot):
+async def setup(bot: Bot) -> None:
     # global connection
     # connection = spreadsheet.SheetConnection(bot.google_creds, bot.google_scope)
     #

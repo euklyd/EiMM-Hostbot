@@ -3,6 +3,7 @@ import re
 from collections import OrderedDict
 from collections.abc import Iterable, MutableMapping
 from contextlib import ExitStack
+from typing import Any
 
 import discord
 from discord.ext import commands
@@ -20,7 +21,7 @@ async def menu_list(
     select_max: int | None = 1,
     repeats: bool = False,
     use_code_block: bool = True,
-):
+) -> Any | None:
     keys, elems = [], []
     for i, e in enumerate(ls):
         keys.append(str(i))
@@ -45,7 +46,7 @@ async def menu_dict(
     select_max: int | None = 1,
     repeats: bool = False,
     use_code_block: bool = True,
-):
+) -> Any | None:
     keys, elems = [], []
     for k, e in d.items():
         keys.append(str(k).replace(",", ""))
@@ -65,12 +66,12 @@ async def menu_dict(
 def menu_str(
     keys: list,
     elements: list,
-    page,
+    page: int,
     heading: str = None,
-    items_per_page=20,
+    items_per_page: int = 20,
     select_max: int | None = 1,
     use_code_block: bool = True,
-):
+) -> str:
     start, stop = page * items_per_page, (page + 1) * items_per_page
 
     max_len = 0
@@ -115,7 +116,7 @@ async def menu_wrapper(
     select_max: int | None = 1,
     repeats: bool = False,
     use_code_block: bool = True,
-):
+) -> Any | None:
     lock = (ctx.author.id, ctx.channel.id)
     if lock in _locks:
         raise RuntimeError("A menu instance in this channel already exists for this user.")
@@ -143,14 +144,14 @@ async def menu_loop(
     select_max: int | None = 1,
     repeats: bool = False,
     use_code_block: bool = True,
-):
+) -> Any | None:
     NUM_ITEMS = 20
     ARROW_LEFT, ARROW_RIGHT = "\U000025c0", "\U000025b6"
 
-    def single_condition(s: str):
+    def single_condition(s: str) -> bool:
         return s in keys
 
-    def multi_condition(ls: list[str]):
+    def multi_condition(ls: list[str]) -> bool:
         if ls is None:
             return False
         for elem in ls:

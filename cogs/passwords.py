@@ -31,14 +31,14 @@ class Passwords(commands.Cog):
             self.users[int(record[USER_ID])] = row
 
     @staticmethod
-    async def check_priv(ctx: commands.Context):
+    async def check_priv(ctx: commands.Context) -> bool:
         if not isinstance(ctx.channel, abc.PrivateChannel):
             await ctx.send("This channel is not private! This command can only be used in DMs.")
             await ctx.message.add_reaction(ctx.bot.redtick)
             return False
         return True
 
-    def update_sheet(self, user: discord.User, password: str):
+    def update_sheet(self, user: discord.User, password: str) -> None:
         sheet = self.connection.get_page(SHEET_NAME)
         if user.id in self.users:
             cell_list = sheet.range(f"{COLS[NAME]}{self.users[user.id]}:{COLS[TIMESTAMP]}{self.users[user.id]}")
@@ -62,7 +62,7 @@ class Passwords(commands.Cog):
         return None
 
     @commands.group(invoke_without_command=True)
-    async def password(self, ctx: commands.Context):
+    async def password(self, ctx: commands.Context) -> None:
         """
         Show your current password. Use only in DMs.
         """
@@ -79,7 +79,7 @@ class Passwords(commands.Cog):
         await ctx.send(f"Your current password is `{record[PASSWORD]}`, and your user ID is `{ctx.author.id}`.")
 
     @password.group(name="set")
-    async def password_set(self, ctx: commands.Context, *, password: str):
+    async def password_set(self, ctx: commands.Context, *, password: str) -> None:
         """
         Set a new password. Use only in DMs.
         """
@@ -99,5 +99,5 @@ class Passwords(commands.Cog):
             await ctx.send(f"Password changed. Your user ID is `{ctx.author.id}`.")
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Passwords(bot))

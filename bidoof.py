@@ -12,7 +12,7 @@ from core.bot import Bot
 
 @commands.command()
 @commands.is_owner()
-async def reload(ctx: commands.Context, extension: str):
+async def reload(ctx: commands.Context, extension: str) -> None:
     """
     Reload the specified extension.
 
@@ -32,7 +32,7 @@ async def reload(ctx: commands.Context, extension: str):
 
 @commands.command()
 @commands.is_owner()
-async def unload(ctx: commands.Context, extension: str):
+async def unload(ctx: commands.Context, extension: str) -> None:
     """
     Unload the specified extension.
     """
@@ -46,7 +46,7 @@ async def unload(ctx: commands.Context, extension: str):
 
 @commands.command()
 @commands.is_owner()
-async def shutdown(ctx: commands.Context):
+async def shutdown(ctx: commands.Context) -> None:
     """
     Zzz.
     """
@@ -54,13 +54,13 @@ async def shutdown(ctx: commands.Context):
     await ctx.bot.close()
 
 
-def parse_args():
+def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--loglevel", "-l", help="log level", default="INFO")
     return parser.parse_args()
 
 
-async def main():
+async def main() -> None:
     args = parse_args()
     logging.basicConfig(level=args.loglevel, format="[%(asctime)s] %(message)s", datefmt="%Y/%m/%d %T:%M:%S")
     faulthandler.enable()
@@ -94,7 +94,7 @@ async def main():
         await bot.start(settings.client_token)
 
 
-def run():
+def run() -> None:
     asyncio.run(main())
 
 

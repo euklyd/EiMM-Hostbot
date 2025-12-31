@@ -181,7 +181,7 @@ class Profiles(commands.Cog):
         self.bot = bot
 
     @commands.command()
-    async def profile(self, ctx: commands.Context, *, member: discord.Member = None):
+    async def profile(self, ctx: commands.Context, *, member: discord.Member = None) -> None:
         if member is None:
             await ctx.send("back off bitch")
             pass
@@ -190,7 +190,7 @@ class Profiles(commands.Cog):
             pass
 
     @commands.group(invoke_without_command=True)
-    async def set(self, ctx: commands.Context):
+    async def set(self, ctx: commands.Context) -> None:
         """
         Set various profile fields.
 
@@ -199,7 +199,7 @@ class Profiles(commands.Cog):
         await ctx.send(f"Use `{self.bot.default_command_prefix}help set` for more info.")
 
     @set.group(name="name")
-    async def set_name(self, ctx: commands.Context, name: str):
+    async def set_name(self, ctx: commands.Context, name: str) -> None:
         """
         Sets the "primary name" field. Simple text entry.
         Ex: 'set name Bidoof'
@@ -211,7 +211,7 @@ class Profiles(commands.Cog):
             await ctx.send(str(ie))
 
     @set.group(name="aka")
-    async def set_aka(self, ctx: commands.Context, aka: str):
+    async def set_aka(self, ctx: commands.Context, aka: str) -> None:
         """
         Sets the "also known as" field. Simple text entry.
         Ex: 'set aka Baby Bibarel'
@@ -223,7 +223,7 @@ class Profiles(commands.Cog):
             await ctx.send(str(ie))
 
     @set.group(name="pronouns")
-    async def set_pronouns(self, ctx: commands.Context):
+    async def set_pronouns(self, ctx: commands.Context) -> None:
         """
         Sets the "also known as" field. Opens a selection menu.
         Allowed values:
@@ -239,7 +239,7 @@ class Profiles(commands.Cog):
             await ctx.send(f"Error: `{ie}`")
 
     @set.group(name="communities")
-    async def set_communities(self, ctx: commands.Context):
+    async def set_communities(self, ctx: commands.Context) -> None:
         """
         Sets the "home communities" field. Opens a selection menu.
         If your community isn't listed, feel free to message a staff member.
@@ -253,7 +253,7 @@ class Profiles(commands.Cog):
         pass
 
     @set.group(name="country")
-    async def set_country(self, ctx: commands.Context):
+    async def set_country(self, ctx: commands.Context) -> None:
         """
         Sets the "country" field. Opens a selection menu.
         """
@@ -265,7 +265,7 @@ class Profiles(commands.Cog):
             await ctx.send(f"Error: `{ie}`")
 
     @set.group(name="offset")
-    async def set_offset(self, ctx: commands.Context):
+    async def set_offset(self, ctx: commands.Context) -> None:
         """
         Sets the "timezone" field. Opens an input menu.
         This is a UTC offset, in the format UTC±HH:MM. See https://en.wikipedia.org/wiki/List_of_time_zone_abbreviations for a list.
@@ -289,7 +289,7 @@ class Profiles(commands.Cog):
             await ctx.send(f"Checked: `{answer}`.")
 
     @set.group(name="birthday")
-    async def set_birthday(self, ctx: commands.Context):
+    async def set_birthday(self, ctx: commands.Context) -> None:
         """
         Sets the "birthday" and "age range" fields. Opens an input menu.
         All dates are in MM/DD or YYYY/MM/DD. Sorry Euros.
@@ -301,7 +301,7 @@ class Profiles(commands.Cog):
         age_range = None
         if selection == "birthday and year":
 
-            def check(m):
+            def check(m: discord.Message) -> bool:
                 try:
                     ProfileValidation.birthday_year(m.content)
                     return True
@@ -314,7 +314,7 @@ class Profiles(commands.Cog):
             birthdate = birthdate.strftime("%Y/%m/%d")
         if selection == "birthday only" or selection == "birthday and age range":
 
-            def check(m):
+            def check(m: discord.Message) -> bool:
                 try:
                     ProfileValidation.birthday_day(m.content)
                     return True
@@ -338,7 +338,7 @@ class Profiles(commands.Cog):
             # TODO: clear prev content
 
     @set.group(name="student")
-    async def set_student(self, ctx: commands.Context, student: str):
+    async def set_student(self, ctx: commands.Context, student: str) -> None:
         """
         Sets the "student?" field. Simple text entry.
         Enter either Y/N.
@@ -347,7 +347,7 @@ class Profiles(commands.Cog):
         pass
 
     @set.group(name="game")
-    async def set_fave_game(self, ctx: commands.Context):
+    async def set_fave_game(self, ctx: commands.Context) -> None:
         """
         Sets the "favorite EiMM game" field. Opens a selection menu.
         If your favorite game isn't listed yet, message a mod to update the list.
@@ -356,7 +356,7 @@ class Profiles(commands.Cog):
         pass
 
     @set.group(name="role")
-    async def set_fave_role(self, ctx: commands.Context, role: str):
+    async def set_fave_role(self, ctx: commands.Context, role: str) -> None:
         """
         Sets the "favorite EiMM role" field. Simple text entry.
         """
@@ -364,7 +364,7 @@ class Profiles(commands.Cog):
         pass
 
     @set.group(name="game type")
-    async def set_fave_game_type(self, ctx: commands.Context):
+    async def set_fave_game_type(self, ctx: commands.Context) -> None:
         """
         Sets the "favorite type of EiMM" field. Opens a selection menu.
         """
@@ -372,5 +372,5 @@ class Profiles(commands.Cog):
         pass
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(Profiles(bot))

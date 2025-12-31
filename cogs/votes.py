@@ -58,7 +58,7 @@ class Channel(Base):
 
 
 @commands.group(invoke_without_command=True)
-async def vote(ctx: commands.Context):
+async def vote(ctx: commands.Context) -> None:
     """
     Run votes for mafia-style games.
     """
@@ -67,7 +67,7 @@ async def vote(ctx: commands.Context):
 
 @vote.command(name="setup")
 @commands.is_owner()
-async def vote_setup(ctx: commands.Context):
+async def vote_setup(ctx: commands.Context) -> None:
     """
     Set up a channel for voting.
     """
@@ -84,7 +84,7 @@ async def vote_setup(ctx: commands.Context):
 
 @vote.command(name="unsetup")
 @commands.is_owner()
-async def vote_unsetup(ctx: commands.Context):
+async def vote_unsetup(ctx: commands.Context) -> None:
     """
     Un-set up a channel for voting.
     """
@@ -101,7 +101,7 @@ async def vote_unsetup(ctx: commands.Context):
 
 @vote.command(name="clear")
 @commands.is_owner()
-async def vote_clear(ctx: commands.Context):
+async def vote_clear(ctx: commands.Context) -> None:
     """
     Clear all votes for a channel.
     """
@@ -118,7 +118,7 @@ async def vote_clear(ctx: commands.Context):
 
 
 @vote.command(name="for")
-async def vote_for(ctx: commands.Context, votee: discord.Member):
+async def vote_for(ctx: commands.Context, votee: discord.Member) -> None:
     """
     Vote.
     """
@@ -161,7 +161,7 @@ async def vote_for(ctx: commands.Context, votee: discord.Member):
 
 
 @vote.command(name="totals")
-async def vote_totals(ctx: commands.Context):
+async def vote_totals(ctx: commands.Context) -> None:
     """
     Current votecounts.
     """
@@ -187,7 +187,7 @@ async def vote_totals(ctx: commands.Context):
 
 @vote.command(name="voters")
 @commands.has_permissions(administrator=True)
-async def vote_voters(ctx: commands.Context):
+async def vote_voters(ctx: commands.Context) -> None:
     session = get_session()
     old_channel = session.query(Channel).filter_by(channel_id=ctx.channel.id).one_or_none()
     if old_channel is None:
@@ -210,7 +210,7 @@ async def vote_voters(ctx: commands.Context):
     await ctx.send(reply)
 
 
-async def setup(bot: Bot):
+async def setup(bot: Bot) -> None:
     global session_maker
 
     # bot.add_command(vote_setup)

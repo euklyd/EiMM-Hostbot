@@ -6,7 +6,7 @@ from PIL import Image
 
 
 @commands.command()
-async def color(ctx: commands.Context, hexcode: str):
+async def color(ctx: commands.Context, hexcode: str) -> None:
     """
     Preview the color of the provided hexcode.
     """
@@ -24,5 +24,5 @@ async def color(ctx: commands.Context, hexcode: str):
     await ctx.send(file=f)
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot) -> None:
     bot.add_command(color)

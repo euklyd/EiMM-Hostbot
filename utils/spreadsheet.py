@@ -13,13 +13,13 @@ class SheetConnection:
         client = gspread.authorize(self.creds)
         return client.open(sheet_name)
 
-    def get_page(self, sheet_name: str, page_name=None) -> gspread.Worksheet:
+    def get_page(self, sheet_name: str, page_name: str | None = None) -> gspread.Worksheet:
         if page_name is None:
             return self.get_sheet(sheet_name).sheet1
         else:
             return self.get_sheet(sheet_name).worksheet(page_name)
 
-    def client(self):
+    def client(self) -> gspread.Client:
         return gspread.authorize(self.creds)
 
 
@@ -37,14 +37,14 @@ def get_headings_to_columns(ws: Worksheet) -> dict[str, int]:
     return {k: i + 1 for i, k in enumerate(ws.row_values(1))}
 
 
-def find_row(records: list[dict[str, Any]], lookup_value, search_heading) -> int | None:
+def find_row(records: list[dict[str, Any]], lookup_value: Any, search_heading: str) -> int | None:
     for i, record in enumerate(records):
         if record[search_heading] == lookup_value:
             return i + 2
     return None
 
 
-def find_record(records: list[dict[str, Any]], lookup_value, search_heading) -> dict | None:
+def find_record(records: list[dict[str, Any]], lookup_value: Any, search_heading: str) -> dict[str, Any] | None:
     for record in records:
         if record[search_heading] == lookup_value:
             return record
@@ -55,7 +55,7 @@ def find_record(records: list[dict[str, Any]], lookup_value, search_heading) -> 
 #     pass
 
 
-def vlookup_heading(records: list[dict[str, Any]], lookup_value, search_heading, return_heading):
+def vlookup_heading(records: list[dict[str, Any]], lookup_value: Any, search_heading: str, return_heading: str) -> Any:
     for record in records:
         if record[search_heading] == lookup_value:
             return record[return_heading]

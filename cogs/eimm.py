@@ -5,6 +5,7 @@ import json
 import pprint
 import random
 import re
+from typing import Any
 
 import discord
 import yaml
@@ -20,7 +21,7 @@ SECRET = "conf/google_creds.json"
 SHEET_NAME = "eimm role templates & keywords"
 
 
-def thwart_misty(ability_name, text: str) -> str:
+def thwart_misty(ability_name: str, text: str) -> str:
     """
     It's not MT it's Mt. Really it should be Atk but you are using it for doctors as well and that's harder to fix.
     """
@@ -30,14 +31,14 @@ def thwart_misty(ability_name, text: str) -> str:
     return re.sub(r"\bMt\b", "Atk", text, flags=re.IGNORECASE)
 
 
-def default_val(val) -> str:
+def default_val(val: Any) -> str:
     if val == "":
         return "None"
     else:
         return str(val)
 
 
-def b_h(row) -> str:
+def b_h(row: dict[str, Any]) -> str:
     if "B/H" in row and row["B/H"]:
         return row["B/H"]
     if "H/B" in row and row["H/B"]:
@@ -55,12 +56,12 @@ def b_h(row) -> str:
     return "???"
 
 
-def ability_text(row):
+def ability_text(row: dict[str, Any]) -> str:
     template = row["Template to Copy / Paste"]
     return thwart_misty(row["Ability Name"], template)
 
 
-def ability_embed(row):
+def ability_embed(row: dict[str, Any]) -> discord.Embed:
     em = discord.Embed(title=row["Ability Name"])
     if default_val(row["Priority(s)"]).lower() != "passive":
         em.add_field(name="Priority", value=default_val(row["Priority(s)"]))
@@ -87,7 +88,7 @@ def ability_embed(row):
     return em
 
 
-def keyword_embed(row):
+def keyword_embed(row: dict[str, Any]) -> discord.Embed:
     em = discord.Embed(title=row["Keyword"])
     em.add_field(name="Meaning", value=default_val(row["Meaning"]))
     em.add_field(name="Intricacies", value=default_val(row["Intricacies"]))
@@ -95,7 +96,7 @@ def keyword_embed(row):
     return em
 
 
-def passive_embed(row):
+def passive_embed(row: dict[str, Any]) -> discord.Embed:
     em = discord.Embed(title=row["Ability"])
     em.add_field(name="Effect", value=default_val(row["Effect"]))
     em.add_field(name="Notes", value=default_val(row["Notes"]))
@@ -103,7 +104,7 @@ def passive_embed(row):
     return em
 
 
-def diff_dict(new_dict, old_dict):
+def diff_dict(new_dict: dict[str, Any], old_dict: dict[str, Any]) -> dict[str, dict[str, Any]]:
     diffs = {"rm": {}, "add": {}, "ch": {}}
     for k, e in old_dict.items():
         if k not in new_dict:
@@ -126,7 +127,7 @@ def diff_dict(new_dict, old_dict):
 
 # used for queue selection algorithm
 class Host:
-    def __init__(self, name, prefs, prio):
+    def __init__(self, name: str, prefs: list[Any], prio: int | None) -> None:
         self.prefs = []
         for pref in prefs:
             if type(pref) is int:
@@ -184,7 +185,7 @@ class EiMM(commands.Cog):
         }
 
     @commands.group(invoke_without_command=True)
-    async def eimm(self, ctx: commands.Context):
+    async def eimm(self, ctx: commands.Context) -> None:
         """
         Query the EiMM ability templates.
 
@@ -194,7 +195,7 @@ class EiMM(commands.Cog):
 
     @eimm.group(name="rebuild")
     @commands.is_owner()
-    async def eimm_rebuild(self, ctx: commands.Context):
+    async def eimm_rebuild(self, ctx: commands.Context) -> None:
         """
         Rebuild the sheet cache.
         """
@@ -204,7 +205,7 @@ class EiMM(commands.Cog):
         await ctx.send("Rebuilt cache.", file=discord.File(f, f"template diffs {datetime.datetime.utcnow()}"))
 
     @eimm.group(name="q")
-    async def eimm_q(self, ctx: commands.Context, *, term: str):
+    async def eimm_q(self, ctx: commands.Context, *, term: str) -> None:
         """
         Search the template sheet for an ability.
 
@@ -226,7 +227,7 @@ class EiMM(commands.Cog):
         await ctx.send(embed=em)
 
     @commands.Cog.listener()
-    async def on_message(self, message: discord.Message):
+    async def on_message(self, message: discord.Message) -> None:
         if message.author.id == self.bot.user.id:
             return
         ability_regex = r"<<([^<>]*)>>"
@@ -329,7 +330,7 @@ class EiMM(commands.Cog):
         return assignments
 
     @commands.command()
-    async def qselect(self, ctx: commands.Context, n_hosts: int, *, jsonstr: str):
+    async def qselect(self, ctx: commands.Context, n_hosts: int, *, jsonstr: str) -> None:
         """
         Selects hosts to fill the next EiMM season.
 
@@ -373,7 +374,7 @@ class EiMM(commands.Cog):
         await ctx.send(reply)
 
     @commands.command()
-    async def queueslots(self, ctx: commands.Context, n_hosts: int, *, jsonstr: str):
+    async def queueslots(self, ctx: commands.Context, n_hosts: int, *, jsonstr: str) -> None:
         """
         Assigns selected hosts to optimal slots for the next EiMM season.
 
@@ -398,5 +399,5 @@ class EiMM(commands.Cog):
         await ctx.send(reply)
 
 
-async def setup(bot: commands.Bot):
+async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(EiMM(bot))
