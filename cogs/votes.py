@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -16,7 +18,7 @@ if TYPE_CHECKING:
 
 Base = declarative_base()
 
-session_maker: "Callable[[], Session] | None" = None
+session_maker: Callable[[], Session] | None = None
 
 
 def get_session() -> Session:
