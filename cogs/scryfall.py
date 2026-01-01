@@ -96,15 +96,6 @@ class Cards(commands.Cog):
         """
         mtg_regex = r"\[\[([^\[\]]*)]]"
         match = re.search(mtg_regex, message.content)
-        if isinstance(message.channel, discord.TextChannel):
-            for member in message.channel.members:
-                if member.id == 558508371821723670:
-                    if member.status == discord.Status.offline:
-                        # karn exists and is online
-                        pass  # we can just answer queries instead of karn :)
-                    else:
-                        # karn exists and is online
-                        return False
         if match is not None:
             expr = match.group(1)
         else:
