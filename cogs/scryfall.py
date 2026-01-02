@@ -76,6 +76,11 @@ class Cards(commands.Cog):
         self.session = session
         self.db: AsyncEngine = create_async_engine(f"sqlite+aiosqlite:///{db_file}")
 
+    async def cog_unload(self) -> None:
+        """Clean up resources when cog is unloaded."""
+        await self.session.close()
+        await self.db.dispose()
+
     def db_session(self) -> async_sessionmaker[AsyncSession]:
         return async_sessionmaker(self.db, expire_on_commit=False, class_=AsyncSession)
 
