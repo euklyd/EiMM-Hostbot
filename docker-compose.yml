@@ -16,7 +16,7 @@ services:
       - ./conf:/app/conf:ro  # Bot config (includes token)
       - ./databases:/app/databases  # SQLite databases
       - backups:/backups
-    restart: unless-stopped
+    restart: on-failure
 
   postgres:
     image: postgres:16-alpine

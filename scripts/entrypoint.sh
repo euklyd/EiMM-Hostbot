@@ -31,8 +31,8 @@ parse_database_url() {
 
 check_pending_migrations() {
     # Returns 0 if there are pending migrations, 1 if up to date
-    local current=$(alembic current 2>/dev/null | grep -oE '[a-f0-9]+' | head -1)
-    local head=$(alembic heads 2>/dev/null | grep -oE '[a-f0-9]+' | head -1)
+    local current=$(uv run alembic current 2>/dev/null | grep -oE '[a-f0-9]+' | head -1)
+    local head=$(uv run alembic heads 2>/dev/null | grep -oE '[a-f0-9]+' | head -1)
 
     if [ -z "$head" ]; then
         # No migrations exist yet
@@ -74,7 +74,7 @@ backup_database() {
 
 run_migrations() {
     echo "Running database migrations..."
-    alembic upgrade head
+    uv run alembic upgrade head
 
     if [ $? -eq 0 ]; then
         echo "Migrations completed successfully"
@@ -98,7 +98,7 @@ main() {
     fi
 
     echo "Starting bot..."
-    exec python bidoof.py "$@"
+    exec uv run python bidoof.py "$@"
 }
 
 main "$@"

@@ -1,7 +1,5 @@
 FROM python:3.11-slim
 
-WORKDIR /app
-
 # Install system dependencies for voice support, PostgreSQL client (for pg_dump)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
@@ -10,26 +8,28 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     postgresql-client \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user early (before copying files)
+RUN useradd --create-home --shell /bin/bash botuser
+
+# Set up app directory with correct ownership
+WORKDIR /app
+RUN chown botuser:botuser /app
+
 # Install uv
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
 # Copy dependency files first for better caching
-COPY pyproject.toml uv.lock ./
+COPY --chown=botuser:botuser pyproject.toml uv.lock ./
 
-# Install dependencies
+# Switch to non-root user and install dependencies
+USER botuser
 RUN uv sync --frozen --no-dev
 
-# Copy application code
-COPY . .
+# Copy application code (--chown avoids slow recursive chown later)
+COPY --chown=botuser:botuser . .
 
 # Make entrypoint executable
 RUN chmod +x scripts/entrypoint.sh
-
-# Create non-root user for security
-RUN useradd --create-home --shell /bin/bash botuser && \
-    chown -R botuser:botuser /app
-
-USER botuser
 
 # Default backup directory (mount a volume here)
 ENV BACKUP_DIR=/backups
