@@ -2,11 +2,12 @@ import argparse
 import asyncio
 import faulthandler
 import logging
+import signal
 
-import conf.settings as settings
 import discord
 from discord.ext import commands
 
+import conf.settings as settings
 from core.bot import Bot
 
 
@@ -80,6 +81,16 @@ async def main() -> None:
         intents=intents,
     )
 
+    # Set up graceful shutdown on SIGINT/SIGTERM
+    loop = asyncio.get_running_loop()
+
+    def handle_shutdown() -> None:
+        logging.warning("Shutting down...")
+        loop.create_task(bot.close())
+
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, handle_shutdown)
+
     async with bot:
         for ext in settings.extensions:
             await bot.load_extension(f"cogs.{ext}")
@@ -89,7 +100,6 @@ async def main() -> None:
         bot.add_command(reload)
         bot.add_command(unload)
 
-        print("doot")
         logging.warning("starting bot")
         await bot.start(settings.client_token)
 
