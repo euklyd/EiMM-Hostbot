@@ -423,3 +423,95 @@ class TestInterviewQueryPatterns:
 
         assert results[0] == (100, 3)  # Candidate 100 has 3 votes
         assert results[1] == (200, 2)  # Candidate 200 has 2 votes
+
+
+class TestQuestionSoftDelete:
+    """Tests for the soft delete functionality on questions."""
+
+    def test_is_deleted_property(self, interview_session: Session) -> None:
+        """is_deleted returns True when deleted_at is set."""
+        from datetime import UTC, datetime
+
+        server = InterviewServer(id=1, name="Test")
+        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        question = Question(
+            interview=interview,
+            question_number=1,
+            asker_id=100,
+            asker_name="Asker",
+            question_text="Q?",
+            source_guild_id=1,
+            source_channel_id=1,
+            source_message_id=1,
+        )
+        interview_session.add(question)
+        interview_session.commit()
+
+        # Initially not deleted
+        assert question.is_deleted is False
+        assert question.deleted_at is None
+        assert question.deleted_by_id is None
+
+        # Mark as deleted
+        question.deleted_at = datetime.now(UTC)
+        question.deleted_by_id = 999
+        interview_session.commit()
+
+        assert question.is_deleted is True
+
+    def test_questions_asked_excludes_deleted(self, interview_session: Session) -> None:
+        """Interview.questions_asked excludes soft-deleted questions."""
+        from datetime import UTC, datetime
+
+        server = InterviewServer(id=1, name="Test")
+        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+
+        for i in range(5):
+            Question(
+                interview=interview,
+                question_number=i + 1,
+                asker_id=100,
+                asker_name="Asker",
+                question_text=f"Q{i}?",
+                source_guild_id=1,
+                source_channel_id=1,
+                source_message_id=i,
+                # Delete questions 4 and 5
+                deleted_at=datetime.now(UTC) if i >= 3 else None,
+                deleted_by_id=999 if i >= 3 else None,
+            )
+
+        interview_session.add(interview)
+        interview_session.commit()
+
+        # Only non-deleted questions counted
+        assert interview.questions_asked == 3
+
+    def test_questions_answered_excludes_deleted(self, interview_session: Session) -> None:
+        """Interview.questions_answered excludes soft-deleted questions."""
+        from datetime import UTC, datetime
+
+        server = InterviewServer(id=1, name="Test")
+        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+
+        for i in range(4):
+            Question(
+                interview=interview,
+                question_number=i + 1,
+                asker_id=100,
+                asker_name="Asker",
+                question_text=f"Q{i}?",
+                answer_text=f"A{i}",
+                is_posted=True,
+                source_guild_id=1,
+                source_channel_id=1,
+                source_message_id=i,
+                # Delete question 4 (which is posted)
+                deleted_at=datetime.now(UTC) if i == 3 else None,
+            )
+
+        interview_session.add(interview)
+        interview_session.commit()
+
+        # Only non-deleted posted questions counted
+        assert interview.questions_answered == 3

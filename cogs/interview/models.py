@@ -31,6 +31,7 @@ class InterviewServer(Base):
     # Channel configuration
     answer_channel_id: Mapped[int | None] = mapped_column(BigInteger)
     backstage_channel_id: Mapped[int | None] = mapped_column(BigInteger)
+    voting_channel_id: Mapped[int | None] = mapped_column(BigInteger)  # Restrict voting to channel
 
     # Role configuration
     manager_role_id: Mapped[int | None] = mapped_column(BigInteger)
@@ -98,13 +99,13 @@ class Interview(Base):
 
     @property
     def questions_asked(self) -> int:
-        """Count of questions asked."""
-        return len(self.questions)
+        """Count of non-deleted questions asked."""
+        return sum(1 for q in self.questions if not q.is_deleted)
 
     @property
     def questions_answered(self) -> int:
-        """Count of questions that have been answered and posted."""
-        return sum(1 for q in self.questions if q.is_posted)
+        """Count of questions that have been answered and posted (excludes deleted)."""
+        return sum(1 for q in self.questions if q.is_posted and not q.is_deleted)
 
 
 class Question(Base):
@@ -148,6 +149,10 @@ class Question(Base):
     # Posted message reference (if posted)
     posted_message_id: Mapped[int | None] = mapped_column(BigInteger)
 
+    # Soft delete for moderation
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    deleted_by_id: Mapped[int | None] = mapped_column(BigInteger)
+
     # Relationship
     interview: Mapped["Interview"] = relationship(back_populates="questions")
 
@@ -156,6 +161,11 @@ class Question(Base):
             f"<Question id={self.id} #{self.question_number} "
             f"from={self.asker_name!r} posted={self.is_posted}>"
         )
+
+    @property
+    def is_deleted(self) -> bool:
+        """Question has been soft-deleted by a moderator."""
+        return self.deleted_at is not None
 
     @property
     def jump_url(self) -> str:
