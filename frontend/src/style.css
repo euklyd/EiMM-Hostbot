@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+/* Custom theme overrides */
+:root {
+  --discord-dark: #36393f;
+  --discord-darker: #2f3136;
+  --discord-darkest: #202225;
+  --discord-blurple: #5865f2;
+  --discord-green: #3ba55c;
+  --discord-yellow: #faa61a;
+  --discord-red: #ed4245;
+}
+
+body {
+  @apply bg-gray-900 text-gray-100 min-h-screen;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--discord-darkest);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--discord-darker);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--discord-dark);
+}
