@@ -1,0 +1,11 @@
+# Development overrides - copy to docker-compose.override.yml
+# That file is gitignored and automatically merged by docker compose
+
+services:
+  bot:
+    volumes:
+      # Mount source code for hot reload with ##reload
+      - ./cogs:/app/cogs:ro
+      - ./core:/app/core:ro
+      - ./db:/app/db:ro
+      - ./bidoof.py:/app/bidoof.py:ro

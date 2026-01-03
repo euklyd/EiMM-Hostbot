@@ -46,8 +46,18 @@ async def start_interview(
     if current is not None:
         await end_interview(session, current.id)
 
+    # Get next interview number for this server
+    result = await session.execute(
+        select(func.coalesce(func.max(Interview.interview_number), 0)).where(
+            Interview.server_id == server_id
+        )
+    )
+    max_num = result.scalar() or 0
+    next_num = max_num + 1
+
     interview = Interview(
         server_id=server_id,
+        interview_number=next_num,
         interviewee_id=interviewee_id,
         interviewee_name=interviewee_name,
         op_channel_id=op_channel_id,
@@ -259,16 +269,24 @@ async def mark_posted(
 
 async def cast_vote(
     session: AsyncSession,
-    interview_id: int,
+    server_id: int,
     voter_id: int,
     candidate_id: int,
+    interview_id: int | None = None,
 ) -> Vote:
     """Cast a vote for a candidate.
+
+    Args:
+        server_id: The server where the vote is cast
+        voter_id: The user casting the vote
+        candidate_id: The user being voted for
+        interview_id: Optional - the current interview (for historical tracking)
 
     Note: Does not check for existing votes - caller should handle that.
     UniqueConstraint will raise IntegrityError if duplicate.
     """
     vote = Vote(
+        server_id=server_id,
         interview_id=interview_id,
         voter_id=voter_id,
         candidate_id=candidate_id,
@@ -280,16 +298,16 @@ async def cast_vote(
 
 async def remove_vote(
     session: AsyncSession,
-    interview_id: int,
+    server_id: int,
     voter_id: int,
 ) -> bool:
-    """Remove a user's vote(s) from an interview.
+    """Remove all of a user's votes for a server.
 
     Returns True if any votes were removed, False otherwise.
     """
     result = await session.execute(
         select(Vote).where(
-            Vote.interview_id == interview_id,
+            Vote.server_id == server_id,
             Vote.voter_id == voter_id,
         )
     )
@@ -300,35 +318,37 @@ async def remove_vote(
 
     for vote in votes:
         await session.delete(vote)
+    # Flush to ensure deletes happen before any subsequent inserts
+    await session.flush()
     return True
 
 
-async def get_user_vote(
+async def get_user_votes(
     session: AsyncSession,
-    interview_id: int,
+    server_id: int,
     voter_id: int,
-) -> Vote | None:
-    """Get a user's vote in an interview."""
+) -> list[Vote]:
+    """Get all of a user's votes in a server."""
     result = await session.execute(
         select(Vote).where(
-            Vote.interview_id == interview_id,
+            Vote.server_id == server_id,
             Vote.voter_id == voter_id,
         )
     )
-    return result.scalar_one_or_none()
+    return list(result.scalars().all())
 
 
 async def get_votals(
     session: AsyncSession,
-    interview_id: int,
+    server_id: int,
 ) -> list[tuple[int, int]]:
-    """Get vote counts per candidate for an interview.
+    """Get vote counts per candidate for a server.
 
     Returns list of (candidate_id, vote_count) tuples, ordered by count desc.
     """
     result = await session.execute(
         select(Vote.candidate_id, func.count(Vote.id).label("vote_count"))
-        .where(Vote.interview_id == interview_id)
+        .where(Vote.server_id == server_id)
         .group_by(Vote.candidate_id)
         .order_by(func.count(Vote.id).desc())
     )

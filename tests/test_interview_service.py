@@ -73,6 +73,7 @@ class TestInterviewLifecycle:
         await async_session.commit()
 
         assert interview.id is not None
+        assert interview.interview_number == 1  # First interview for this server
         assert interview.interviewee_id == 12345
         assert interview.interviewee_name == "Test User"
         assert interview.op_channel_id == 100
@@ -102,6 +103,33 @@ class TestInterviewLifecycle:
         assert interview1.is_current is False
         assert interview1.ended_at is not None
         assert interview2.is_current is True
+
+    async def test_interview_numbers_increment_per_server(self, async_session: AsyncSession) -> None:
+        """Interview numbers increment independently per server."""
+        server1 = InterviewServer(id=1, name="Server 1")
+        server2 = InterviewServer(id=2, name="Server 2")
+        async_session.add_all([server1, server2])
+        await async_session.flush()
+
+        # Start interviews on server 1
+        iv1_s1 = await service.start_interview(async_session, 1, 100, "User A")
+        iv2_s1 = await service.start_interview(async_session, 1, 101, "User B")
+        iv3_s1 = await service.start_interview(async_session, 1, 102, "User C")
+
+        # Start interviews on server 2
+        iv1_s2 = await service.start_interview(async_session, 2, 200, "User X")
+        iv2_s2 = await service.start_interview(async_session, 2, 201, "User Y")
+
+        await async_session.commit()
+
+        # Server 1 should have interviews numbered 1, 2, 3
+        assert iv1_s1.interview_number == 1
+        assert iv2_s1.interview_number == 2
+        assert iv3_s1.interview_number == 3
+
+        # Server 2 should have interviews numbered 1, 2 (independent)
+        assert iv1_s2.interview_number == 1
+        assert iv2_s2.interview_number == 2
 
     async def test_end_interview(
         self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
@@ -372,75 +400,155 @@ class TestVoting:
         self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
     ) -> None:
         """Cast a vote."""
-        _, interview = server_with_interview
+        server, interview = server_with_interview
 
         vote = await service.cast_vote(
             async_session,
-            interview_id=interview.id,
+            server_id=server.id,
             voter_id=100,
             candidate_id=200,
+            interview_id=interview.id,
         )
         await async_session.commit()
 
         assert vote.id is not None
+        assert vote.server_id == server.id
         assert vote.voter_id == 100
         assert vote.candidate_id == 200
+        assert vote.interview_id == interview.id
+
+    async def test_cast_vote_without_interview(self, async_session: AsyncSession) -> None:
+        """Cast a vote when no interview is active."""
+        server = InterviewServer(id=1, name="Test Server", active=True)
+        async_session.add(server)
+        await async_session.flush()
+
+        # Vote without an active interview
+        vote = await service.cast_vote(
+            async_session,
+            server_id=server.id,
+            voter_id=100,
+            candidate_id=200,
+            interview_id=None,
+        )
+        await async_session.commit()
+
+        assert vote.id is not None
+        assert vote.server_id == server.id
+        assert vote.interview_id is None
 
     async def test_remove_vote(
         self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
     ) -> None:
         """Remove a vote."""
-        _, interview = server_with_interview
+        server, _ = server_with_interview
 
-        await service.cast_vote(async_session, interview.id, 100, 200)
+        await service.cast_vote(async_session, server.id, 100, 200)
         await async_session.commit()
 
-        result = await service.remove_vote(async_session, interview.id, voter_id=100)
+        result = await service.remove_vote(async_session, server.id, voter_id=100)
         await async_session.commit()
 
         assert result is True
 
         # Verify vote is gone
-        vote = await service.get_user_vote(async_session, interview.id, 100)
-        assert vote is None
+        votes = await service.get_user_votes(async_session, server.id, 100)
+        assert votes == []
 
     async def test_remove_vote_not_found(
         self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
     ) -> None:
         """Remove vote returns False when no vote exists."""
-        _, interview = server_with_interview
+        server, _ = server_with_interview
 
-        result = await service.remove_vote(async_session, interview.id, voter_id=999)
+        result = await service.remove_vote(async_session, server.id, voter_id=999)
         assert result is False
 
-    async def test_get_user_vote(
+    async def test_remove_vote_removes_all_candidates(
         self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
     ) -> None:
-        """Get a user's vote."""
-        _, interview = server_with_interview
+        """Remove vote removes all candidates voter voted for."""
+        server, _ = server_with_interview
 
-        await service.cast_vote(async_session, interview.id, 100, 200)
+        # Vote for multiple candidates
+        await service.cast_vote(async_session, server.id, 100, 200)
+        await service.cast_vote(async_session, server.id, 100, 300)
+        await service.cast_vote(async_session, server.id, 100, 400)
         await async_session.commit()
 
-        vote = await service.get_user_vote(async_session, interview.id, 100)
-        assert vote is not None
-        assert vote.candidate_id == 200
+        votes = await service.get_user_votes(async_session, server.id, 100)
+        assert len(votes) == 3
+
+        # Remove all votes
+        result = await service.remove_vote(async_session, server.id, voter_id=100)
+        await async_session.commit()
+
+        assert result is True
+        votes = await service.get_user_votes(async_session, server.id, 100)
+        assert votes == []
+
+    async def test_vote_override_same_session(
+        self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
+    ) -> None:
+        """Override vote in same session (tests flush after delete)."""
+        server, _ = server_with_interview
+
+        # Initial vote for candidates 200 and 300
+        await service.cast_vote(async_session, server.id, 100, 200)
+        await service.cast_vote(async_session, server.id, 100, 300)
+        await async_session.commit()
+
+        # Override: remove old votes and add new ones (same session, no commit between)
+        await service.remove_vote(async_session, server.id, voter_id=100)
+        # The flush() in remove_vote is critical here - without it, the new vote
+        # would violate the unique constraint because the delete hasn't happened yet
+        await service.cast_vote(async_session, server.id, 100, 200)  # Re-vote for 200
+        await service.cast_vote(async_session, server.id, 100, 400)  # New vote for 400
+        await async_session.commit()
+
+        votes = await service.get_user_votes(async_session, server.id, 100)
+        candidate_ids = {v.candidate_id for v in votes}
+        assert candidate_ids == {200, 400}
+
+    async def test_get_user_votes(
+        self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
+    ) -> None:
+        """Get a user's votes (can be multiple)."""
+        server, _ = server_with_interview
+
+        await service.cast_vote(async_session, server.id, 100, 200)
+        await service.cast_vote(async_session, server.id, 100, 300)
+        await async_session.commit()
+
+        votes = await service.get_user_votes(async_session, server.id, 100)
+        assert len(votes) == 2
+        candidate_ids = {v.candidate_id for v in votes}
+        assert candidate_ids == {200, 300}
+
+    async def test_get_user_votes_empty(
+        self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
+    ) -> None:
+        """Get user votes returns empty list when no votes."""
+        server, _ = server_with_interview
+
+        votes = await service.get_user_votes(async_session, server.id, 100)
+        assert votes == []
 
     async def test_get_votals(
         self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
     ) -> None:
         """Get vote counts per candidate."""
-        _, interview = server_with_interview
+        server, _ = server_with_interview
 
         # 3 votes for candidate 200, 2 for candidate 300
-        await service.cast_vote(async_session, interview.id, 1, 200)
-        await service.cast_vote(async_session, interview.id, 2, 200)
-        await service.cast_vote(async_session, interview.id, 3, 200)
-        await service.cast_vote(async_session, interview.id, 4, 300)
-        await service.cast_vote(async_session, interview.id, 5, 300)
+        await service.cast_vote(async_session, server.id, 1, 200)
+        await service.cast_vote(async_session, server.id, 2, 200)
+        await service.cast_vote(async_session, server.id, 3, 200)
+        await service.cast_vote(async_session, server.id, 4, 300)
+        await service.cast_vote(async_session, server.id, 5, 300)
         await async_session.commit()
 
-        votals = await service.get_votals(async_session, interview.id)
+        votals = await service.get_votals(async_session, server.id)
         assert len(votals) == 2
         assert votals[0] == (200, 3)  # Most votes first
         assert votals[1] == (300, 2)
@@ -449,10 +557,30 @@ class TestVoting:
         self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
     ) -> None:
         """Get votals when no votes exist."""
-        _, interview = server_with_interview
+        server, _ = server_with_interview
 
-        votals = await service.get_votals(async_session, interview.id)
+        votals = await service.get_votals(async_session, server.id)
         assert votals == []
+
+    async def test_votes_persist_after_interview_ends(
+        self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
+    ) -> None:
+        """Votes remain after interview ends (they're per-server)."""
+        server, interview = server_with_interview
+
+        # Cast votes during interview
+        await service.cast_vote(async_session, server.id, 100, 200, interview.id)
+        await service.cast_vote(async_session, server.id, 101, 200, interview.id)
+        await async_session.commit()
+
+        # End interview
+        await service.end_interview(async_session, interview.id)
+        await async_session.commit()
+
+        # Votes should still be queryable by server_id
+        votals = await service.get_votals(async_session, server.id)
+        assert len(votals) == 1
+        assert votals[0] == (200, 2)
 
 
 class TestServerConfig:

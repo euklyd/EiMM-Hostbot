@@ -1,9 +1,11 @@
 conf/settings.py
 conf/*.json
 databases/*
+backups/
 __pycache__
 .DS_Store
 .venv/
 .env
+docker-compose.override.yml
 CLAUDE.md
 .claude/

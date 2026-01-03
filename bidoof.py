@@ -2,6 +2,7 @@ import argparse
 import asyncio
 import faulthandler
 import logging
+import os
 import signal
 
 import discord
@@ -9,6 +10,7 @@ from discord.ext import commands
 
 import conf.settings as settings
 from core.bot import Bot
+from db import init_db
 
 
 @commands.command()
@@ -43,6 +45,26 @@ async def unload(ctx: commands.Context, extension: str) -> None:
         logging.warning(f"unloaded cogs.{extension}")
     else:
         await ctx.send(f"Extension `{extension}` not loaded.")
+
+
+@commands.command()
+@commands.is_owner()
+async def sync(ctx: commands.Context, guild_id: int | None = None) -> None:
+    """
+    Sync slash commands to Discord.
+
+    If guild_id is provided, copy global commands to that guild and sync (instant).
+    Otherwise, sync globally (can take up to an hour to propagate).
+    """
+    if guild_id:
+        guild = discord.Object(id=guild_id)
+        # Copy global commands to this guild for instant availability
+        ctx.bot.tree.copy_global_to(guild=guild)
+        synced = await ctx.bot.tree.sync(guild=guild)
+        await ctx.send(f"Synced {len(synced)} commands to guild {guild_id}.")
+    else:
+        synced = await ctx.bot.tree.sync()
+        await ctx.send(f"Synced {len(synced)} commands globally.")
 
 
 @commands.command()
@@ -92,6 +114,14 @@ async def main() -> None:
         loop.add_signal_handler(sig, handle_shutdown)
 
     async with bot:
+        # Initialize database if DATABASE_URL is set
+        database_url = os.environ.get("DATABASE_URL")
+        if database_url:
+            init_db(database_url)
+            logging.info("Database initialized")
+        else:
+            logging.warning("DATABASE_URL not set - database features disabled")
+
         for ext in settings.extensions:
             await bot.load_extension(f"cogs.{ext}")
             logging.warning(f"loaded cogs.{ext}")
@@ -99,6 +129,7 @@ async def main() -> None:
         bot.add_command(shutdown)
         bot.add_command(reload)
         bot.add_command(unload)
+        bot.add_command(sync)
 
         logging.warning("starting bot")
         await bot.start(settings.client_token)

@@ -67,6 +67,9 @@ class Interview(Base):
         BigInteger, ForeignKey("interview_servers.id", ondelete="CASCADE")
     )
 
+    # Interview number within this server (1, 2, 3, ...)
+    interview_number: Mapped[int]
+
     # Interviewee info (cached for display even if user leaves)
     interviewee_id: Mapped[int] = mapped_column(BigInteger)
     interviewee_name: Mapped[str] = mapped_column(String(100))
@@ -179,20 +182,27 @@ class Question(Base):
 class Vote(Base):
     """A vote for the next interviewee.
 
-    Votes are linked to interviews for historical tracking.
-    Users get multiple votes per interview (enforced at application layer).
-    Unique constraint prevents voting for the same candidate twice.
+    Votes are per-server. The interview_id is optional and used for historical
+    tracking (which interview was active when the vote was cast).
+    Unique constraint prevents voting for the same candidate twice per server.
     """
 
     __tablename__ = "interview_votes"
     __table_args__ = (
-        # Can't vote for the same person twice in the same interview
-        UniqueConstraint("interview_id", "voter_id", "candidate_id"),
+        # Can't vote for the same person twice in the same server
+        UniqueConstraint("server_id", "voter_id", "candidate_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    interview_id: Mapped[int] = mapped_column(
-        ForeignKey("interviews.id", ondelete="CASCADE")
+
+    # Server this vote belongs to (required)
+    server_id: Mapped[int] = mapped_column(
+        BigInteger, ForeignKey("interview_servers.id", ondelete="CASCADE")
+    )
+
+    # Interview active when vote was cast (optional, for history)
+    interview_id: Mapped[int | None] = mapped_column(
+        ForeignKey("interviews.id", ondelete="SET NULL")
     )
 
     # Voter and candidate
@@ -204,12 +214,13 @@ class Vote(Base):
         DateTime(timezone=True), server_default=func.now()
     )
 
-    # Relationship
-    interview: Mapped["Interview"] = relationship(back_populates="votes")
+    # Relationships
+    server: Mapped["InterviewServer"] = relationship()
+    interview: Mapped["Interview | None"] = relationship(back_populates="votes")
 
     def __repr__(self) -> str:
         return (
-            f"<Vote interview={self.interview_id} voter={self.voter_id} "
+            f"<Vote server={self.server_id} voter={self.voter_id} "
             f"candidate={self.candidate_id}>"
         )
 

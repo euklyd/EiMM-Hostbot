@@ -31,7 +31,8 @@ COPY --chown=botuser:botuser . .
 # Make entrypoint executable
 RUN chmod +x scripts/entrypoint.sh
 
-# Default backup directory (mount a volume here)
-ENV BACKUP_DIR=/backups
+# Create backup directory with correct ownership
+RUN mkdir -p /app/backups
+ENV BACKUP_DIR=/app/backups
 
 ENTRYPOINT ["scripts/entrypoint.sh"]
