@@ -47,8 +47,8 @@ async def list_servers(
     """
     results = []
 
-    for guild in user.guilds:
-        guild_id = int(guild.id)
+    # Use guild_ids (from session) since guilds list may be empty
+    for guild_id in user.guild_ids:
         server = await service.get_server(db, guild_id)
 
         if server is None:
