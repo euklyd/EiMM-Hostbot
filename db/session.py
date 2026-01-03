@@ -38,6 +38,24 @@ def init_db(database_url: str, echo: bool = False) -> None:
     )
 
 
+def get_engine():
+    """Get the database engine, raising if not initialized."""
+    if _engine is None:
+        raise RuntimeError("Database not initialized. Call init_db() first.")
+    return _engine
+
+
+async def create_tables(base) -> None:
+    """Create all tables for the given declarative base.
+
+    Args:
+        base: SQLAlchemy declarative base (e.g., Base from a schema module)
+    """
+    engine = get_engine()
+    async with engine.begin() as conn:
+        await conn.run_sync(base.metadata.create_all)
+
+
 def get_session_factory() -> async_sessionmaker[AsyncSession]:
     """Get the session factory, raising if not initialized."""
     if _async_session_factory is None:

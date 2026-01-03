@@ -105,9 +105,12 @@ async def main() -> None:
 
     # Set up graceful shutdown on SIGINT/SIGTERM
     loop = asyncio.get_running_loop()
+    web_server = None  # Will be uvicorn.Server if web is enabled
 
     def handle_shutdown() -> None:
         logging.warning("Shutting down...")
+        if web_server is not None:
+            web_server.should_exit = True
         loop.create_task(bot.close())
 
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -119,8 +122,36 @@ async def main() -> None:
         if database_url:
             init_db(database_url)
             logging.info("Database initialized")
+
+            # Create tables for interview schema
+            from db import create_tables
+            from db.base import Base
+
+            # Import models to register them with Base.metadata
+            from cogs.interview import models as _  # noqa: F401
+
+            await create_tables(Base)
+            logging.info("Database tables created")
         else:
             logging.warning("DATABASE_URL not set - database features disabled")
+
+        # Initialize web server if enabled
+        web_enabled = os.environ.get("WEB_ENABLED", "").lower() == "true"
+        if web_enabled:
+            import uvicorn
+
+            from web.app import create_app
+
+            web_app = create_app(bot)
+            web_port = int(os.environ.get("WEB_PORT", "8080"))
+            config = uvicorn.Config(
+                web_app,
+                host="0.0.0.0",
+                port=web_port,
+                log_level=args.loglevel.lower(),
+            )
+            web_server = uvicorn.Server(config)
+            logging.info(f"Web server will start on port {web_port}")
 
         for ext in settings.extensions:
             await bot.load_extension(f"cogs.{ext}")
@@ -132,7 +163,15 @@ async def main() -> None:
         bot.add_command(sync)
 
         logging.warning("starting bot")
-        await bot.start(settings.client_token)
+
+        # Run bot and web server concurrently if web is enabled
+        if web_server is not None:
+            await asyncio.gather(
+                bot.start(settings.client_token),
+                web_server.serve(),
+            )
+        else:
+            await bot.start(settings.client_token)
 
 
 def run() -> None:

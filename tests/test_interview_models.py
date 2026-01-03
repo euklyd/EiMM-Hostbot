@@ -62,6 +62,7 @@ class TestInterviewModel:
         server = InterviewServer(id=1, name="Test Server")
         interview = Interview(
             server=server,
+            interview_number=1,
             interviewee_id=987654321098765432,
             interviewee_name="TestUser#1234",
         )
@@ -79,6 +80,7 @@ class TestInterviewModel:
         server = InterviewServer(id=1, name="Test Server")
         interview = Interview(
             server=server,
+            interview_number=1,
             interviewee_id=123,
             interviewee_name="User",
         )
@@ -93,7 +95,7 @@ class TestInterviewModel:
     def test_questions_asked_property(self, interview_session: Session) -> None:
         """questions_asked should count questions."""
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
 
         # Add some questions
         for i in range(3):
@@ -116,7 +118,7 @@ class TestInterviewModel:
     def test_questions_answered_property(self, interview_session: Session) -> None:
         """questions_answered should count posted questions only."""
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
 
         # Add questions with different posted status
         for i in range(3):
@@ -145,7 +147,7 @@ class TestQuestionModel:
     def test_create_question(self, interview_session: Session) -> None:
         """Basic question creation."""
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
         question = Question(
             interview=interview,
             question_number=1,
@@ -168,7 +170,7 @@ class TestQuestionModel:
     def test_question_with_answer(self, interview_session: Session) -> None:
         """Question with answer."""
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
         question = Question(
             interview=interview,
             question_number=1,
@@ -191,7 +193,7 @@ class TestQuestionModel:
     def test_jump_url_property(self, interview_session: Session) -> None:
         """jump_url should generate correct Discord URL."""
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
         question = Question(
             interview=interview,
             question_number=1,
@@ -214,8 +216,9 @@ class TestVoteModel:
     def test_create_vote(self, interview_session: Session) -> None:
         """Basic vote creation."""
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
         vote = Vote(
+            server_id=server.id,
             interview=interview,
             voter_id=111222333,
             candidate_id=444555666,
@@ -233,13 +236,13 @@ class TestVoteModel:
     def test_vote_unique_constraint(self, interview_session: Session) -> None:
         """Can't vote for the same candidate twice in same interview."""
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
-        vote1 = Vote(interview=interview, voter_id=100, candidate_id=200)
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
+        vote1 = Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=200)
         interview_session.add(vote1)
         interview_session.commit()
 
-        # Same voter, same candidate, same interview should fail
-        vote2 = Vote(interview_id=interview.id, voter_id=100, candidate_id=200)
+        # Same voter, same candidate, same server should fail
+        vote2 = Vote(server_id=server.id, interview_id=interview.id, voter_id=100, candidate_id=200)
         interview_session.add(vote2)
         try:
             interview_session.commit()
@@ -250,12 +253,12 @@ class TestVoteModel:
     def test_multiple_votes_different_candidates(self, interview_session: Session) -> None:
         """Same voter can vote for different candidates (up to limit)."""
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
         # User votes for 3 different candidates
         interview_session.add_all([
-            Vote(interview=interview, voter_id=100, candidate_id=201),
-            Vote(interview=interview, voter_id=100, candidate_id=202),
-            Vote(interview=interview, voter_id=100, candidate_id=203),
+            Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=201),
+            Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=202),
+            Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=203),
         ])
         interview_session.commit()
 
@@ -265,11 +268,11 @@ class TestVoteModel:
     def test_multiple_voters(self, interview_session: Session) -> None:
         """Different voters can vote in same interview."""
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
         interview_session.add_all([
-            Vote(interview=interview, voter_id=100, candidate_id=999),
-            Vote(interview=interview, voter_id=101, candidate_id=999),
-            Vote(interview=interview, voter_id=102, candidate_id=888),
+            Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=999),
+            Vote(server_id=server.id, interview=interview, voter_id=101, candidate_id=999),
+            Vote(server_id=server.id, interview=interview, voter_id=102, candidate_id=888),
         ])
         interview_session.commit()
 
@@ -283,16 +286,16 @@ class TestVoteModel:
         server = InterviewServer(id=1, name="Test")
         # Old interview (ended)
         interview1 = Interview(
-            server=server, interviewee_id=1, interviewee_name="User1",
+            server=server, interview_number=1, interviewee_id=1, interviewee_name="User1",
             ended_at=datetime.now(UTC)
         )
         # Current interview (not ended)
-        interview2 = Interview(server=server, interviewee_id=2, interviewee_name="User2")
+        interview2 = Interview(server=server, interview_number=2, interviewee_id=2, interviewee_name="User2")
 
-        # Same voter votes in both interviews
+        # Same voter votes for different candidates in same server
         interview_session.add_all([
-            Vote(interview=interview1, voter_id=100, candidate_id=200),
-            Vote(interview=interview2, voter_id=100, candidate_id=300),
+            Vote(server_id=server.id, interview=interview1, voter_id=100, candidate_id=200),
+            Vote(server_id=server.id, interview=interview2, voter_id=100, candidate_id=300),
         ])
         interview_session.commit()
 
@@ -344,11 +347,11 @@ class TestInterviewQueryPatterns:
         server = InterviewServer(id=1, name="Test")
         # Old interview (ended)
         Interview(
-            server=server, interviewee_id=1, interviewee_name="Old",
+            server=server, interview_number=1, interviewee_id=1, interviewee_name="Old",
             ended_at=datetime.now(UTC)
         )
         # Current interview (not ended)
-        Interview(server=server, interviewee_id=2, interviewee_name="Current")
+        Interview(server=server, interview_number=2, interviewee_id=2, interviewee_name="Current")
         interview_session.add(server)
         interview_session.commit()
 
@@ -365,7 +368,7 @@ class TestInterviewQueryPatterns:
     def test_get_unanswered_questions(self, interview_session: Session) -> None:
         """Query for unanswered questions (for answer command)."""
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
 
         for i in range(5):
             Question(
@@ -402,13 +405,13 @@ class TestInterviewQueryPatterns:
         from sqlalchemy import func
 
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
         interview_session.add_all([
-            Vote(interview=interview, voter_id=1, candidate_id=100),
-            Vote(interview=interview, voter_id=2, candidate_id=100),
-            Vote(interview=interview, voter_id=3, candidate_id=100),
-            Vote(interview=interview, voter_id=4, candidate_id=200),
-            Vote(interview=interview, voter_id=5, candidate_id=200),
+            Vote(server_id=server.id, interview=interview, voter_id=1, candidate_id=100),
+            Vote(server_id=server.id, interview=interview, voter_id=2, candidate_id=100),
+            Vote(server_id=server.id, interview=interview, voter_id=3, candidate_id=100),
+            Vote(server_id=server.id, interview=interview, voter_id=4, candidate_id=200),
+            Vote(server_id=server.id, interview=interview, voter_id=5, candidate_id=200),
         ])
         interview_session.commit()
 
@@ -433,7 +436,7 @@ class TestQuestionSoftDelete:
         from datetime import UTC, datetime
 
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
         question = Question(
             interview=interview,
             question_number=1,
@@ -464,7 +467,7 @@ class TestQuestionSoftDelete:
         from datetime import UTC, datetime
 
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
 
         for i in range(5):
             Question(
@@ -492,7 +495,7 @@ class TestQuestionSoftDelete:
         from datetime import UTC, datetime
 
         server = InterviewServer(id=1, name="Test")
-        interview = Interview(server=server, interviewee_id=1, interviewee_name="User")
+        interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
 
         for i in range(4):
             Question(
