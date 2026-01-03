@@ -1,3 +1,13 @@
+# Stage 1: Build frontend
+FROM node:20-slim AS frontend
+
+WORKDIR /frontend
+COPY frontend/package*.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: Python application
 FROM python:3.11-slim
 
 # Install system dependencies for voice support, PostgreSQL client (for pg_dump)
@@ -28,11 +38,17 @@ RUN uv sync --frozen --no-dev
 # Copy application code (--chown avoids slow recursive chown later)
 COPY --chown=botuser:botuser . .
 
+# Copy built frontend from stage 1
+COPY --from=frontend --chown=botuser:botuser /frontend/../web/static ./web/static
+
 # Make entrypoint executable
 RUN chmod +x scripts/entrypoint.sh
 
 # Create backup directory with correct ownership
 RUN mkdir -p /app/backups
 ENV BACKUP_DIR=/app/backups
+
+# Expose web interface port
+EXPOSE 8080
 
 ENTRYPOINT ["scripts/entrypoint.sh"]
