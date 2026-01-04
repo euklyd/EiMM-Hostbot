@@ -81,7 +81,9 @@ async def get_user_with_guilds(user_data: dict, access_token: str | None) -> Dis
                     guild_ids = [int(g["id"]) for g in guilds]
                     if user_id is not None:
                         _guild_cache[user_id] = (guild_ids, now)
-                    logger.debug(f"get_user_with_guilds: fetched {len(guild_ids)} guilds for {user_data.get('username')}")
+                    logger.debug(
+                        f"get_user_with_guilds: fetched {len(guild_ids)} guilds for {user_data.get('username')}"
+                    )
                 else:
                     logger.warning(f"Failed to fetch guilds: {response.status_code}")
         except Exception as e:
