@@ -26,13 +26,8 @@ const isInterviewee = computed(() => {
   return String(auth.user.id) === store.currentInterview.interviewee_id;
 });
 
-// Check if current user is a manager (simplified - would need backend check for full accuracy)
-const isManager = computed(() => {
-  if (!auth.user) return false;
-  // For now, assume managers based on guild admin permission from OAuth
-  const guild = auth.user.guilds.find((g) => g.id === serverId.value);
-  return guild ? (parseInt(guild.permissions) & 0x8) !== 0 : false;
-});
+// Manager status is computed on the backend based on the configured manager role
+const isManager = computed(() => store.currentServer?.is_manager ?? false);
 
 const canAnswer = computed(() => isInterviewee.value);
 const canDelete = computed(() => isManager.value);

@@ -165,6 +165,7 @@ class ServerWithInterviewResponse(BaseModel):
 
     server: ServerResponse
     current_interview: InterviewSummary | None = None
+    is_manager: bool = False
 
 
 # =============================================================================

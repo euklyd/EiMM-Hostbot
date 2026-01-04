@@ -72,6 +72,7 @@ async def get_server(
     server_id: int,
     user: CurrentUser,
     db: DbSession,
+    bot: BotInstance,
 ) -> ServerWithInterviewResponse:
     """Get server details with current interview info."""
     logger.debug(f"get_server: checking membership for {user.username} in {server_id}")
@@ -85,10 +86,12 @@ async def get_server(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Server not found")
 
     current = await service.get_current_interview(db, server_id)
+    is_manager = await check_manager_role(server_id, user, bot, db)
 
     return ServerWithInterviewResponse(
         server=ServerResponse.model_validate(server),
         current_interview=InterviewSummary.model_validate(current) if current else None,
+        is_manager=is_manager,
     )
 
 

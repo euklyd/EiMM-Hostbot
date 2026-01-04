@@ -68,6 +68,7 @@ export interface QuestionResponse {
 export interface ServerWithInterviewResponse {
   server: ServerResponse;
   current_interview: InterviewSummary | null;
+  is_manager: boolean;
 }
 
 export interface ServerStatsResponse {
