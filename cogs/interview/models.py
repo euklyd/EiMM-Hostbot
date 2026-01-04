@@ -38,9 +38,7 @@ class InterviewServer(Base):
     audience_role_id: Mapped[int | None] = mapped_column(BigInteger)
 
     # Interview settings
-    default_question: Mapped[str] = mapped_column(
-        Text, default="What's your favorite card?"
-    )
+    default_question: Mapped[str] = mapped_column(Text, default="What's your favorite card?")
     reinterview_days: Mapped[int] = mapped_column(default=0)  # 0 = no limit
     reinterviews_allowed: Mapped[bool] = mapped_column(Boolean, default=True)
     active: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -63,9 +61,7 @@ class Interview(Base):
     __tablename__ = "interviews"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    server_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("interview_servers.id", ondelete="CASCADE")
-    )
+    server_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("interview_servers.id", ondelete="CASCADE"))
 
     # Interview number within this server (1, 2, 3, ...)
     interview_number: Mapped[int]
@@ -75,9 +71,7 @@ class Interview(Base):
     interviewee_name: Mapped[str] = mapped_column(String(100))
 
     # Timing
-    started_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # OP message for votals display
@@ -90,10 +84,7 @@ class Interview(Base):
     votes: Mapped[list["Vote"]] = relationship(back_populates="interview")
 
     def __repr__(self) -> str:
-        return (
-            f"<Interview id={self.id} interviewee={self.interviewee_name!r} "
-            f"is_current={self.is_current}>"
-        )
+        return f"<Interview id={self.id} interviewee={self.interviewee_name!r} is_current={self.is_current}>"
 
     @property
     def is_current(self) -> bool:
@@ -120,9 +111,7 @@ class Question(Base):
     __tablename__ = "interview_questions"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    interview_id: Mapped[int] = mapped_column(
-        ForeignKey("interviews.id", ondelete="CASCADE")
-    )
+    interview_id: Mapped[int] = mapped_column(ForeignKey("interviews.id", ondelete="CASCADE"))
 
     # Question ordering
     question_number: Mapped[int]
@@ -139,9 +128,7 @@ class Question(Base):
     is_posted: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Timestamps
-    asked_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    asked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     answered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     # Source message (for jump_url reconstruction)
@@ -160,10 +147,7 @@ class Question(Base):
     interview: Mapped["Interview"] = relationship(back_populates="questions")
 
     def __repr__(self) -> str:
-        return (
-            f"<Question id={self.id} #{self.question_number} "
-            f"from={self.asker_name!r} posted={self.is_posted}>"
-        )
+        return f"<Question id={self.id} #{self.question_number} from={self.asker_name!r} posted={self.is_posted}>"
 
     @property
     def is_deleted(self) -> bool:
@@ -173,10 +157,7 @@ class Question(Base):
     @property
     def jump_url(self) -> str:
         """Discord jump URL to the original question message."""
-        return (
-            f"https://discord.com/channels/"
-            f"{self.source_guild_id}/{self.source_channel_id}/{self.source_message_id}"
-        )
+        return f"https://discord.com/channels/{self.source_guild_id}/{self.source_channel_id}/{self.source_message_id}"
 
 
 class Vote(Base):
@@ -196,33 +177,24 @@ class Vote(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
 
     # Server this vote belongs to (required)
-    server_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("interview_servers.id", ondelete="CASCADE")
-    )
+    server_id: Mapped[int] = mapped_column(BigInteger, ForeignKey("interview_servers.id", ondelete="CASCADE"))
 
     # Interview active when vote was cast (optional, for history)
-    interview_id: Mapped[int | None] = mapped_column(
-        ForeignKey("interviews.id", ondelete="SET NULL")
-    )
+    interview_id: Mapped[int | None] = mapped_column(ForeignKey("interviews.id", ondelete="SET NULL"))
 
     # Voter and candidate
     voter_id: Mapped[int] = mapped_column(BigInteger)
     candidate_id: Mapped[int] = mapped_column(BigInteger)
 
     # When they voted
-    voted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now()
-    )
+    voted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships
     server: Mapped["InterviewServer"] = relationship()
     interview: Mapped["Interview | None"] = relationship(back_populates="votes")
 
     def __repr__(self) -> str:
-        return (
-            f"<Vote server={self.server_id} voter={self.voter_id} "
-            f"candidate={self.candidate_id}>"
-        )
+        return f"<Vote server={self.server_id} voter={self.voter_id} candidate={self.candidate_id}>"
 
 
 class OptOut(Base):

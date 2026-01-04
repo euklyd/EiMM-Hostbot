@@ -37,13 +37,14 @@ export const useAuthStore = defineStore("auth", () => {
     window.location.href = "/auth/logout";
   }
 
-  function isMemberOf(guildId: number): boolean {
+  function isMemberOf(guildId: number | string): boolean {
     if (!user.value) return false;
+    const id = typeof guildId === "string" ? parseInt(guildId) : guildId;
     // Check guild_ids first (compact session storage), then fall back to guilds
     if (user.value.guild_ids?.length > 0) {
-      return user.value.guild_ids.includes(guildId);
+      return user.value.guild_ids.includes(id);
     }
-    return user.value.guilds.some((g) => parseInt(g.id) === guildId);
+    return user.value.guilds.some((g) => parseInt(g.id) === id);
   }
 
   return {

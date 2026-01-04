@@ -15,20 +15,22 @@ const store = useInterviewStore();
 const posting = ref(false);
 const postMessage = ref<string | null>(null);
 
-const serverIdNum = computed(() => parseInt(props.serverId));
-const interviewIdNum = computed(() => parseInt(props.interviewId));
+// Use strings for Discord IDs to avoid precision loss
+const serverId = computed(() => props.serverId);
+const interviewIdNum = computed(() => parseInt(props.interviewId)); // DB ID, safe as int
 
 // Check if current user is the interviewee
 const isInterviewee = computed(() => {
   if (!auth.user || !store.currentInterview) return false;
-  return auth.user.id === store.currentInterview.interviewee_id;
+  // Compare as strings since interviewee_id is now a string
+  return String(auth.user.id) === store.currentInterview.interviewee_id;
 });
 
 // Check if current user is a manager (simplified - would need backend check for full accuracy)
 const isManager = computed(() => {
   if (!auth.user) return false;
   // For now, assume managers based on guild admin permission from OAuth
-  const guild = auth.user.guilds.find((g) => parseInt(g.id) === serverIdNum.value);
+  const guild = auth.user.guilds.find((g) => g.id === serverId.value);
   return guild ? (parseInt(guild.permissions) & 0x8) !== 0 : false;
 });
 
@@ -38,13 +40,13 @@ const canPost = computed(() => isInterviewee.value && store.answeredQuestions.le
 
 onMounted(async () => {
   await Promise.all([
-    store.fetchServer(serverIdNum.value),
+    store.fetchServer(serverId.value),
     store.fetchInterview(interviewIdNum.value),
     store.fetchQuestions(interviewIdNum.value),
   ]);
 
   // Connect WebSocket for real-time updates
-  store.connectWebSocket(serverIdNum.value);
+  store.connectWebSocket(serverId.value);
 });
 
 onUnmounted(() => {

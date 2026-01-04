@@ -67,9 +67,7 @@ def upgrade() -> None:
         "interview_votes",
         type_="unique",
     )
-    op.drop_constraint(
-        "interview_votes_interview_id_fkey", "interview_votes", type_="foreignkey"
-    )
+    op.drop_constraint("interview_votes_interview_id_fkey", "interview_votes", type_="foreignkey")
 
     # Add new FK for interview_id with SET NULL on delete
     op.create_foreign_key(
@@ -89,9 +87,7 @@ def upgrade() -> None:
     )
 
     # Add index on server_id
-    op.create_index(
-        "ix_interview_votes_server_id", "interview_votes", ["server_id"]
-    )
+    op.create_index("ix_interview_votes_server_id", "interview_votes", ["server_id"])
 
 
 def downgrade() -> None:
@@ -100,15 +96,9 @@ def downgrade() -> None:
 
     # Drop new constraints
     op.drop_index("ix_interview_votes_server_id", table_name="interview_votes")
-    op.drop_constraint(
-        "uq_interview_votes_server_voter_candidate", "interview_votes", type_="unique"
-    )
-    op.drop_constraint(
-        "fk_interview_votes_interview_id", "interview_votes", type_="foreignkey"
-    )
-    op.drop_constraint(
-        "fk_interview_votes_server_id", "interview_votes", type_="foreignkey"
-    )
+    op.drop_constraint("uq_interview_votes_server_voter_candidate", "interview_votes", type_="unique")
+    op.drop_constraint("fk_interview_votes_interview_id", "interview_votes", type_="foreignkey")
+    op.drop_constraint("fk_interview_votes_server_id", "interview_votes", type_="foreignkey")
 
     # Delete votes without interview_id (can't restore these)
     op.execute("DELETE FROM interview_votes WHERE interview_id IS NULL")
@@ -133,6 +123,4 @@ def downgrade() -> None:
         "interview_votes",
         ["interview_id", "voter_id", "candidate_id"],
     )
-    op.create_index(
-        "ix_interview_votes_interview_id", "interview_votes", ["interview_id"]
-    )
+    op.create_index("ix_interview_votes_interview_id", "interview_votes", ["interview_id"])

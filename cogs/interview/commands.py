@@ -161,8 +161,7 @@ class Interview(commands.Cog):
             server = await service.get_server(session, ctx.guild.id)
         if server is None or not server.active:
             await ctx.send(
-                f"Interview system not set up or disabled. "
-                f"Use `{ctx.prefix}iv setup #answer #backstage` first.",
+                f"Interview system not set up or disabled. Use `{ctx.prefix}iv setup #answer #backstage` first.",
                 ephemeral=True,
             )
             return None
@@ -249,8 +248,7 @@ class Interview(commands.Cog):
             await session.commit()
 
             await ctx.send(
-                f"Submitted {len(added)} questions (#{added[0]}-#{added[-1]}) "
-                f"for {interview.interviewee_name}!",
+                f"Submitted {len(added)} questions (#{added[0]}-#{added[-1]}) for {interview.interviewee_name}!",
                 ephemeral=True,
             )
 
@@ -400,9 +398,7 @@ class Interview(commands.Cog):
                 await ctx.send("No interview is currently active.", ephemeral=True)
                 return
 
-            questions = await service.get_questions(
-                session, interview.id, QuestionFilter.ANSWERED_UNPOSTED
-            )
+            questions = await service.get_questions(session, interview.id, QuestionFilter.ANSWERED_UNPOSTED)
 
         if not questions:
             await ctx.send("No answered questions ready to post.", ephemeral=True)
@@ -463,9 +459,7 @@ class Interview(commands.Cog):
                 await ctx.send("Answer channel not found.", ephemeral=True)
                 return
 
-            questions = await service.get_questions(
-                session, interview.id, QuestionFilter.ANSWERED_UNPOSTED
-            )
+            questions = await service.get_questions(session, interview.id, QuestionFilter.ANSWERED_UNPOSTED)
 
             if not questions:
                 await ctx.send("No answered questions ready to post.", ephemeral=True)
@@ -491,9 +485,7 @@ class Interview(commands.Cog):
             ]
 
             # Count previously posted
-            posted_count = await service.count_questions(
-                session, interview.id, answered_only=True
-            ) - len(questions)
+            posted_count = await service.count_questions(session, interview.id, answered_only=True) - len(questions)
 
             result = generate_answer_embeds(
                 interviewee_data,
@@ -515,7 +507,6 @@ class Interview(commands.Cog):
                 f"Posted {len(questions)} answers to {answer_channel.mention}!",
                 ephemeral=True,
             )
-
 
     # =========================================================================
     # Management Commands (iv group)
@@ -556,9 +547,7 @@ class Interview(commands.Cog):
     ) -> None:
         """Set up the interview system for this server (admin only)."""
         async with get_session() as session:
-            server, created = await service.get_or_create_server(
-                session, ctx.guild.id, ctx.guild.name
-            )
+            server, created = await service.get_or_create_server(session, ctx.guild.id, ctx.guild.name)
 
             await service.update_server_config(
                 session,
@@ -648,9 +637,7 @@ class Interview(commands.Cog):
             await service.end_interview(session, interview.id)
             await session.commit()
 
-            await ctx.send(
-                f"Interview with {interview.interviewee_name} has ended."
-            )
+            await ctx.send(f"Interview with {interview.interviewee_name} has ended.")
 
     @iv.command(name="settings")
     @is_manager()
@@ -738,22 +725,14 @@ class Interview(commands.Cog):
     ) -> None:
         """Set the answer, backstage, or voting channel."""
         async with get_session() as session:
-            server, _ = await service.get_or_create_server(
-                session, ctx.guild.id, ctx.guild.name
-            )
+            server, _ = await service.get_or_create_server(session, ctx.guild.id, ctx.guild.name)
 
             if channel_type == "answer":
-                await service.update_server_config(
-                    session, ctx.guild.id, answer_channel_id=channel.id
-                )
+                await service.update_server_config(session, ctx.guild.id, answer_channel_id=channel.id)
             elif channel_type == "backstage":
-                await service.update_server_config(
-                    session, ctx.guild.id, backstage_channel_id=channel.id
-                )
+                await service.update_server_config(session, ctx.guild.id, backstage_channel_id=channel.id)
             elif channel_type == "voting":
-                await service.update_server_config(
-                    session, ctx.guild.id, voting_channel_id=channel.id
-                )
+                await service.update_server_config(session, ctx.guild.id, voting_channel_id=channel.id)
             else:
                 await ctx.send(
                     "Invalid channel type. Use `answer`, `backstage`, or `voting`.",
@@ -772,9 +751,7 @@ class Interview(commands.Cog):
         """Set the manager role (admin only)."""
         async with get_session() as session:
             await service.get_or_create_server(session, ctx.guild.id, ctx.guild.name)
-            await service.update_server_config(
-                session, ctx.guild.id, manager_role_id=role.id
-            )
+            await service.update_server_config(session, ctx.guild.id, manager_role_id=role.id)
             await session.commit()
 
         await ctx.send(f"Manager role set to {role.mention}.")
@@ -859,7 +836,6 @@ class Interview(commands.Cog):
         )
         await ctx.send(embed=embed, ephemeral=True)
 
-
     # =========================================================================
     # Dev Commands (owner only)
     # =========================================================================
@@ -895,8 +871,10 @@ class Interview(commands.Cog):
                 {"sid": ctx.guild.id},
             )
             await session.execute(
-                text("DELETE FROM interview_questions WHERE interview_id IN "
-                     "(SELECT id FROM interviews WHERE server_id = :sid)"),
+                text(
+                    "DELETE FROM interview_questions WHERE interview_id IN "
+                    "(SELECT id FROM interviews WHERE server_id = :sid)"
+                ),
                 {"sid": ctx.guild.id},
             )
             await session.execute(

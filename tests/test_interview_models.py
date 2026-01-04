@@ -210,6 +210,7 @@ class TestQuestionModel:
         expected = "https://discord.com/channels/111222333444555666/222333444555666777/333444555666777888"
         assert question.jump_url == expected
 
+
 class TestVoteModel:
     """Tests for the Vote model."""
 
@@ -226,11 +227,7 @@ class TestVoteModel:
         interview_session.add(vote)
         interview_session.commit()
 
-        retrieved = (
-            interview_session.query(Vote)
-            .filter_by(interview_id=interview.id, voter_id=111222333)
-            .one()
-        )
+        retrieved = interview_session.query(Vote).filter_by(interview_id=interview.id, voter_id=111222333).one()
         assert retrieved.candidate_id == 444555666
 
     def test_vote_unique_constraint(self, interview_session: Session) -> None:
@@ -255,11 +252,13 @@ class TestVoteModel:
         server = InterviewServer(id=1, name="Test")
         interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
         # User votes for 3 different candidates
-        interview_session.add_all([
-            Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=201),
-            Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=202),
-            Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=203),
-        ])
+        interview_session.add_all(
+            [
+                Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=201),
+                Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=202),
+                Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=203),
+            ]
+        )
         interview_session.commit()
 
         votes = interview_session.query(Vote).filter_by(voter_id=100).all()
@@ -269,11 +268,13 @@ class TestVoteModel:
         """Different voters can vote in same interview."""
         server = InterviewServer(id=1, name="Test")
         interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
-        interview_session.add_all([
-            Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=999),
-            Vote(server_id=server.id, interview=interview, voter_id=101, candidate_id=999),
-            Vote(server_id=server.id, interview=interview, voter_id=102, candidate_id=888),
-        ])
+        interview_session.add_all(
+            [
+                Vote(server_id=server.id, interview=interview, voter_id=100, candidate_id=999),
+                Vote(server_id=server.id, interview=interview, voter_id=101, candidate_id=999),
+                Vote(server_id=server.id, interview=interview, voter_id=102, candidate_id=888),
+            ]
+        )
         interview_session.commit()
 
         votes = interview_session.query(Vote).filter_by(interview_id=interview.id).all()
@@ -286,17 +287,18 @@ class TestVoteModel:
         server = InterviewServer(id=1, name="Test")
         # Old interview (ended)
         interview1 = Interview(
-            server=server, interview_number=1, interviewee_id=1, interviewee_name="User1",
-            ended_at=datetime.now(UTC)
+            server=server, interview_number=1, interviewee_id=1, interviewee_name="User1", ended_at=datetime.now(UTC)
         )
         # Current interview (not ended)
         interview2 = Interview(server=server, interview_number=2, interviewee_id=2, interviewee_name="User2")
 
         # Same voter votes for different candidates in same server
-        interview_session.add_all([
-            Vote(server_id=server.id, interview=interview1, voter_id=100, candidate_id=200),
-            Vote(server_id=server.id, interview=interview2, voter_id=100, candidate_id=300),
-        ])
+        interview_session.add_all(
+            [
+                Vote(server_id=server.id, interview=interview1, voter_id=100, candidate_id=200),
+                Vote(server_id=server.id, interview=interview2, voter_id=100, candidate_id=300),
+            ]
+        )
         interview_session.commit()
 
         all_votes = interview_session.query(Vote).filter_by(voter_id=100).all()
@@ -313,11 +315,7 @@ class TestOptOutModel:
         interview_session.add(opt_out)
         interview_session.commit()
 
-        retrieved = (
-            interview_session.query(OptOut)
-            .filter_by(server_id=1, user_id=123456789)
-            .one()
-        )
+        retrieved = interview_session.query(OptOut).filter_by(server_id=1, user_id=123456789).one()
         assert retrieved is not None
 
     def test_opt_out_composite_key(self, interview_session: Session) -> None:
@@ -347,8 +345,7 @@ class TestInterviewQueryPatterns:
         server = InterviewServer(id=1, name="Test")
         # Old interview (ended)
         Interview(
-            server=server, interview_number=1, interviewee_id=1, interviewee_name="Old",
-            ended_at=datetime.now(UTC)
+            server=server, interview_number=1, interviewee_id=1, interviewee_name="Old", ended_at=datetime.now(UTC)
         )
         # Current interview (not ended)
         Interview(server=server, interview_number=2, interviewee_id=2, interviewee_name="Current")
@@ -406,13 +403,15 @@ class TestInterviewQueryPatterns:
 
         server = InterviewServer(id=1, name="Test")
         interview = Interview(server=server, interview_number=1, interviewee_id=1, interviewee_name="User")
-        interview_session.add_all([
-            Vote(server_id=server.id, interview=interview, voter_id=1, candidate_id=100),
-            Vote(server_id=server.id, interview=interview, voter_id=2, candidate_id=100),
-            Vote(server_id=server.id, interview=interview, voter_id=3, candidate_id=100),
-            Vote(server_id=server.id, interview=interview, voter_id=4, candidate_id=200),
-            Vote(server_id=server.id, interview=interview, voter_id=5, candidate_id=200),
-        ])
+        interview_session.add_all(
+            [
+                Vote(server_id=server.id, interview=interview, voter_id=1, candidate_id=100),
+                Vote(server_id=server.id, interview=interview, voter_id=2, candidate_id=100),
+                Vote(server_id=server.id, interview=interview, voter_id=3, candidate_id=100),
+                Vote(server_id=server.id, interview=interview, voter_id=4, candidate_id=200),
+                Vote(server_id=server.id, interview=interview, voter_id=5, candidate_id=200),
+            ]
+        )
         interview_session.commit()
 
         # Count votes per candidate for current interview

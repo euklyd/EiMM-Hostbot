@@ -9,12 +9,13 @@ const props = defineProps<{
 
 const store = useInterviewStore();
 
-const serverIdNum = computed(() => parseInt(props.serverId));
-const interviewIdNum = computed(() => parseInt(props.interviewId));
+// Use string for Discord IDs to avoid precision loss
+const serverId = computed(() => props.serverId);
+const interviewIdNum = computed(() => parseInt(props.interviewId)); // DB ID, safe as int
 
 onMounted(async () => {
   await Promise.all([
-    store.fetchServer(serverIdNum.value),
+    store.fetchServer(serverId.value),
     store.fetchInterview(interviewIdNum.value),
     // Archive view only shows posted questions
     store.fetchQuestions(interviewIdNum.value, "posted"),

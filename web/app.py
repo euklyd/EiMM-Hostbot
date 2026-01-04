@@ -73,6 +73,7 @@ def create_app(bot: Bot | None = None) -> FastAPI:
 
     # SPA fallback - serve index.html for frontend routes (only if built)
     if index_path.exists():
+
         @app.get("/{full_path:path}")
         async def serve_spa(request: Request, full_path: str) -> FileResponse | JSONResponse:
             """Serve Vue SPA for non-API routes."""

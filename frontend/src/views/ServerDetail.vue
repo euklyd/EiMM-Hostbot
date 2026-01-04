@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { onMounted, ref, computed } from "vue";
-import { useAuthStore } from "../stores/auth";
 import { useInterviewStore } from "../stores/interview";
 import type { InterviewSummary, ServerStatsResponse } from "../api/types";
 import * as api from "../api/client";
@@ -9,18 +8,18 @@ const props = defineProps<{
   serverId: string;
 }>();
 
-const auth = useAuthStore();
 const store = useInterviewStore();
 
 const interviews = ref<InterviewSummary[]>([]);
 const stats = ref<ServerStatsResponse | null>(null);
 const loadingInterviews = ref(false);
 
-const serverIdNum = computed(() => parseInt(props.serverId));
+// Use string directly to avoid JavaScript number precision loss
+const serverId = computed(() => props.serverId);
 
 onMounted(async () => {
   await Promise.all([
-    store.fetchServer(serverIdNum.value),
+    store.fetchServer(serverId.value),
     fetchInterviews(),
     fetchStats(),
   ]);
@@ -29,7 +28,7 @@ onMounted(async () => {
 async function fetchInterviews() {
   loadingInterviews.value = true;
   try {
-    interviews.value = await api.getInterviews(serverIdNum.value);
+    interviews.value = await api.getInterviews(serverId.value);
   } catch (e) {
     console.error("Failed to fetch interviews:", e);
   } finally {
@@ -39,7 +38,7 @@ async function fetchInterviews() {
 
 async function fetchStats() {
   try {
-    stats.value = await api.getServerStats(serverIdNum.value);
+    stats.value = await api.getServerStats(serverId.value);
   } catch (e) {
     console.error("Failed to fetch stats:", e);
   }

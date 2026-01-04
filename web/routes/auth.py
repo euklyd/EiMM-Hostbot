@@ -66,7 +66,7 @@ async def callback(
 
     try:
         # Exchange code for token
-        logger.debug(f"Exchanging authorization code for token...")
+        logger.debug("Exchanging authorization code for token...")
         token_data = await exchange_code(code)
         access_token = token_data["access_token"]
         logger.debug("Token exchange successful")
@@ -95,7 +95,7 @@ async def callback(
 
     except httpx.HTTPStatusError as e:
         # Log the full response for debugging
-        response_text = e.response.text if hasattr(e.response, 'text') else 'No response body'
+        response_text = e.response.text if hasattr(e.response, "text") else "No response body"
         logger.error(f"Discord API error during login: {e}")
         logger.error(f"Response status: {e.response.status_code}")
         logger.error(f"Response body: {response_text}")

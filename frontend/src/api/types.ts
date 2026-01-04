@@ -18,20 +18,20 @@ export interface DiscordUser {
 }
 
 export interface ServerResponse {
-  id: number;
+  id: string; // Discord ID as string to avoid JS precision loss
   name: string;
   active: boolean;
-  answer_channel_id: number | null;
-  backstage_channel_id: number | null;
-  voting_channel_id: number | null;
-  manager_role_id: number | null;
+  answer_channel_id: string | null;
+  backstage_channel_id: string | null;
+  voting_channel_id: string | null;
+  manager_role_id: string | null;
   default_question: string;
 }
 
 export interface InterviewSummary {
-  id: number;
+  id: number; // Database ID
   interview_number: number;
-  interviewee_id: number;
+  interviewee_id: string; // Discord ID
   interviewee_name: string;
   started_at: string;
   ended_at: string | null;
@@ -39,10 +39,10 @@ export interface InterviewSummary {
 }
 
 export interface InterviewResponse {
-  id: number;
+  id: number; // Database ID
   interview_number: number;
-  server_id: number;
-  interviewee_id: number;
+  server_id: string; // Discord ID
+  interviewee_id: string; // Discord ID
   interviewee_name: string;
   started_at: string;
   ended_at: string | null;
@@ -52,10 +52,10 @@ export interface InterviewResponse {
 }
 
 export interface QuestionResponse {
-  id: number;
-  interview_id: number;
+  id: number; // Database ID
+  interview_id: number; // Database ID
   question_number: number;
-  asker_id: number;
+  asker_id: string; // Discord ID
   asker_name: string;
   question_text: string;
   answer_text: string | null;
@@ -79,7 +79,7 @@ export interface ServerStatsResponse {
 }
 
 export interface TopAskerResponse {
-  user_id: number;
+  user_id: string; // Discord ID
   user_name: string;
   question_count: number;
 }

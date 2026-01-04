@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from sqlalchemy.orm import Session, sessionmaker
 
 from cogs.interview import service
-from cogs.interview.models import Interview, InterviewServer, OptOut, Question, Vote
+from cogs.interview.models import Interview, InterviewServer, Question
 from cogs.interview.service import QuestionFilter
 from db.base import Base
 
@@ -270,15 +270,9 @@ class TestQuestions:
         _, interview = server_with_interview
 
         # Create questions in different states
-        q1 = await service.add_question(
-            async_session, interview.id, 100, "A", "Q1?", 1, 10, 1
-        )
-        q2 = await service.add_question(
-            async_session, interview.id, 100, "A", "Q2?", 1, 10, 2
-        )
-        q3 = await service.add_question(
-            async_session, interview.id, 100, "A", "Q3?", 1, 10, 3
-        )
+        q1 = await service.add_question(async_session, interview.id, 100, "A", "Q1?", 1, 10, 1)
+        q2 = await service.add_question(async_session, interview.id, 100, "A", "Q2?", 1, 10, 2)
+        q3 = await service.add_question(async_session, interview.id, 100, "A", "Q3?", 1, 10, 3)
 
         # Answer q1 and q2
         await service.answer_question(async_session, q1.id, "A1")
@@ -287,21 +281,15 @@ class TestQuestions:
         await service.mark_posted(async_session, [q1.id], 999)
         await async_session.commit()
 
-        unanswered = await service.get_questions(
-            async_session, interview.id, QuestionFilter.UNANSWERED
-        )
+        unanswered = await service.get_questions(async_session, interview.id, QuestionFilter.UNANSWERED)
         assert len(unanswered) == 1
         assert unanswered[0].id == q3.id
 
-        answered_unposted = await service.get_questions(
-            async_session, interview.id, QuestionFilter.ANSWERED_UNPOSTED
-        )
+        answered_unposted = await service.get_questions(async_session, interview.id, QuestionFilter.ANSWERED_UNPOSTED)
         assert len(answered_unposted) == 1
         assert answered_unposted[0].id == q2.id
 
-        posted = await service.get_questions(
-            async_session, interview.id, QuestionFilter.POSTED
-        )
+        posted = await service.get_questions(async_session, interview.id, QuestionFilter.POSTED)
         assert len(posted) == 1
         assert posted[0].id == q1.id
 
@@ -311,12 +299,8 @@ class TestQuestions:
         """Deleted questions are excluded by default."""
         _, interview = server_with_interview
 
-        q1 = await service.add_question(
-            async_session, interview.id, 100, "A", "Q1?", 1, 10, 1
-        )
-        q2 = await service.add_question(
-            async_session, interview.id, 100, "A", "Q2?", 1, 10, 2
-        )
+        q1 = await service.add_question(async_session, interview.id, 100, "A", "Q1?", 1, 10, 1)
+        q2 = await service.add_question(async_session, interview.id, 100, "A", "Q2?", 1, 10, 2)
 
         await service.delete_question(async_session, q1.id, deleted_by_id=999)
         await async_session.commit()
@@ -326,9 +310,7 @@ class TestQuestions:
         assert questions[0].id == q2.id
 
         # Can include deleted if needed
-        all_questions = await service.get_questions(
-            async_session, interview.id, include_deleted=True
-        )
+        all_questions = await service.get_questions(async_session, interview.id, include_deleted=True)
         assert len(all_questions) == 2
 
     async def test_answer_question(
@@ -337,9 +319,7 @@ class TestQuestions:
         """Answer a question."""
         _, interview = server_with_interview
 
-        q = await service.add_question(
-            async_session, interview.id, 100, "A", "Q?", 1, 10, 1
-        )
+        q = await service.add_question(async_session, interview.id, 100, "A", "Q?", 1, 10, 1)
         await async_session.commit()
 
         result = await service.answer_question(async_session, q.id, "This is my answer")
@@ -355,9 +335,7 @@ class TestQuestions:
         """Soft delete a question."""
         _, interview = server_with_interview
 
-        q = await service.add_question(
-            async_session, interview.id, 100, "A", "Q?", 1, 10, 1
-        )
+        q = await service.add_question(async_session, interview.id, 100, "A", "Q?", 1, 10, 1)
         await async_session.commit()
 
         result = await service.delete_question(async_session, q.id, deleted_by_id=999)
@@ -373,12 +351,8 @@ class TestQuestions:
         """Mark questions as posted."""
         _, interview = server_with_interview
 
-        q1 = await service.add_question(
-            async_session, interview.id, 100, "A", "Q1?", 1, 10, 1
-        )
-        q2 = await service.add_question(
-            async_session, interview.id, 100, "A", "Q2?", 1, 10, 2
-        )
+        q1 = await service.add_question(async_session, interview.id, 100, "A", "Q1?", 1, 10, 1)
+        q2 = await service.add_question(async_session, interview.id, 100, "A", "Q2?", 1, 10, 2)
         await async_session.commit()
 
         count = await service.mark_posted(async_session, [q1.id, q2.id], posted_message_id=12345)
@@ -750,9 +724,7 @@ class TestStats:
         _, interview = server_with_interview
 
         for i in range(5):
-            q = await service.add_question(
-                async_session, interview.id, 100, "A", f"Q{i}?", 1, 10, i
-            )
+            q = await service.add_question(async_session, interview.id, 100, "A", f"Q{i}?", 1, 10, i)
             if i < 3:
                 await service.answer_question(async_session, q.id, f"A{i}")
         await async_session.commit()
@@ -769,12 +741,8 @@ class TestStats:
         """Deleted questions are not counted."""
         _, interview = server_with_interview
 
-        q1 = await service.add_question(
-            async_session, interview.id, 100, "A", "Q1?", 1, 10, 1
-        )
-        await service.add_question(
-            async_session, interview.id, 100, "A", "Q2?", 1, 10, 2
-        )
+        q1 = await service.add_question(async_session, interview.id, 100, "A", "Q1?", 1, 10, 1)
+        await service.add_question(async_session, interview.id, 100, "A", "Q2?", 1, 10, 2)
         await service.delete_question(async_session, q1.id, 999)
         await async_session.commit()
 
@@ -827,22 +795,14 @@ class TestStats:
         async_session.add(server)
         await async_session.flush()
 
-        interview = await service.start_interview(
-            async_session, 1, 1, "Interviewee"
-        )
+        interview = await service.start_interview(async_session, 1, 1, "Interviewee")
 
         # User 100 asks 3, user 200 asks 2, user 300 asks 1
         for i in range(3):
-            await service.add_question(
-                async_session, interview.id, 100, "Alice", f"Q{i}?", 1, 10, i
-            )
+            await service.add_question(async_session, interview.id, 100, "Alice", f"Q{i}?", 1, 10, i)
         for i in range(2):
-            await service.add_question(
-                async_session, interview.id, 200, "Bob", f"Q{i}?", 1, 10, 100 + i
-            )
-        await service.add_question(
-            async_session, interview.id, 300, "Charlie", "Q?", 1, 10, 200
-        )
+            await service.add_question(async_session, interview.id, 200, "Bob", f"Q{i}?", 1, 10, 100 + i)
+        await service.add_question(async_session, interview.id, 300, "Charlie", "Q?", 1, 10, 200)
         await async_session.commit()
 
         top = await service.get_top_askers(async_session, 1, limit=3)

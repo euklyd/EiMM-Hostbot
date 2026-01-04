@@ -4,7 +4,6 @@ These tests are independent of Discord - they test the pure logic
 of text processing and embed generation.
 """
 
-
 from cogs.interview.embeds import (
     SAFE_EMBED_TOTAL,
     SAFE_FIELDS_PER_EMBED,
@@ -392,9 +391,7 @@ class TestGenerateAnswerEmbeds:
                 jump_url="http://discord.com/channels/1/2/3",
             )
         ]
-        result = generate_answer_embeds(
-            interviewee, questions, prior_answered=5, total_asked=10
-        )
+        result = generate_answer_embeds(interviewee, questions, prior_answered=5, total_asked=10)
         # Should show 6 answered (5 prior + 1 in batch) of 10
         assert "6" in result.embeds[0].footer.text
         assert "10" in result.embeds[0].footer.text
@@ -414,8 +411,6 @@ class TestGenerateAnswerEmbeds:
             )
             for i in range(1, SAFE_FIELDS_PER_EMBED + 5)
         ]
-        result = generate_answer_embeds(
-            interviewee, questions, prior_answered=0, total_asked=len(questions)
-        )
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=len(questions))
         # Should have more than one embed due to field limit
         assert len(result.embeds) > 1

@@ -80,9 +80,7 @@ async def seed_server() -> InterviewServer:
     """Create the test server with configuration."""
     print("Creating test server...")
     async with get_session() as session:
-        server, created = await service.get_or_create_server(
-            session, TEST_SERVER_ID, TEST_SERVER_NAME
-        )
+        server, created = await service.get_or_create_server(session, TEST_SERVER_ID, TEST_SERVER_NAME)
         if created:
             print(f"  Created server: {TEST_SERVER_NAME}")
         else:
@@ -111,9 +109,7 @@ async def seed_opt_outs() -> None:
     """Create opt-out entries."""
     print("Creating opt-outs...")
     async with get_session() as session:
-        await service.opt_out(
-            session, TEST_SERVER_ID, USERS["opted_out"]["id"]
-        )
+        await service.opt_out(session, TEST_SERVER_ID, USERS["opted_out"]["id"])
         await session.commit()
     print(f"  {USERS['opted_out']['name']} opted out")
 
@@ -185,9 +181,7 @@ async def seed_current_interview() -> Interview:
             source_message_id=500000000000000002,
         )
         await service.answer_question(
-            session, q1.id,
-            "I found my older brother's cards in the attic when I was 12. "
-            "Been hooked ever since!"
+            session, q1.id, "I found my older brother's cards in the attic when I was 12. Been hooked ever since!"
         )
         await service.mark_posted(session, [q1.id], 500000000000000010)
         await session.commit()
@@ -206,9 +200,10 @@ async def seed_current_interview() -> Interview:
             source_message_id=500000000000000003,
         )
         await service.answer_question(
-            session, q2.id,
+            session,
+            q2.id,
             "Commander, because I love the social aspect and the crazy combos "
-            "you can pull off with a 100-card singleton deck."
+            "you can pull off with a 100-card singleton deck.",
         )
         await session.commit()
     print("  Added Q2: answered, not posted")
@@ -224,10 +219,7 @@ async def seed_current_interview() -> Interview:
             source_channel_id=CHANNELS["questions"],
             source_message_id=500000000000000004,
         )
-        await service.answer_question(
-            session, q3.id,
-            "Yes! A cat named Jace and a dog named Chandra."
-        )
+        await service.answer_question(session, q3.id, "Yes! A cat named Jace and a dog named Chandra.")
         await session.commit()
     print("  Added Q3: answered, not posted")
 
@@ -341,9 +333,7 @@ async def print_summary() -> None:
             print(f"\nCurrent Interview: {interview.interviewee_name}")
             print(f"  Interview ID: {interview.id}")
 
-            questions = await service.get_questions(
-                session, interview.id, service.QuestionFilter.ALL
-            )
+            questions = await service.get_questions(session, interview.id, service.QuestionFilter.ALL)
             answered = [q for q in questions if q.answer_text]
             posted = [q for q in questions if q.is_posted]
             print(f"  Questions: {len(questions)} total, {len(answered)} answered, {len(posted)} posted")
@@ -352,10 +342,7 @@ async def print_summary() -> None:
             print(f"  Votes: {sum(count for _, count in votals)} total")
             for candidate_id, count in votals:
                 # Find candidate name
-                name = next(
-                    (u["name"] for u in USERS.values() if u["id"] == candidate_id),
-                    f"Unknown ({candidate_id})"
-                )
+                name = next((u["name"] for u in USERS.values() if u["id"] == candidate_id), f"Unknown ({candidate_id})")
                 print(f"    {name}: {count} votes")
 
         opt_outs = await service.get_opt_outs(session, TEST_SERVER_ID)
@@ -376,10 +363,7 @@ async def print_summary() -> None:
 async def main(clear: bool = False) -> None:
     """Main entry point for seeding."""
     # Get database URL from environment or use default for local dev
-    database_url = os.environ.get(
-        "DATABASE_URL",
-        "postgresql+asyncpg://eimm:eimm@localhost:5432/eimm"
-    )
+    database_url = os.environ.get("DATABASE_URL", "postgresql+asyncpg://eimm:eimm@localhost:5432/eimm")
 
     print("Connecting to database...")
     print(f"  URL: {database_url.replace(database_url.split(':')[2].split('@')[0], '***')}")
@@ -405,11 +389,7 @@ async def main(clear: bool = False) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Seed test data for interview cog")
-    parser.add_argument(
-        "--clear", "-c",
-        action="store_true",
-        help="Clear existing interview data before seeding"
-    )
+    parser.add_argument("--clear", "-c", action="store_true", help="Clear existing interview data before seeding")
     args = parser.parse_args()
 
     asyncio.run(main(clear=args.clear))

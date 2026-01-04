@@ -70,6 +70,7 @@ async def get_current_user(request: Request) -> DiscordUser | None:
     if not guild_ids and access_token:
         try:
             import httpx
+
             async with httpx.AsyncClient() as client:
                 response = await client.get(
                     "https://discord.com/api/v10/users/@me/guilds",

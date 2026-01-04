@@ -48,9 +48,7 @@ async def start_interview(
 
     # Get next interview number for this server
     result = await session.execute(
-        select(func.coalesce(func.max(Interview.interview_number), 0)).where(
-            Interview.server_id == server_id
-        )
+        select(func.coalesce(func.max(Interview.interview_number), 0)).where(Interview.server_id == server_id)
     )
     max_num = result.scalar() or 0
     next_num = max_num + 1
@@ -73,9 +71,7 @@ async def end_interview(session: AsyncSession, interview_id: int) -> Interview |
 
     Returns the interview if found, None otherwise.
     """
-    result = await session.execute(
-        select(Interview).where(Interview.id == interview_id)
-    )
+    result = await session.execute(select(Interview).where(Interview.id == interview_id))
     interview = result.scalar_one_or_none()
     if interview is None:
         return None
@@ -84,9 +80,7 @@ async def end_interview(session: AsyncSession, interview_id: int) -> Interview |
     return interview
 
 
-async def get_current_interview(
-    session: AsyncSession, server_id: int
-) -> Interview | None:
+async def get_current_interview(session: AsyncSession, server_id: int) -> Interview | None:
     """Get the current (non-ended) interview for a server."""
     result = await session.execute(
         select(Interview).where(
@@ -99,9 +93,7 @@ async def get_current_interview(
 
 async def get_interview(session: AsyncSession, interview_id: int) -> Interview | None:
     """Get an interview by ID."""
-    result = await session.execute(
-        select(Interview).where(Interview.id == interview_id)
-    )
+    result = await session.execute(select(Interview).where(Interview.id == interview_id))
     return result.scalar_one_or_none()
 
 
@@ -143,9 +135,7 @@ async def add_question(
     """
     # Get next question number
     result = await session.execute(
-        select(func.coalesce(func.max(Question.question_number), 0)).where(
-            Question.interview_id == interview_id
-        )
+        select(func.coalesce(func.max(Question.question_number), 0)).where(Question.interview_id == interview_id)
     )
     max_num = result.scalar() or 0
     next_num = max_num + 1
@@ -197,9 +187,7 @@ async def get_questions(
 
 async def get_question(session: AsyncSession, question_id: int) -> Question | None:
     """Get a question by ID."""
-    result = await session.execute(
-        select(Question).where(Question.id == question_id)
-    )
+    result = await session.execute(select(Question).where(Question.id == question_id))
     return result.scalar_one_or_none()
 
 
@@ -248,9 +236,7 @@ async def mark_posted(
 
     Returns the number of questions updated.
     """
-    result = await session.execute(
-        select(Question).where(Question.id.in_(question_ids))
-    )
+    result = await session.execute(select(Question).where(Question.id.in_(question_ids)))
     questions = result.scalars().all()
 
     count = 0
@@ -362,9 +348,7 @@ async def get_votals(
 
 async def get_server(session: AsyncSession, server_id: int) -> InterviewServer | None:
     """Get a server by ID."""
-    result = await session.execute(
-        select(InterviewServer).where(InterviewServer.id == server_id)
-    )
+    result = await session.execute(select(InterviewServer).where(InterviewServer.id == server_id))
     return result.scalar_one_or_none()
 
 
@@ -508,9 +492,7 @@ async def get_opt_outs(
     server_id: int,
 ) -> list[int]:
     """Get list of user IDs who have opted out."""
-    result = await session.execute(
-        select(OptOut.user_id).where(OptOut.server_id == server_id)
-    )
+    result = await session.execute(select(OptOut.user_id).where(OptOut.server_id == server_id))
     return [int(row[0]) for row in result.all()]
 
 
@@ -562,10 +544,7 @@ async def get_avg_answer_time(
     if not rows:
         return None
 
-    total_seconds = sum(
-        (row.answered_at - row.asked_at).total_seconds()
-        for row in rows
-    )
+    total_seconds = sum((row.answered_at - row.asked_at).total_seconds() for row in rows)
     return total_seconds / len(rows)
 
 
@@ -610,9 +589,7 @@ async def get_server_stats(
     - avg_answer_time_seconds: float | None
     """
     # Count interviews
-    interview_result = await session.execute(
-        select(func.count(Interview.id)).where(Interview.server_id == server_id)
-    )
+    interview_result = await session.execute(select(func.count(Interview.id)).where(Interview.server_id == server_id))
     total_interviews = interview_result.scalar() or 0
 
     # Count questions (need to join to filter by server)
@@ -653,10 +630,7 @@ async def get_server_stats(
     )
     time_rows = time_result.all()
     if time_rows:
-        total_seconds = sum(
-            (row.answered_at - row.asked_at).total_seconds()
-            for row in time_rows
-        )
+        total_seconds = sum((row.answered_at - row.asked_at).total_seconds() for row in time_rows)
         avg_answer_time = total_seconds / len(time_rows)
     else:
         avg_answer_time = None
@@ -703,9 +677,7 @@ async def can_view_interview(
         True if user can view, False otherwise
     """
     if discord_client is None:
-        raise NotImplementedError(
-            "can_view_interview requires discord_client for membership check"
-        )
+        raise NotImplementedError("can_view_interview requires discord_client for membership check")
 
     # Get interview to find server_id
     interview = await get_interview(session, interview_id)
@@ -745,9 +717,7 @@ async def can_view_unanswered(
         return True
 
     # Check if user is manager
-    return await can_manage_interview(
-        session, user_id, interview.server_id, discord_client=discord_client
-    )
+    return await can_manage_interview(session, user_id, interview.server_id, discord_client=discord_client)
 
 
 async def can_manage_interview(
@@ -768,9 +738,7 @@ async def can_manage_interview(
         discord_client: Discord client for API calls (required for role check)
     """
     if discord_client is None:
-        raise NotImplementedError(
-            "can_manage_interview requires discord_client for role check"
-        )
+        raise NotImplementedError("can_manage_interview requires discord_client for role check")
 
     server = await get_server(session, server_id)
     if server is None:
@@ -802,9 +770,7 @@ async def can_configure_server(
         discord_client: Discord client for API calls (required for admin check)
     """
     if discord_client is None:
-        raise NotImplementedError(
-            "can_configure_server requires discord_client for admin check"
-        )
+        raise NotImplementedError("can_configure_server requires discord_client for admin check")
 
     # TODO: Check if user is server admin via Discord API
     raise NotImplementedError("Discord admin check not yet implemented")

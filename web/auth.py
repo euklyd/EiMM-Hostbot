@@ -41,6 +41,11 @@ def get_oauth_config() -> dict[str, str]:
     if missing:
         raise ValueError(f"Missing required environment variables: {', '.join(missing)}")
 
+    # After validation, we know these are not None
+    assert client_id is not None
+    assert client_secret is not None
+    assert redirect_uri is not None
+
     return {
         "client_id": client_id,
         "client_secret": client_secret,

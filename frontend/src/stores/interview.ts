@@ -48,7 +48,7 @@ export const useInterviewStore = defineStore("interview", () => {
     }
   }
 
-  async function fetchServer(serverId: number) {
+  async function fetchServer(serverId: string) {
     loading.value = true;
     error.value = null;
 
@@ -129,7 +129,7 @@ export const useInterviewStore = defineStore("interview", () => {
   }
 
   // WebSocket management
-  function connectWebSocket(serverId: number) {
+  function connectWebSocket(serverId: string) {
     if (ws) {
       ws.close();
     }

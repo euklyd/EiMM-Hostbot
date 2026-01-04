@@ -124,11 +124,10 @@ async def main() -> None:
             logging.info("Database initialized")
 
             # Create tables for interview schema
-            from db import create_tables
-            from db.base import Base
-
             # Import models to register them with Base.metadata
             from cogs.interview import models as _  # noqa: F401
+            from db import create_tables
+            from db.base import Base
 
             await create_tables(Base)
             logging.info("Database tables created")

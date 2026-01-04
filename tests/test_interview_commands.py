@@ -54,7 +54,7 @@ class TestTextChannelConverter:
         converter = TextChannelConverter()
 
         # Mock the standard converter to succeed for mentions
-        with patch.object(commands.TextChannelConverter, 'convert') as mock_convert:
+        with patch.object(commands.TextChannelConverter, "convert") as mock_convert:
             mock_convert.return_value = mock_text_channel
 
             result = await converter.convert(mock_ctx_for_converter, "<#123456789012345678>")
@@ -62,14 +62,12 @@ class TestTextChannelConverter:
             assert result == mock_text_channel
             mock_convert.assert_called_once()
 
-    async def test_convert_channel_name(
-        self, mock_ctx_for_converter: MagicMock, mock_text_channel: MagicMock
-    ) -> None:
+    async def test_convert_channel_name(self, mock_ctx_for_converter: MagicMock, mock_text_channel: MagicMock) -> None:
         """Convert a channel name like 'test-channel'."""
         converter = TextChannelConverter()
 
         # Mock the standard converter to succeed for names
-        with patch.object(commands.TextChannelConverter, 'convert') as mock_convert:
+        with patch.object(commands.TextChannelConverter, "convert") as mock_convert:
             mock_convert.return_value = mock_text_channel
 
             result = await converter.convert(mock_ctx_for_converter, "test-channel")
@@ -77,14 +75,12 @@ class TestTextChannelConverter:
             assert result == mock_text_channel
             mock_convert.assert_called_once()
 
-    async def test_convert_raw_snowflake(
-        self, mock_ctx_for_converter: MagicMock, mock_text_channel: MagicMock
-    ) -> None:
+    async def test_convert_raw_snowflake(self, mock_ctx_for_converter: MagicMock, mock_text_channel: MagicMock) -> None:
         """Convert a raw snowflake ID like '123456789012345678'."""
         converter = TextChannelConverter()
 
         # Mock the standard converter to FAIL (so we fall through to snowflake handling)
-        with patch.object(commands.TextChannelConverter, 'convert') as mock_convert:
+        with patch.object(commands.TextChannelConverter, "convert") as mock_convert:
             mock_convert.side_effect = commands.ChannelNotFound("123456789012345678")
 
             result = await converter.convert(mock_ctx_for_converter, "123456789012345678")
@@ -93,39 +89,31 @@ class TestTextChannelConverter:
             # Verify we tried standard converter first
             mock_convert.assert_called_once()
 
-    async def test_convert_raw_snowflake_not_found(
-        self, mock_ctx_for_converter: MagicMock
-    ) -> None:
+    async def test_convert_raw_snowflake_not_found(self, mock_ctx_for_converter: MagicMock) -> None:
         """Raise ChannelNotFound when snowflake doesn't match any channel."""
         # Mock get_channel to return None and fetch_channel to raise NotFound
         mock_ctx_for_converter.guild.get_channel = lambda x: None
-        mock_ctx_for_converter.guild.fetch_channel = AsyncMock(
-            side_effect=discord.NotFound(MagicMock(), "Not found")
-        )
+        mock_ctx_for_converter.guild.fetch_channel = AsyncMock(side_effect=discord.NotFound(MagicMock(), "Not found"))
 
         converter = TextChannelConverter()
 
-        with patch.object(commands.TextChannelConverter, 'convert') as mock_convert:
+        with patch.object(commands.TextChannelConverter, "convert") as mock_convert:
             mock_convert.side_effect = commands.ChannelNotFound("999999999999999999")
 
             with pytest.raises(commands.ChannelNotFound):
                 await converter.convert(mock_ctx_for_converter, "999999999999999999")
 
-    async def test_convert_invalid_string(
-        self, mock_ctx_for_converter: MagicMock
-    ) -> None:
+    async def test_convert_invalid_string(self, mock_ctx_for_converter: MagicMock) -> None:
         """Raise ChannelNotFound for invalid input."""
         converter = TextChannelConverter()
 
-        with patch.object(commands.TextChannelConverter, 'convert') as mock_convert:
+        with patch.object(commands.TextChannelConverter, "convert") as mock_convert:
             mock_convert.side_effect = commands.ChannelNotFound("not-a-valid-channel")
 
             with pytest.raises(commands.ChannelNotFound):
                 await converter.convert(mock_ctx_for_converter, "not-a-valid-channel")
 
-    async def test_convert_snowflake_wrong_channel_type(
-        self, mock_ctx_for_converter: MagicMock
-    ) -> None:
+    async def test_convert_snowflake_wrong_channel_type(self, mock_ctx_for_converter: MagicMock) -> None:
         """Raise ChannelNotFound when snowflake points to non-text channel."""
         # Make the guild return a voice channel instead
         voice_channel = MagicMock(spec=discord.VoiceChannel)
@@ -136,7 +124,7 @@ class TestTextChannelConverter:
 
         converter = TextChannelConverter()
 
-        with patch.object(commands.TextChannelConverter, 'convert') as mock_convert:
+        with patch.object(commands.TextChannelConverter, "convert") as mock_convert:
             mock_convert.side_effect = commands.ChannelNotFound("123456789012345678")
 
             with pytest.raises(commands.ChannelNotFound):
@@ -153,7 +141,7 @@ class TestTextChannelConverter:
 
         converter = TextChannelConverter()
 
-        with patch.object(commands.TextChannelConverter, 'convert') as mock_convert:
+        with patch.object(commands.TextChannelConverter, "convert") as mock_convert:
             mock_convert.side_effect = commands.ChannelNotFound("123456789012345678")
 
             result = await converter.convert(mock_ctx_for_converter, "123456789012345678")
@@ -161,16 +149,14 @@ class TestTextChannelConverter:
             assert result == mock_text_channel
             mock_ctx_for_converter.guild.fetch_channel.assert_called_once_with(123456789012345678)
 
-    async def test_convert_snowflake_fetch_not_found(
-        self, mock_ctx_for_converter: MagicMock
-    ) -> None:
+    async def test_convert_snowflake_fetch_not_found(self, mock_ctx_for_converter: MagicMock) -> None:
         """Raise ChannelNotFound when fetch fails."""
         mock_ctx_for_converter.guild.get_channel = lambda x: None
         mock_ctx_for_converter.guild.fetch_channel = AsyncMock(side_effect=discord.NotFound(MagicMock(), "Not found"))
 
         converter = TextChannelConverter()
 
-        with patch.object(commands.TextChannelConverter, 'convert') as mock_convert:
+        with patch.object(commands.TextChannelConverter, "convert") as mock_convert:
             mock_convert.side_effect = commands.ChannelNotFound("123456789012345678")
 
             with pytest.raises(commands.ChannelNotFound):
@@ -186,7 +172,7 @@ class TestTextChannelConverter:
         # U+2060 WORD JOINER is commonly inserted
         snowflake_with_unicode = "\u2060123456789012345678"
 
-        with patch.object(commands.TextChannelConverter, 'convert') as mock_convert:
+        with patch.object(commands.TextChannelConverter, "convert") as mock_convert:
             mock_convert.side_effect = commands.ChannelNotFound(snowflake_with_unicode)
 
             result = await converter.convert(mock_ctx_for_converter, snowflake_with_unicode)

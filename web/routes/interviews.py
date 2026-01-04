@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
+import discord
 from fastapi import APIRouter, HTTPException, Query, WebSocket, status
 
 from cogs.interview import service
@@ -73,7 +74,10 @@ async def get_server(
     db: DbSession,
 ) -> ServerWithInterviewResponse:
     """Get server details with current interview info."""
+    logger.debug(f"get_server: checking membership for {user.username} in {server_id}")
+    logger.debug(f"get_server: user has {len(user.guild_ids)} guild_ids")
     if not user.is_member_of(server_id):
+        logger.warning(f"get_server: {user.username} not a member of {server_id}, guild_ids={user.guild_ids[:5]}...")
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not a member of this server")
 
     server = await service.get_server(db, server_id)
@@ -115,7 +119,7 @@ async def get_top_askers(
 
     askers = await service.get_top_askers(db, server_id, limit=limit)
     return [
-        TopAskerResponse(user_id=user_id, user_name=user_name, question_count=count)
+        TopAskerResponse(user_id=str(user_id), user_name=user_name, question_count=count)
         for user_id, user_name, count in askers
     ]
 
@@ -314,6 +318,8 @@ async def post_answers(
     channel = bot.get_channel(server.answer_channel_id)
     if channel is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Answer channel not found")
+    if not isinstance(channel, discord.abc.Messageable):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Answer channel is not a text channel")
 
     # Get unposted answered questions
     questions = await service.get_questions(db, interview_id, filter_by=QuestionFilter.ANSWERED_UNPOSTED)

@@ -44,9 +44,7 @@ def upgrade() -> None:
             server_default="What's your favorite card?",
         ),
         sa.Column("reinterview_days", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column(
-            "reinterviews_allowed", sa.Boolean(), nullable=False, server_default="true"
-        ),
+        sa.Column("reinterviews_allowed", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column("active", sa.Boolean(), nullable=False, server_default="false"),
         sa.PrimaryKeyConstraint("id"),
     )
@@ -117,9 +115,7 @@ def upgrade() -> None:
             ondelete="CASCADE",
         ),
     )
-    op.create_index(
-        "ix_interview_questions_interview_id", "interview_questions", ["interview_id"]
-    )
+    op.create_index("ix_interview_questions_interview_id", "interview_questions", ["interview_id"])
 
     # Votes
     op.create_table(

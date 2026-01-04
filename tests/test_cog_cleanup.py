@@ -5,12 +5,10 @@ that can cause hangs on shutdown.
 """
 
 import ast
-import importlib
 import inspect
 from pathlib import Path
 
 import pytest
-
 
 # Patterns that indicate a resource requiring cleanup
 RESOURCE_PATTERNS = {
@@ -125,7 +123,7 @@ class TestCogUnloadImplementation:
 
         # Verify the method exists and has the right signature
         assert hasattr(Cards, "cog_unload")
-        method = getattr(Cards, "cog_unload")
+        method = Cards.cog_unload
         assert inspect.iscoroutinefunction(method)
 
         # Check the source contains the expected cleanup calls

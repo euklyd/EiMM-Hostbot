@@ -53,20 +53,21 @@ export async function getCurrentUser(): Promise<DiscordUser | null> {
 }
 
 // Server endpoints
+// Note: serverId is string to avoid JavaScript number precision loss with Discord snowflakes
 export async function getServers(): Promise<ServerWithInterviewResponse[]> {
   return request<ServerWithInterviewResponse[]>("/api/servers");
 }
 
-export async function getServer(serverId: number): Promise<ServerWithInterviewResponse> {
+export async function getServer(serverId: string): Promise<ServerWithInterviewResponse> {
   return request<ServerWithInterviewResponse>(`/api/servers/${serverId}`);
 }
 
-export async function getServerStats(serverId: number): Promise<ServerStatsResponse> {
+export async function getServerStats(serverId: string): Promise<ServerStatsResponse> {
   return request<ServerStatsResponse>(`/api/servers/${serverId}/stats`);
 }
 
 export async function getTopAskers(
-  serverId: number,
+  serverId: string,
   limit = 10,
 ): Promise<TopAskerResponse[]> {
   return request<TopAskerResponse[]>(`/api/servers/${serverId}/top-askers?limit=${limit}`);
@@ -74,7 +75,7 @@ export async function getTopAskers(
 
 // Interview endpoints
 export async function getInterviews(
-  serverId: number,
+  serverId: string,
   limit = 20,
   offset = 0,
 ): Promise<InterviewSummary[]> {

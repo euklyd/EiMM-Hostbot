@@ -6,7 +6,7 @@ Supports both PostgreSQL (production) and SQLite (testing).
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
 # Global engine and session factory - initialized by init_db()
 _engine = None
@@ -38,14 +38,14 @@ def init_db(database_url: str, echo: bool = False) -> None:
     )
 
 
-def get_engine():
+def get_engine() -> AsyncEngine:
     """Get the database engine, raising if not initialized."""
     if _engine is None:
         raise RuntimeError("Database not initialized. Call init_db() first.")
     return _engine
 
 
-async def create_tables(base) -> None:
+async def create_tables(base: type) -> None:
     """Create all tables for the given declarative base.
 
     Args:

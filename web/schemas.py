@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, field_validator
 
 # =============================================================================
 # Discord OAuth2 User
@@ -68,18 +69,31 @@ class DiscordUser(BaseModel):
 
 
 class ServerResponse(BaseModel):
-    """Server info for API responses."""
+    """Server info for API responses.
+
+    Discord IDs are serialized as strings to avoid JavaScript precision loss.
+    """
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: str  # Serialized as string for JS safety
     name: str
     active: bool
-    answer_channel_id: int | None = None
-    backstage_channel_id: int | None = None
-    voting_channel_id: int | None = None
-    manager_role_id: int | None = None
+    answer_channel_id: str | None = None
+    backstage_channel_id: str | None = None
+    voting_channel_id: str | None = None
+    manager_role_id: str | None = None
     default_question: str
+
+    @field_validator(
+        "id", "answer_channel_id", "backstage_channel_id", "voting_channel_id", "manager_role_id", mode="before"
+    )
+    @classmethod
+    def convert_int_to_str(cls, v: Any) -> str | None:
+        """Convert integer IDs to strings for JavaScript safety."""
+        if v is None:
+            return None
+        return str(v)
 
 
 class InterviewSummary(BaseModel):
@@ -87,13 +101,18 @@ class InterviewSummary(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: int  # Database ID, not Discord ID - safe as int
     interview_number: int
-    interviewee_id: int
+    interviewee_id: str  # Discord ID
     interviewee_name: str
     started_at: datetime
     ended_at: datetime | None = None
     is_current: bool
+
+    @field_validator("interviewee_id", mode="before")
+    @classmethod
+    def convert_int_to_str(cls, v: Any) -> str | None:
+        return str(v) if v is not None else None
 
 
 class InterviewResponse(BaseModel):
@@ -101,10 +120,10 @@ class InterviewResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: int  # Database ID, not Discord ID - safe as int
     interview_number: int
-    server_id: int
-    interviewee_id: int
+    server_id: str  # Discord ID
+    interviewee_id: str  # Discord ID
     interviewee_name: str
     started_at: datetime
     ended_at: datetime | None = None
@@ -112,16 +131,21 @@ class InterviewResponse(BaseModel):
     questions_asked: int = 0
     questions_answered: int = 0
 
+    @field_validator("server_id", "interviewee_id", mode="before")
+    @classmethod
+    def convert_int_to_str(cls, v: Any) -> str | None:
+        return str(v) if v is not None else None
+
 
 class QuestionResponse(BaseModel):
     """Question info for API responses."""
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
-    interview_id: int
+    id: int  # Database ID
+    interview_id: int  # Database ID
     question_number: int
-    asker_id: int
+    asker_id: str  # Discord ID
     asker_name: str
     question_text: str
     answer_text: str | None = None
@@ -129,6 +153,11 @@ class QuestionResponse(BaseModel):
     asked_at: datetime
     answered_at: datetime | None = None
     jump_url: str
+
+    @field_validator("asker_id", mode="before")
+    @classmethod
+    def convert_int_to_str(cls, v: Any) -> str | None:
+        return str(v) if v is not None else None
 
 
 class ServerWithInterviewResponse(BaseModel):
@@ -175,6 +204,11 @@ class ServerStatsResponse(BaseModel):
 class TopAskerResponse(BaseModel):
     """Top asker entry."""
 
-    user_id: int
+    user_id: str  # Discord ID
     user_name: str
     question_count: int
+
+    @field_validator("user_id", mode="before")
+    @classmethod
+    def convert_int_to_str(cls, v: Any) -> str | None:
+        return str(v) if v is not None else None
