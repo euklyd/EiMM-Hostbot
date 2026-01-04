@@ -505,10 +505,15 @@ async def count_questions(
     session: AsyncSession,
     interview_id: int,
     answered_only: bool = False,
+    posted_only: bool = False,
 ) -> int:
     """Count questions for an interview.
 
-    If answered_only is True, only counts answered (non-deleted) questions.
+    Args:
+        session: Database session.
+        interview_id: Interview to count questions for.
+        answered_only: If True, only count answered (non-deleted) questions.
+        posted_only: If True, only count posted (non-deleted) questions.
     """
     query = select(func.count(Question.id)).where(
         Question.interview_id == interview_id,
@@ -516,6 +521,8 @@ async def count_questions(
     )
     if answered_only:
         query = query.where(Question.answer_text.isnot(None))
+    if posted_only:
+        query = query.where(Question.is_posted == True)  # noqa: E712
 
     result = await session.execute(query)
     return result.scalar() or 0

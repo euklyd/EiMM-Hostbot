@@ -11,6 +11,7 @@ export default defineConfig({
         target: "http://localhost:8080",
         changeOrigin: true,
         cookieDomainRewrite: "localhost",
+        ws: true,
       },
       "/auth": {
         target: "http://localhost:8080",

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import time
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING, Annotated
 
@@ -44,27 +43,28 @@ DbSession = Annotated[AsyncSession, Depends(get_db)]
 # =============================================================================
 
 
-async def get_current_user(request: Request) -> DiscordUser | None:
-    """Get the current user from session, or None if not authenticated.
+async def get_user_with_guilds(user_data: dict, access_token: str | None) -> DiscordUser:
+    """Build a DiscordUser with guild memberships from cache or Discord API.
 
-    Fetches guild memberships on demand using the stored access token.
-    Results are cached for 5 minutes to avoid hitting Discord rate limits.
+    Args:
+        user_data: User data dict (id, username, discriminator, avatar).
+        access_token: Discord OAuth access token for fetching guilds.
+
+    Returns:
+        DiscordUser with guild_ids populated.
     """
-    user_data = request.session.get("user")
-    if user_data is None:
-        return None
+    import time
 
-    user_id = user_data.get("id")
-    access_token = request.session.get("access_token")
+    user_id: int | None = user_data.get("id")
     guild_ids: list[int] = []
 
     # Check cache first
     now = time.time()
-    if user_id in _guild_cache:
+    if user_id is not None and user_id in _guild_cache:
         cached_guilds, cached_time = _guild_cache[user_id]
         if now - cached_time < _GUILD_CACHE_TTL:
             guild_ids = cached_guilds
-            logger.debug(f"get_current_user: using cached guilds for {user_data.get('username')}")
+            logger.debug(f"get_user_with_guilds: using cached guilds for {user_data.get('username')}")
 
     # Fetch from Discord if not cached
     if not guild_ids and access_token:
@@ -79,8 +79,9 @@ async def get_current_user(request: Request) -> DiscordUser | None:
                 if response.status_code == 200:
                     guilds = response.json()
                     guild_ids = [int(g["id"]) for g in guilds]
-                    _guild_cache[user_id] = (guild_ids, now)
-                    logger.debug(f"get_current_user: fetched {len(guild_ids)} guilds for {user_data.get('username')}")
+                    if user_id is not None:
+                        _guild_cache[user_id] = (guild_ids, now)
+                    logger.debug(f"get_user_with_guilds: fetched {len(guild_ids)} guilds for {user_data.get('username')}")
                 else:
                     logger.warning(f"Failed to fetch guilds: {response.status_code}")
         except Exception as e:
@@ -89,6 +90,20 @@ async def get_current_user(request: Request) -> DiscordUser | None:
     # Build user with guild_ids
     user_data_with_guilds = {**user_data, "guild_ids": guild_ids, "guilds": []}
     return DiscordUser.model_validate(user_data_with_guilds)
+
+
+async def get_current_user(request: Request) -> DiscordUser | None:
+    """Get the current user from session, or None if not authenticated.
+
+    Fetches guild memberships on demand using the stored access token.
+    Results are cached for 5 minutes to avoid hitting Discord rate limits.
+    """
+    user_data = request.session.get("user")
+    if user_data is None:
+        return None
+
+    access_token = request.session.get("access_token")
+    return await get_user_with_guilds(user_data, access_token)
 
 
 async def require_user(request: Request) -> DiscordUser:

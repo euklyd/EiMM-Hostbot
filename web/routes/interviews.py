@@ -159,7 +159,22 @@ async def get_interview(
     if not user.is_member_of(interview.server_id):
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not a member of this server")
 
-    return InterviewResponse.model_validate(interview)
+    # Compute counts separately to avoid async lazy-loading issues
+    questions_asked = await service.count_questions(db, interview_id)
+    questions_answered = await service.count_questions(db, interview_id, posted_only=True)
+
+    return InterviewResponse(
+        id=interview.id,
+        interview_number=interview.interview_number,
+        server_id=str(interview.server_id),
+        interviewee_id=str(interview.interviewee_id),
+        interviewee_name=interview.interviewee_name,
+        started_at=interview.started_at,
+        ended_at=interview.ended_at,
+        is_current=interview.is_current,
+        questions_asked=questions_asked,
+        questions_answered=questions_answered,
+    )
 
 
 # =============================================================================
@@ -395,30 +410,30 @@ async def websocket_route(
 
     Requires authentication via session cookie.
     """
-    from ..schemas import DiscordUser
+    from ..dependencies import get_user_with_guilds
 
     # Authenticate from session cookie
-    # Note: Starlette's SessionMiddleware populates request.session
-    # For WebSocket, we need to access it through the scope
-    session = websocket.session if hasattr(websocket, "session") else {}
-
-    # Try to get session from scope (how Starlette middleware stores it)
-    if not session:
-        session = websocket.scope.get("session", {})
+    # Starlette's SessionMiddleware populates the session in scope
+    session = websocket.scope.get("session", {})
 
     user_data = session.get("user")
+    access_token = session.get("access_token")
     if not user_data:
+        # Must accept before closing with a reason
+        await websocket.accept()
         await websocket.close(code=4001, reason="Not authenticated")
         return
 
     try:
-        user = DiscordUser.model_validate(user_data)
+        user = await get_user_with_guilds(user_data, access_token)
     except Exception:
+        await websocket.accept()
         await websocket.close(code=4001, reason="Invalid session")
         return
 
     # Check server membership
     if not user.is_member_of(server_id):
+        await websocket.accept()
         await websocket.close(code=4003, reason="Not a member of this server")
         return
 
