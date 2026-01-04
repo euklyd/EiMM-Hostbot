@@ -61,6 +61,15 @@ function confirmDelete() {
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString();
 }
+
+function handleKeydown(event: KeyboardEvent) {
+  if (event.key === "Escape") {
+    cancelEdit();
+  } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+    event.preventDefault();
+    saveAnswer();
+  }
+}
 </script>
 
 <template>
@@ -96,11 +105,13 @@ function formatDate(dateStr: string): string {
             v-model="editText"
             class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-gray-100 resize-none focus:outline-none focus:border-indigo-500"
             rows="4"
-            placeholder="Type your answer..."
+            placeholder="Type your answer... (Ctrl+Enter to save, Esc to cancel)"
             :disabled="saving"
+            @keydown="handleKeydown"
           ></textarea>
           <div class="flex space-x-2">
             <button
+              type="button"
               @click="saveAnswer"
               :disabled="saving || !editText.trim()"
               class="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm rounded transition-colors"
@@ -108,6 +119,7 @@ function formatDate(dateStr: string): string {
               {{ saving ? "Saving..." : "Save" }}
             </button>
             <button
+              type="button"
               @click="cancelEdit"
               :disabled="saving"
               class="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded transition-colors"
@@ -151,6 +163,7 @@ function formatDate(dateStr: string): string {
     <!-- Actions -->
     <td v-if="canDelete" class="px-4 py-3 text-center w-20">
       <button
+        type="button"
         @click="confirmDelete"
         class="text-red-400 hover:text-red-300 text-sm"
         title="Delete question"

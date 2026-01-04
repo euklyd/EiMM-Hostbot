@@ -78,7 +78,11 @@ export const useInterviewStore = defineStore("interview", () => {
     interviewId: number,
     filterBy: "all" | "unanswered" | "answered" | "posted" = "all",
   ) {
-    loading.value = true;
+    // Only show loading skeleton on initial load, not refreshes
+    const isInitialLoad = questions.value.length === 0;
+    if (isInitialLoad) {
+      loading.value = true;
+    }
     error.value = null;
 
     try {
@@ -86,7 +90,9 @@ export const useInterviewStore = defineStore("interview", () => {
     } catch (e) {
       error.value = e instanceof Error ? e.message : "Failed to fetch questions";
     } finally {
-      loading.value = false;
+      if (isInitialLoad) {
+        loading.value = false;
+      }
     }
   }
 
