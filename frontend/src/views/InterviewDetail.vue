@@ -102,13 +102,31 @@ function formatDate(dateStr: string): string {
       <div class="mb-6">
         <div class="flex items-center justify-between">
           <div>
-            <h1 class="text-2xl font-bold text-white">
-              {{ store.currentInterview.interviewee_name }}'s Interview
-            </h1>
+            <div class="flex items-center gap-3">
+              <h1 class="text-2xl font-bold text-white">
+                {{ store.currentInterview.interviewee_name }}'s Interview
+              </h1>
+              <span
+                v-if="store.currentInterview.is_current"
+                class="px-2 py-0.5 text-xs font-medium rounded-full bg-green-600 text-white"
+              >
+                Active
+              </span>
+              <span
+                v-else
+                class="px-2 py-0.5 text-xs font-medium rounded-full bg-gray-600 text-gray-300"
+              >
+                Ended
+              </span>
+            </div>
             <p class="text-gray-400">
               Interview #{{ store.currentInterview.interview_number }}
               <span class="mx-2">·</span>
               Started {{ formatDate(store.currentInterview.started_at) }}
+              <template v-if="store.currentInterview.ended_at">
+                <span class="mx-2">·</span>
+                Ended {{ formatDate(store.currentInterview.ended_at) }}
+              </template>
             </p>
           </div>
 

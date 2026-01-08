@@ -6,10 +6,11 @@ All commands work as both prefix (##) and slash (/) commands.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import re
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Annotated, TypeVar
+from typing import TYPE_CHECKING, Annotated, Any, TypeVar
 
 import discord
 from discord import app_commands
@@ -33,6 +34,34 @@ logger = logging.getLogger(__name__)
 
 # Type variable for decorator return type
 T = TypeVar("T")
+
+
+# =============================================================================
+# WebSocket Broadcasting
+# =============================================================================
+
+
+async def _broadcast_event(server_id: int, event_type: str, data: Any = None) -> None:
+    """Broadcast an event to connected WebSocket clients.
+
+    Gracefully handles the case where the web server isn't running.
+    """
+    try:
+        from web.websocket import manager
+
+        sent = await manager.broadcast(server_id, event_type, data)
+        if sent > 0:
+            logger.debug(f"Broadcast {event_type} to {sent} clients for server {server_id}")
+    except ImportError:
+        # Web module not available (e.g., web server not enabled)
+        pass
+    except Exception as e:
+        logger.warning(f"Failed to broadcast {event_type}: {e}")
+
+
+def broadcast_event(server_id: int, event_type: str, data: Any = None) -> None:
+    """Fire-and-forget broadcast of an event to WebSocket clients."""
+    asyncio.create_task(_broadcast_event(server_id, event_type, data))
 
 
 class TextChannelConverter(commands.Converter[discord.TextChannel]):
@@ -209,6 +238,13 @@ class Interview(commands.Cog):
             )
             await session.commit()
 
+            # Broadcast to WebSocket clients
+            broadcast_event(ctx.guild.id, "new_question", {
+                "question_id": q.id,
+                "question_number": q.question_number,
+                "asker_name": ctx.author.display_name,
+            })
+
             await ctx.send(
                 f"Question #{q.question_number} submitted for {interview.interviewee_name}!",
                 ephemeral=True,
@@ -244,11 +280,19 @@ class Interview(commands.Cog):
                     source_channel_id=ctx.channel.id,
                     source_message_id=ctx.message.id if ctx.message else 0,
                 )
-                added.append(q.question_number)
+                added.append((q.id, q.question_number))
             await session.commit()
 
+            # Broadcast each new question to WebSocket clients
+            for q_id, q_num in added:
+                broadcast_event(ctx.guild.id, "new_question", {
+                    "question_id": q_id,
+                    "question_number": q_num,
+                    "asker_name": ctx.author.display_name,
+                })
+
             await ctx.send(
-                f"Submitted {len(added)} questions (#{added[0]}-#{added[-1]}) for {interview.interviewee_name}!",
+                f"Submitted {len(added)} questions (#{added[0][1]}-#{added[-1][1]}) for {interview.interviewee_name}!",
                 ephemeral=True,
             )
 
@@ -616,6 +660,14 @@ class Interview(commands.Cog):
             )
             await session.commit()
 
+            # Broadcast to WebSocket clients
+            broadcast_event(ctx.guild.id, "interview_started", {
+                "interview_id": interview.id,
+                "interview_number": interview.interview_number,
+                "interviewee_id": str(interviewee.id),
+                "interviewee_name": interviewee.display_name,
+            })
+
             embed = discord.Embed(
                 title=f"Interview #{interview.interview_number}: {interviewee.display_name}",
                 description=f"Use `{ctx.prefix}ask <question>` to submit questions!",
@@ -636,6 +688,11 @@ class Interview(commands.Cog):
 
             await service.end_interview(session, interview.id)
             await session.commit()
+
+            # Broadcast to WebSocket clients
+            broadcast_event(ctx.guild.id, "interview_ended", {
+                "interview_id": interview.id,
+            })
 
             await ctx.send(f"Interview with {interview.interviewee_name} has ended.")
 

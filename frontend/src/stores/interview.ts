@@ -178,6 +178,7 @@ export const useInterviewStore = defineStore("interview", () => {
   }
 
   function handleWebSocketMessage(message: WebSocketMessage) {
+    console.log("WebSocket message received:", message.type, message.data);
     switch (message.type) {
       case "new_question":
         // Refresh questions list
@@ -190,6 +191,26 @@ export const useInterviewStore = defineStore("interview", () => {
         // Refresh questions list
         if (currentInterview.value) {
           fetchQuestions(currentInterview.value.id);
+        }
+        break;
+
+      case "interview_started":
+        // Refresh interview and server data
+        if (currentInterview.value) {
+          fetchInterview(currentInterview.value.id);
+        }
+        if (currentServer.value) {
+          fetchServer(currentServer.value.server.id);
+        }
+        break;
+
+      case "interview_ended":
+        // Refresh interview and server data
+        if (currentInterview.value) {
+          fetchInterview(currentInterview.value.id);
+        }
+        if (currentServer.value) {
+          fetchServer(currentServer.value.server.id);
         }
         break;
 
