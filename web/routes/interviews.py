@@ -153,13 +153,33 @@ async def get_interview(
     interview_id: int,
     user: CurrentUser,
     db: DbSession,
+    bot: BotInstance,
 ) -> InterviewResponse:
     """Get interview details."""
     interview = await service.get_interview(db, interview_id)
     if interview is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Interview not found")
 
-    if not user.is_member_of(interview.server_id):
+    # Check membership via OAuth guild_ids or bot's member cache
+    is_member = user.is_member_of(interview.server_id)
+    if not is_member:
+        # Fallback: check if bot knows user is in the guild
+        guild = bot.get_guild(interview.server_id)
+        if guild:
+            member = guild.get_member(user.id)
+            is_member = member is not None
+            if is_member:
+                logger.debug(f"get_interview: {user.username} verified via bot cache for server {interview.server_id}")
+
+    logger.debug(
+        f"get_interview: user {user.username} membership={is_member} for server {interview.server_id}, "
+        f"has {len(user.guild_ids)} guild_ids"
+    )
+    if not is_member:
+        logger.warning(
+            f"get_interview: {user.username} denied access to interview {interview_id} "
+            f"(server {interview.server_id}), guild_ids={user.guild_ids[:5] if user.guild_ids else []}..."
+        )
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not a member of this server")
 
     # Compute counts separately to avoid async lazy-loading issues
@@ -206,7 +226,15 @@ async def list_questions(
     if interview is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Interview not found")
 
-    if not user.is_member_of(interview.server_id):
+    # Check membership via OAuth guild_ids or bot's member cache
+    is_member = user.is_member_of(interview.server_id)
+    if not is_member:
+        guild = bot.get_guild(interview.server_id)
+        if guild:
+            member = guild.get_member(user.id)
+            is_member = member is not None
+
+    if not is_member:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Not a member of this server")
 
     # Check permissions

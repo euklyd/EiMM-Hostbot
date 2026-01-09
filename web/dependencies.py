@@ -84,10 +84,17 @@ async def get_user_with_guilds(user_data: dict, access_token: str | None) -> Dis
                     logger.debug(
                         f"get_user_with_guilds: fetched {len(guild_ids)} guilds for {user_data.get('username')}"
                     )
+                elif response.status_code == 401:
+                    logger.warning(
+                        f"get_user_with_guilds: OAuth token expired for {user_data.get('username')} "
+                        "(user needs to re-authenticate)"
+                    )
                 else:
-                    logger.warning(f"Failed to fetch guilds: {response.status_code}")
+                    logger.warning(f"Failed to fetch guilds: {response.status_code} - {response.text[:200]}")
         except Exception as e:
             logger.warning(f"Error fetching guilds: {e}")
+    elif not guild_ids:
+        logger.warning(f"get_user_with_guilds: no access_token available for {user_data.get('username')}")
 
     # Build user with guild_ids
     user_data_with_guilds = {**user_data, "guild_ids": guild_ids, "guilds": []}
