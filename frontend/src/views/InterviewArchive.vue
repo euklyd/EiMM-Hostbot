@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted, computed } from "vue";
+import { onMounted, computed, ref } from "vue";
 import { useInterviewStore } from "../stores/interview";
+import ArchiveQuestionGroup from "../components/ArchiveQuestionGroup.vue";
+import type { QuestionResponse } from "../api/types";
 
 const props = defineProps<{
   serverId: string;
@@ -8,10 +10,41 @@ const props = defineProps<{
 }>();
 
 const store = useInterviewStore();
+const groupRefs = ref<InstanceType<typeof ArchiveQuestionGroup>[]>([]);
+const allExpanded = ref(false);
 
 // Use string for Discord IDs to avoid precision loss
 const serverId = computed(() => props.serverId);
 const interviewIdNum = computed(() => parseInt(props.interviewId)); // DB ID, safe as int
+
+// Group consecutive questions by asker
+interface QuestionGroup {
+  askerName: string;
+  askerId: string;
+  questions: QuestionResponse[];
+}
+
+const questionGroups = computed<QuestionGroup[]>(() => {
+  const groups: QuestionGroup[] = [];
+  let currentGroup: QuestionGroup | null = null;
+
+  for (const q of store.questions) {
+    if (currentGroup && currentGroup.askerId === q.asker_id) {
+      // Same asker, add to current group
+      currentGroup.questions.push(q);
+    } else {
+      // New asker, start new group
+      currentGroup = {
+        askerName: q.asker_name,
+        askerId: q.asker_id,
+        questions: [q],
+      };
+      groups.push(currentGroup);
+    }
+  }
+
+  return groups;
+});
 
 onMounted(async () => {
   await Promise.all([
@@ -22,12 +55,18 @@ onMounted(async () => {
   ]);
 });
 
-function formatDate(dateStr: string): string {
-  return new Date(dateStr).toLocaleString();
-}
-
 function formatDateShort(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString();
+}
+
+function expandAll() {
+  groupRefs.value.forEach((ref) => ref?.expand());
+  allExpanded.value = true;
+}
+
+function collapseAll() {
+  groupRefs.value.forEach((ref) => ref?.collapse());
+  allExpanded.value = false;
 }
 </script>
 
@@ -70,41 +109,47 @@ function formatDateShort(dateStr: string): string {
         </p>
       </div>
 
-      <!-- Stats -->
-      <div class="flex space-x-6 mb-6 text-sm">
-        <div>
-          <span class="text-gray-400">Questions Answered:</span>
-          <span class="text-white ml-1">{{ store.questions.length }}</span>
+      <!-- Stats & Controls -->
+      <div class="flex items-center justify-between mb-6">
+        <div class="flex space-x-6 text-sm">
+          <div>
+            <span class="text-gray-400">Questions:</span>
+            <span class="text-white ml-1">{{ store.questions.length }}</span>
+          </div>
+          <div>
+            <span class="text-gray-400">Askers:</span>
+            <span class="text-white ml-1">{{ questionGroups.length }}</span>
+          </div>
+        </div>
+
+        <!-- Expand/Collapse buttons -->
+        <div v-if="questionGroups.length > 0" class="flex gap-2">
+          <button
+            type="button"
+            @click="expandAll"
+            class="px-3 py-1 text-sm text-gray-400 hover:text-white border border-gray-600 hover:border-gray-500 rounded transition-colors"
+          >
+            Expand All
+          </button>
+          <button
+            type="button"
+            @click="collapseAll"
+            class="px-3 py-1 text-sm text-gray-400 hover:text-white border border-gray-600 hover:border-gray-500 rounded transition-colors"
+          >
+            Collapse All
+          </button>
         </div>
       </div>
 
-      <!-- Questions list (read-only, card format) -->
-      <div class="space-y-4">
-        <div
-          v-for="question in store.questions"
-          :key="question.id"
-          class="bg-gray-800 rounded-lg p-4 border border-gray-700"
-        >
-          <!-- Question header -->
-          <div class="flex items-center justify-between mb-2">
-            <div class="flex items-center space-x-2">
-              <span class="text-gray-500 font-mono">Q{{ question.question_number }}</span>
-              <span class="text-gray-400">{{ question.asker_name }}</span>
-            </div>
-            <span class="text-gray-500 text-sm">{{ formatDate(question.asked_at) }}</span>
-          </div>
-
-          <!-- Question text -->
-          <p class="text-gray-200 mb-3">{{ question.question_text }}</p>
-
-          <!-- Answer -->
-          <div class="bg-gray-900/50 rounded p-3 border-l-2 border-indigo-500">
-            <p class="text-gray-100 whitespace-pre-wrap">{{ question.answer_text }}</p>
-            <p v-if="question.answered_at" class="text-gray-500 text-sm mt-2">
-              Answered {{ formatDate(question.answered_at) }}
-            </p>
-          </div>
-        </div>
+      <!-- Question groups -->
+      <div class="space-y-3">
+        <ArchiveQuestionGroup
+          v-for="(group, idx) in questionGroups"
+          :key="`${group.askerId}-${idx}`"
+          :ref="(el) => { if (el) groupRefs[idx] = el as InstanceType<typeof ArchiveQuestionGroup> }"
+          :questions="group.questions"
+          :asker-name="group.askerName"
+        />
 
         <!-- Empty state -->
         <div
