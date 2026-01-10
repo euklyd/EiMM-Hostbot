@@ -51,6 +51,8 @@ export const useInterviewStore = defineStore("interview", () => {
   async function fetchServer(serverId: string) {
     loading.value = true;
     error.value = null;
+    // Clear stale data to prevent flash of old content
+    currentServer.value = null;
 
     try {
       currentServer.value = await api.getServer(serverId);
@@ -64,6 +66,9 @@ export const useInterviewStore = defineStore("interview", () => {
   async function fetchInterview(interviewId: number) {
     loading.value = true;
     error.value = null;
+    // Clear stale data to prevent flash of old content
+    currentInterview.value = null;
+    questions.value = [];
 
     try {
       currentInterview.value = await api.getInterview(interviewId);

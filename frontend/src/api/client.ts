@@ -25,6 +25,8 @@ async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
+  console.debug(`[API] ${options.method ?? "GET"} ${path}`);
+
   const response = await fetch(path, {
     ...options,
     credentials: "include", // Include session cookies
@@ -36,8 +38,11 @@ async function request<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: "Unknown error" }));
+    console.debug(`[API] ${path} failed: ${response.status} - ${error.detail}`);
     throw new ApiError(response.status, error.detail || "Request failed");
   }
+
+  console.debug(`[API] ${path} → ${response.status}`);
 
   // Handle 204 No Content
   if (response.status === 204) {
