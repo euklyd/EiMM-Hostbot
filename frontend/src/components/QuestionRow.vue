@@ -136,191 +136,345 @@ watch(isEditing, (editing) => {
 </script>
 
 <template>
-  <!-- Collapsed Row -->
-  <tr
-    v-if="!isExpanded"
-    class="border-t border-gray-700 hover:bg-gray-800/50 transition-colors cursor-pointer"
-    @click="toggleExpand"
-  >
-    <!-- Question number -->
-    <td class="px-3 py-1.5 text-gray-400 text-center text-sm w-10">
-      {{ question.question_number }}
-    </td>
-
-    <!-- Date -->
-    <td class="px-2 py-1.5 text-gray-500 text-xs w-16" :title="formatDate(question.asked_at)">
-      {{ formatShortDate(question.asked_at) }}
-    </td>
-
-    <!-- Asker -->
-    <td class="px-2 py-1.5 text-gray-400 text-sm w-28 truncate">
-      {{ question.asker_name }}
-    </td>
-
-    <!-- Question preview -->
-    <td
-      class="px-2 py-1.5 text-gray-100 text-sm"
-      :title="isQuestionTruncated ? question.question_text : undefined"
+  <!-- Mobile Card View (shown on small screens) -->
+  <div class="md:hidden">
+    <!-- Collapsed Card -->
+    <div
+      v-if="!isExpanded"
+      class="bg-gray-800 border border-gray-700 rounded-lg p-3 cursor-pointer active:bg-gray-750"
+      @click="toggleExpand"
     >
-      {{ questionPreview }}
-    </td>
-
-    <!-- Answer preview -->
-    <td
-      class="px-2 py-1.5 text-sm w-48 cursor-pointer"
-      :title="isAnswerTruncated ? (question.answer_text ?? undefined) : undefined"
-      @click.stop="expandAndEdit"
-    >
-      <span v-if="answerPreview" class="text-gray-300">{{ answerPreview }}</span>
-      <span v-else-if="canAnswer" class="text-indigo-400 hover:text-indigo-300">+ Answer</span>
-      <span v-else class="text-gray-600 italic">—</span>
-    </td>
-
-    <!-- Status -->
-    <td class="px-2 py-1.5 text-center w-12" :title="statusText">
-      <span :class="statusDotColor" class="inline-block w-2 h-2 rounded-full"></span>
-    </td>
-
-    <!-- Jump link -->
-    <td class="px-2 py-1.5 text-center w-10">
-      <a
-        v-if="question.jump_url"
-        :href="question.jump_url"
-        target="_blank"
-        class="text-indigo-400 hover:text-indigo-300"
-        title="Jump to message"
-        @click.stop
-      >
-        <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-        </svg>
-      </a>
-    </td>
-
-    <!-- Actions (delete) -->
-    <td v-if="canDelete" class="px-2 py-1.5 text-center w-10">
-      <button
-        type="button"
-        @click.stop="confirmDelete"
-        class="text-red-400 hover:text-red-300"
-        title="Delete question"
-      >
-        <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-        </svg>
-      </button>
-    </td>
-  </tr>
-
-  <!-- Expanded Row -->
-  <tr
-    v-else
-    class="border-t border-gray-700"
-  >
-    <td :colspan="canDelete ? 8 : 7" class="p-2">
-      <div class="bg-gray-750 border border-gray-600 rounded-lg overflow-hidden">
-        <!-- Collapsible header -->
-        <div
-          class="flex items-center justify-between px-4 py-2 bg-gray-700/50 cursor-pointer hover:bg-gray-700 transition-colors"
-          @click="toggleExpand"
-        >
-          <div class="flex items-center gap-4">
-            <span class="text-gray-300 font-medium">#{{ question.question_number }}</span>
-            <span class="text-gray-400 text-sm">{{ question.asker_name }}</span>
-            <span class="text-gray-500 text-xs">{{ formatDate(question.asked_at) }}</span>
-            <span :class="statusColor" class="text-sm font-medium">{{ statusText }}</span>
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex-1 min-w-0">
+          <!-- Header: number, asker, status -->
+          <div class="flex items-center gap-2 mb-1">
+            <span class="text-gray-400 text-sm font-medium">#{{ question.question_number }}</span>
+            <span class="text-gray-400 text-sm truncate">{{ question.asker_name }}</span>
+            <span :class="statusDotColor" class="inline-block w-2 h-2 rounded-full flex-shrink-0"></span>
           </div>
-          <div class="flex items-center gap-3">
-            <a
-              v-if="question.jump_url"
-              :href="question.jump_url"
-              target="_blank"
-              class="text-indigo-400 hover:text-indigo-300 text-xs"
-              @click.stop
-            >
-              Jump to message
-            </a>
+          <!-- Question preview -->
+          <p class="text-gray-100 text-sm line-clamp-2">{{ question.question_text }}</p>
+          <!-- Answer preview or action -->
+          <div class="mt-1.5">
+            <p v-if="answerPreview" class="text-gray-400 text-sm line-clamp-1">{{ answerPreview }}</p>
             <button
-              v-if="canDelete"
+              v-else-if="canAnswer"
               type="button"
-              @click.stop="confirmDelete"
-              class="text-red-400 hover:text-red-300 text-xs"
+              class="text-indigo-400 text-sm font-medium"
+              @click.stop="expandAndEdit"
             >
-              Delete
+              + Answer
             </button>
-            <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
-            </svg>
+            <span v-else class="text-gray-600 text-sm italic">Awaiting answer</span>
           </div>
         </div>
+        <!-- Expand chevron -->
+        <svg class="w-5 h-5 text-gray-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+    </div>
 
-        <!-- Content -->
-        <div class="px-4 py-3">
-          <!-- Question text -->
-          <div class="text-gray-100 mb-3">{{ question.question_text }}</div>
+    <!-- Expanded Card -->
+    <div
+      v-else
+      class="bg-gray-800 border border-gray-600 rounded-lg overflow-hidden"
+    >
+      <!-- Header -->
+      <div
+        class="flex items-center justify-between px-3 py-2 bg-gray-700/50 cursor-pointer active:bg-gray-700"
+        @click="toggleExpand"
+      >
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-gray-300 font-medium">#{{ question.question_number }}</span>
+          <span class="text-gray-400 text-sm">{{ question.asker_name }}</span>
+          <span :class="statusColor" class="text-sm">{{ statusText }}</span>
+        </div>
+        <svg class="w-5 h-5 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+        </svg>
+      </div>
 
-          <!-- Answer section -->
-          <div class="pl-4 border-l-2 border-indigo-500/50">
-        <!-- Editing mode -->
-        <template v-if="isEditing">
-          <div class="space-y-2">
-            <textarea
-              v-model="editText"
-              class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-gray-100 resize-none focus:outline-none focus:border-indigo-500"
-              rows="3"
-              placeholder="Type your answer... (Ctrl+Enter to save, Esc to cancel)"
-              :disabled="saving"
-              @keydown="handleKeydown"
-            ></textarea>
-            <div class="flex space-x-2">
-              <button
-                type="button"
-                @click="saveAnswer"
-                :disabled="saving || !editText.trim()"
-                class="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm rounded transition-colors"
-              >
-                {{ saving ? "Saving..." : "Save" }}
-              </button>
-              <button
-                type="button"
-                @click="cancelEdit"
+      <!-- Content -->
+      <div class="px-3 py-3">
+        <!-- Meta info -->
+        <div class="flex items-center gap-3 text-xs text-gray-500 mb-2">
+          <span>{{ formatDate(question.asked_at) }}</span>
+          <a
+            v-if="question.jump_url"
+            :href="question.jump_url"
+            target="_blank"
+            class="text-indigo-400"
+            @click.stop
+          >
+            Jump to Discord
+          </a>
+        </div>
+
+        <!-- Question text -->
+        <div class="text-gray-100 text-sm mb-3">{{ question.question_text }}</div>
+
+        <!-- Answer section -->
+        <div class="pl-3 border-l-2 border-indigo-500/50">
+          <!-- Editing mode -->
+          <template v-if="isEditing">
+            <div class="space-y-2">
+              <textarea
+                v-model="editText"
+                class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-gray-100 text-sm resize-none focus:outline-none focus:border-indigo-500"
+                rows="4"
+                placeholder="Type your answer..."
                 :disabled="saving"
-                class="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded transition-colors"
+              ></textarea>
+              <div class="flex gap-2">
+                <button
+                  type="button"
+                  @click="saveAnswer"
+                  :disabled="saving || !editText.trim()"
+                  class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:opacity-50 text-white text-sm rounded transition-colors"
+                >
+                  {{ saving ? "Saving..." : "Save" }}
+                </button>
+                <button
+                  type="button"
+                  @click="cancelEdit"
+                  :disabled="saving"
+                  class="px-3 py-2 bg-gray-600 hover:bg-gray-500 active:bg-gray-400 text-white text-sm rounded transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </template>
+
+          <!-- Display mode with answer -->
+          <template v-else-if="question.answer_text">
+            <div class="text-gray-100 text-sm whitespace-pre-wrap">{{ question.answer_text }}</div>
+            <button
+              v-if="canAnswer && !question.is_posted"
+              type="button"
+              @click="startEditing"
+              class="text-indigo-400 text-sm mt-2"
+            >
+              Edit answer
+            </button>
+          </template>
+
+          <!-- Display mode without answer -->
+          <template v-else>
+            <button
+              v-if="canAnswer"
+              type="button"
+              @click="startEditing"
+              class="text-indigo-400 text-sm py-1"
+            >
+              + Add answer
+            </button>
+            <span v-else class="text-gray-500 text-sm italic">Awaiting answer</span>
+          </template>
+        </div>
+
+        <!-- Delete button -->
+        <button
+          v-if="canDelete"
+          type="button"
+          @click.stop="confirmDelete"
+          class="mt-3 text-red-400 text-sm"
+        >
+          Delete question
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Desktop Table Row (hidden on small screens) -->
+  <template class="hidden md:contents">
+    <!-- Collapsed Row -->
+    <tr
+      v-if="!isExpanded"
+      class="hidden md:table-row border-t border-gray-700 hover:bg-gray-800/50 transition-colors cursor-pointer"
+      @click="toggleExpand"
+    >
+      <!-- Question number -->
+      <td class="px-3 py-1.5 text-gray-400 text-center text-sm w-10">
+        {{ question.question_number }}
+      </td>
+
+      <!-- Date -->
+      <td class="px-2 py-1.5 text-gray-500 text-xs w-16" :title="formatDate(question.asked_at)">
+        {{ formatShortDate(question.asked_at) }}
+      </td>
+
+      <!-- Asker -->
+      <td class="px-2 py-1.5 text-gray-400 text-sm w-28 truncate">
+        {{ question.asker_name }}
+      </td>
+
+      <!-- Question preview -->
+      <td
+        class="px-2 py-1.5 text-gray-100 text-sm"
+        :title="isQuestionTruncated ? question.question_text : undefined"
+      >
+        {{ questionPreview }}
+      </td>
+
+      <!-- Answer preview -->
+      <td
+        class="px-2 py-1.5 text-sm w-48 cursor-pointer"
+        :title="isAnswerTruncated ? (question.answer_text ?? undefined) : undefined"
+        @click.stop="expandAndEdit"
+      >
+        <span v-if="answerPreview" class="text-gray-300">{{ answerPreview }}</span>
+        <span v-else-if="canAnswer" class="text-indigo-400 hover:text-indigo-300">+ Answer</span>
+        <span v-else class="text-gray-600 italic">—</span>
+      </td>
+
+      <!-- Status -->
+      <td class="px-2 py-1.5 text-center w-12" :title="statusText">
+        <span :class="statusDotColor" class="inline-block w-2 h-2 rounded-full"></span>
+      </td>
+
+      <!-- Jump link -->
+      <td class="px-2 py-1.5 text-center w-10">
+        <a
+          v-if="question.jump_url"
+          :href="question.jump_url"
+          target="_blank"
+          class="text-indigo-400 hover:text-indigo-300"
+          title="Jump to message"
+          @click.stop
+        >
+          <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+          </svg>
+        </a>
+      </td>
+
+      <!-- Actions (delete) -->
+      <td v-if="canDelete" class="px-2 py-1.5 text-center w-10">
+        <button
+          type="button"
+          @click.stop="confirmDelete"
+          class="text-red-400 hover:text-red-300"
+          title="Delete question"
+        >
+          <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        </button>
+      </td>
+    </tr>
+
+    <!-- Expanded Row -->
+    <tr
+      v-else
+      class="hidden md:table-row border-t border-gray-700"
+    >
+      <td :colspan="canDelete ? 8 : 7" class="p-2">
+        <div class="bg-gray-750 border border-gray-600 rounded-lg overflow-hidden">
+          <!-- Collapsible header -->
+          <div
+            class="flex items-center justify-between px-4 py-2 bg-gray-700/50 cursor-pointer hover:bg-gray-700 transition-colors"
+            @click="toggleExpand"
+          >
+            <div class="flex items-center gap-4">
+              <span class="text-gray-300 font-medium">#{{ question.question_number }}</span>
+              <span class="text-gray-400 text-sm">{{ question.asker_name }}</span>
+              <span class="text-gray-500 text-xs">{{ formatDate(question.asked_at) }}</span>
+              <span :class="statusColor" class="text-sm font-medium">{{ statusText }}</span>
+            </div>
+            <div class="flex items-center gap-3">
+              <a
+                v-if="question.jump_url"
+                :href="question.jump_url"
+                target="_blank"
+                class="text-indigo-400 hover:text-indigo-300 text-xs"
+                @click.stop
               >
-                Cancel
+                Jump to message
+              </a>
+              <button
+                v-if="canDelete"
+                type="button"
+                @click.stop="confirmDelete"
+                class="text-red-400 hover:text-red-300 text-xs"
+              >
+                Delete
               </button>
+              <svg class="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+              </svg>
             </div>
           </div>
-        </template>
 
-        <!-- Display mode with answer -->
-        <template v-else-if="question.answer_text">
-          <div class="text-gray-100 whitespace-pre-wrap">{{ question.answer_text }}</div>
-          <button
-            v-if="canAnswer && !question.is_posted"
-            type="button"
-            @click="startEditing"
-            class="text-xs text-indigo-400 hover:text-indigo-300 mt-2"
-          >
-            Edit answer
-          </button>
-        </template>
+          <!-- Content -->
+          <div class="px-4 py-3">
+            <!-- Question text -->
+            <div class="text-gray-100 mb-3">{{ question.question_text }}</div>
 
-        <!-- Display mode without answer -->
-        <template v-else>
-          <button
-            v-if="canAnswer"
-            type="button"
-            @click="startEditing"
-            class="text-indigo-400 hover:text-indigo-300"
-          >
-            + Add answer
-          </button>
-          <span v-else class="text-gray-500 italic">Awaiting answer</span>
-        </template>
+            <!-- Answer section -->
+            <div class="pl-4 border-l-2 border-indigo-500/50">
+              <!-- Editing mode -->
+              <template v-if="isEditing">
+                <div class="space-y-2">
+                  <textarea
+                    v-model="editText"
+                    class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-gray-100 resize-none focus:outline-none focus:border-indigo-500"
+                    rows="3"
+                    placeholder="Type your answer... (Ctrl+Enter to save, Esc to cancel)"
+                    :disabled="saving"
+                    @keydown="handleKeydown"
+                  ></textarea>
+                  <div class="flex space-x-2">
+                    <button
+                      type="button"
+                      @click="saveAnswer"
+                      :disabled="saving || !editText.trim()"
+                      class="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm rounded transition-colors"
+                    >
+                      {{ saving ? "Saving..." : "Save" }}
+                    </button>
+                    <button
+                      type="button"
+                      @click="cancelEdit"
+                      :disabled="saving"
+                      class="px-3 py-1 bg-gray-600 hover:bg-gray-500 text-white text-sm rounded transition-colors"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </template>
+
+              <!-- Display mode with answer -->
+              <template v-else-if="question.answer_text">
+                <div class="text-gray-100 whitespace-pre-wrap">{{ question.answer_text }}</div>
+                <button
+                  v-if="canAnswer && !question.is_posted"
+                  type="button"
+                  @click="startEditing"
+                  class="text-xs text-indigo-400 hover:text-indigo-300 mt-2"
+                >
+                  Edit answer
+                </button>
+              </template>
+
+              <!-- Display mode without answer -->
+              <template v-else>
+                <button
+                  v-if="canAnswer"
+                  type="button"
+                  @click="startEditing"
+                  class="text-indigo-400 hover:text-indigo-300"
+                >
+                  + Add answer
+                </button>
+                <span v-else class="text-gray-500 italic">Awaiting answer</span>
+              </template>
+            </div>
           </div>
         </div>
-      </div>
-    </td>
-  </tr>
+      </td>
+    </tr>
+  </template>
 </template>

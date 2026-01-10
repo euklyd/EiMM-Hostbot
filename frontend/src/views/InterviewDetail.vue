@@ -111,10 +111,11 @@ function formatDate(dateStr: string): string {
     <template v-else-if="store.currentInterview">
       <!-- Header -->
       <div class="mb-6">
-        <div class="flex items-center justify-between">
+        <!-- Title row -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
           <div>
-            <div class="flex items-center gap-3">
-              <h1 class="text-2xl font-bold text-white">
+            <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 class="text-xl sm:text-2xl font-bold text-white">
                 {{ store.currentInterview.interviewee_name }}'s Interview
               </h1>
               <span
@@ -130,13 +131,13 @@ function formatDate(dateStr: string): string {
                 Ended
               </span>
             </div>
-            <p class="text-gray-400">
+            <p class="text-gray-400 text-sm sm:text-base mt-1">
               Interview #{{ store.currentInterview.interview_number }}
-              <span class="mx-2">·</span>
-              Started {{ formatDate(store.currentInterview.started_at) }}
+              <span class="mx-1 sm:mx-2">·</span>
+              <span class="hidden sm:inline">Started </span>{{ formatDate(store.currentInterview.started_at) }}
               <template v-if="store.currentInterview.ended_at">
-                <span class="mx-2">·</span>
-                Ended {{ formatDate(store.currentInterview.ended_at) }}
+                <span class="mx-1 sm:mx-2">·</span>
+                <span class="hidden sm:inline">Ended </span>{{ formatDate(store.currentInterview.ended_at) }}
               </template>
             </p>
           </div>
@@ -154,7 +155,7 @@ function formatDate(dateStr: string): string {
         </div>
 
         <!-- Stats row -->
-        <div class="flex space-x-6 mt-4 text-sm">
+        <div class="flex flex-wrap gap-3 sm:gap-6 mt-3 sm:mt-4 text-sm">
           <div>
             <span class="text-gray-400">Questions:</span>
             <span class="text-white ml-1">{{ store.questions.length }}</span>
@@ -184,8 +185,29 @@ function formatDate(dateStr: string): string {
         <span v-if="postMessage" class="text-green-400">{{ postMessage }}</span>
       </div>
 
-      <!-- Questions table -->
-      <div class="bg-gray-800 rounded-lg overflow-hidden">
+      <!-- Mobile: Card list -->
+      <div class="md:hidden space-y-2">
+        <QuestionRow
+          v-for="question in store.questions"
+          :key="question.id"
+          :question="question"
+          :can-answer="canAnswer"
+          :can-delete="canDelete"
+          @answer="handleAnswer"
+          @delete="handleDelete"
+        />
+
+        <!-- Empty state -->
+        <div
+          v-if="store.questions.length === 0"
+          class="text-center py-12 text-gray-500 bg-gray-800 rounded-lg"
+        >
+          No questions yet. Questions will appear here when asked in Discord.
+        </div>
+      </div>
+
+      <!-- Desktop: Table -->
+      <div class="hidden md:block bg-gray-800 rounded-lg overflow-hidden">
         <table class="w-full table-fixed">
           <thead class="bg-gray-700">
             <tr>

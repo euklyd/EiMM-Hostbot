@@ -6,41 +6,41 @@ const auth = useAuthStore();
 
 <template>
   <nav class="bg-gray-800 border-b border-gray-700">
-    <div class="container mx-auto px-4">
-      <div class="flex items-center justify-between h-14">
+    <div class="container mx-auto px-3 sm:px-4">
+      <div class="flex items-center justify-between h-12 sm:h-14">
         <!-- Logo/Title -->
         <router-link to="/" class="flex items-center space-x-2">
-          <span class="text-xl font-bold text-white">Discord Interviews</span>
+          <span class="text-lg sm:text-xl font-bold text-white">Discord Interviews</span>
         </router-link>
 
         <!-- User section -->
-        <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-2 sm:space-x-4">
           <template v-if="auth.loading">
-            <div class="animate-pulse bg-gray-600 h-8 w-24 rounded"></div>
+            <div class="animate-pulse bg-gray-600 h-8 w-16 sm:w-24 rounded"></div>
           </template>
 
           <template v-else-if="auth.isAuthenticated && auth.user">
-            <div class="flex items-center space-x-3">
+            <div class="flex items-center space-x-2 sm:space-x-3">
               <!-- User avatar -->
               <img
                 v-if="auth.avatarUrl"
                 :src="auth.avatarUrl"
                 :alt="auth.user.username"
-                class="w-8 h-8 rounded-full"
+                class="w-7 h-7 sm:w-8 sm:h-8 rounded-full"
               />
-              <div v-else class="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center">
-                <span class="text-white text-sm font-medium">
+              <div v-else class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500 flex items-center justify-center">
+                <span class="text-white text-xs sm:text-sm font-medium">
                   {{ auth.user.username.charAt(0).toUpperCase() }}
                 </span>
               </div>
 
-              <!-- Username -->
-              <span class="text-gray-200">{{ auth.user.username }}</span>
+              <!-- Username (hidden on very small screens) -->
+              <span class="hidden xs:inline text-gray-200 text-sm sm:text-base">{{ auth.user.username }}</span>
 
               <!-- Logout button -->
               <button
                 @click="auth.logout()"
-                class="px-3 py-1.5 text-sm text-gray-300 hover:text-white hover:bg-gray-700 rounded transition-colors"
+                class="px-2 sm:px-3 py-1.5 text-sm text-gray-300 hover:text-white hover:bg-gray-700 active:bg-gray-600 rounded transition-colors"
               >
                 Logout
               </button>
@@ -50,9 +50,10 @@ const auth = useAuthStore();
           <template v-else>
             <button
               @click="auth.login()"
-              class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-md transition-colors"
+              class="px-3 sm:px-4 py-2 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm sm:text-base rounded-md transition-colors"
             >
-              Login with Discord
+              <span class="hidden sm:inline">Login with Discord</span>
+              <span class="sm:hidden">Login</span>
             </button>
           </template>
         </div>

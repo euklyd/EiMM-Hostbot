@@ -100,29 +100,29 @@ function collapseAll() {
     <!-- Content -->
     <template v-else-if="store.currentInterview">
       <!-- Header -->
-      <div class="mb-6">
-        <div class="flex items-center space-x-3">
-          <h1 class="text-2xl font-bold text-white">
+      <div class="mb-4 sm:mb-6">
+        <div class="flex flex-wrap items-center gap-2 sm:gap-3">
+          <h1 class="text-xl sm:text-2xl font-bold text-white">
             {{ store.currentInterview.interviewee_name }}'s Interview
           </h1>
-          <span class="px-2 py-1 bg-gray-700 text-gray-400 text-sm rounded">
+          <span class="px-2 py-0.5 sm:py-1 bg-gray-700 text-gray-400 text-xs sm:text-sm rounded">
             Archived
           </span>
         </div>
-        <p class="text-gray-400 mt-1">
+        <p class="text-gray-400 text-sm sm:text-base mt-1">
           Interview #{{ store.currentInterview.interview_number }}
-          <span class="mx-2">·</span>
+          <span class="mx-1 sm:mx-2">·</span>
           {{ formatDateShort(store.currentInterview.started_at) }}
           <template v-if="store.currentInterview.ended_at">
-            <span class="mx-2">→</span>
+            <span class="mx-1 sm:mx-2">→</span>
             {{ formatDateShort(store.currentInterview.ended_at) }}
           </template>
         </p>
       </div>
 
       <!-- Stats & Controls -->
-      <div class="flex items-center justify-between mb-6">
-        <div class="flex space-x-6 text-sm">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 sm:mb-6">
+        <div class="flex gap-4 sm:gap-6 text-sm">
           <div>
             <span class="text-gray-400">Questions:</span>
             <span class="text-white ml-1">{{ store.questions.length }}</span>
@@ -138,14 +138,14 @@ function collapseAll() {
           <button
             type="button"
             @click="expandAll"
-            class="px-3 py-1 text-sm text-gray-400 hover:text-white border border-gray-600 hover:border-gray-500 rounded transition-colors"
+            class="px-3 py-1.5 sm:py-1 text-sm text-gray-400 hover:text-white active:text-white border border-gray-600 hover:border-gray-500 rounded transition-colors"
           >
             Expand All
           </button>
           <button
             type="button"
             @click="collapseAll"
-            class="px-3 py-1 text-sm text-gray-400 hover:text-white border border-gray-600 hover:border-gray-500 rounded transition-colors"
+            class="px-3 py-1.5 sm:py-1 text-sm text-gray-400 hover:text-white active:text-white border border-gray-600 hover:border-gray-500 rounded transition-colors"
           >
             Collapse All
           </button>

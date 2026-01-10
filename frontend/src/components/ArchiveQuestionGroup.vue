@@ -34,24 +34,24 @@ defineExpose({
   <div class="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden">
     <!-- Group header (always visible, clickable) -->
     <div
-      class="flex items-center justify-between px-4 py-2 bg-gray-700/50 cursor-pointer hover:bg-gray-700 transition-colors"
+      class="flex items-center justify-between px-3 sm:px-4 py-2.5 sm:py-2 bg-gray-700/50 cursor-pointer hover:bg-gray-700 active:bg-gray-600 transition-colors"
       @click="toggleExpand"
     >
-      <div class="flex items-center gap-3">
-        <span class="text-gray-300 font-medium">{{ askerName }}</span>
-        <span class="text-gray-500 text-sm">
-          {{ questions.length }} question{{ questions.length !== 1 ? 's' : '' }}
+      <div class="flex items-center gap-2 sm:gap-3 min-w-0">
+        <span class="text-gray-300 font-medium text-sm sm:text-base truncate">{{ askerName }}</span>
+        <span class="text-gray-500 text-xs sm:text-sm flex-shrink-0">
+          {{ questions.length }} Q{{ questions.length !== 1 ? 's' : '' }}
         </span>
       </div>
-      <div class="flex items-center gap-2">
-        <span class="text-gray-500 text-xs">
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <span class="text-gray-500 text-xs hidden sm:inline">
           {{ formatShortDate(questions[0].asked_at) }}
           <template v-if="questions.length > 1 && questions[questions.length - 1].asked_at !== questions[0].asked_at">
             – {{ formatShortDate(questions[questions.length - 1].asked_at) }}
           </template>
         </span>
         <svg
-          class="w-4 h-4 text-gray-400 transition-transform"
+          class="w-5 h-5 sm:w-4 sm:h-4 text-gray-400 transition-transform"
           :class="{ 'rotate-180': isExpanded }"
           fill="none"
           stroke="currentColor"
@@ -67,36 +67,45 @@ defineExpose({
       <div
         v-for="question in questions"
         :key="question.id"
-        class="px-4 py-3"
+        class="px-3 sm:px-4 py-3"
       >
         <!-- Question header -->
         <div class="flex items-center justify-between mb-2">
-          <span class="text-gray-500 font-mono text-sm">Q{{ question.question_number }}</span>
+          <span class="text-gray-500 font-mono text-xs sm:text-sm">Q{{ question.question_number }}</span>
           <span class="text-gray-500 text-xs">{{ formatDate(question.asked_at) }}</span>
         </div>
 
         <!-- Question (quoted) -->
-        <div class="bg-gray-900/50 rounded p-3 border-l-2 border-gray-500 mb-3">
-          <p class="text-gray-300">{{ question.question_text }}</p>
+        <div class="bg-gray-900/50 rounded p-2 sm:p-3 border-l-2 border-gray-500 mb-3">
+          <p class="text-gray-300 text-sm sm:text-base">{{ question.question_text }}</p>
         </div>
 
         <!-- Answer -->
-        <p class="text-gray-100 whitespace-pre-wrap">{{ question.answer_text }}</p>
+        <p class="text-gray-100 text-sm sm:text-base whitespace-pre-wrap">{{ question.answer_text }}</p>
         <p v-if="question.answered_at" class="text-gray-500 text-xs mt-2">
           Answered {{ formatDate(question.answered_at) }}
         </p>
       </div>
     </div>
 
-    <!-- Collapsed preview -->
-    <div v-else class="px-4 py-2 text-gray-400 text-sm">
-      <template v-for="(q, idx) in questions.slice(0, 3)" :key="q.id">
-        <span class="text-gray-500">Q{{ q.question_number }}:</span>
-        {{ q.question_text.slice(0, 50) }}{{ q.question_text.length > 50 ? '...' : '' }}
-        <span v-if="idx < Math.min(questions.length, 3) - 1" class="mx-2 text-gray-600">·</span>
-      </template>
-      <span v-if="questions.length > 3" class="text-gray-500 ml-2">
-        +{{ questions.length - 3 }} more
+    <!-- Collapsed preview (simplified on mobile) -->
+    <div v-else class="px-3 sm:px-4 py-2 text-gray-400 text-xs sm:text-sm">
+      <!-- Mobile: just show first question preview -->
+      <span class="sm:hidden">
+        <span class="text-gray-500">Q{{ questions[0].question_number }}:</span>
+        {{ questions[0].question_text.slice(0, 40) }}{{ questions[0].question_text.length > 40 ? '...' : '' }}
+        <span v-if="questions.length > 1" class="text-gray-500"> +{{ questions.length - 1 }} more</span>
+      </span>
+      <!-- Desktop: show up to 3 questions -->
+      <span class="hidden sm:inline">
+        <template v-for="(q, idx) in questions.slice(0, 3)" :key="q.id">
+          <span class="text-gray-500">Q{{ q.question_number }}:</span>
+          {{ q.question_text.slice(0, 50) }}{{ q.question_text.length > 50 ? '...' : '' }}
+          <span v-if="idx < Math.min(questions.length, 3) - 1" class="mx-2 text-gray-600">·</span>
+        </template>
+        <span v-if="questions.length > 3" class="text-gray-500 ml-2">
+          +{{ questions.length - 3 }} more
+        </span>
       </span>
     </div>
   </div>
