@@ -26,7 +26,7 @@ onMounted(async () => {
     <!-- Not authenticated -->
     <template v-else-if="!auth.isAuthenticated">
       <div class="text-center py-16">
-        <h1 class="text-3xl font-bold text-white mb-4">EiMM Interview Admin</h1>
+        <h1 class="text-3xl font-bold text-white mb-4">Discord Interviews</h1>
         <p class="text-gray-400 mb-8">
           Login with Discord to manage your server's interviews.
         </p>

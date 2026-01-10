@@ -10,7 +10,7 @@ const auth = useAuthStore();
       <div class="flex items-center justify-between h-14">
         <!-- Logo/Title -->
         <router-link to="/" class="flex items-center space-x-2">
-          <span class="text-xl font-bold text-white">EiMM Interviews</span>
+          <span class="text-xl font-bold text-white">Discord Interviews</span>
         </router-link>
 
         <!-- User section -->
