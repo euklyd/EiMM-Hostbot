@@ -475,8 +475,8 @@ class Interview(commands.Cog):
         )
 
         await ctx.send(f"Preview ({len(questions)} questions):", ephemeral=True)
-        for embed in result.embeds:
-            await ctx.send(embed=embed, ephemeral=True)
+        for embed_group in result.embed_groups:
+            await ctx.send(embeds=embed_group, ephemeral=True)
 
     @commands.hybrid_command(name="answer")
     @commands.guild_only()
@@ -538,10 +538,10 @@ class Interview(commands.Cog):
                 total_asked=await service.count_questions(session, interview.id),
             )
 
-            # Post embeds
+            # Post embed groups (each group sent as single message for gallery support)
             question_ids = [q.id for q in questions]
-            for embed in result.embeds:
-                msg = await answer_channel.send(embed=embed)
+            for embed_group in result.embed_groups:
+                msg = await answer_channel.send(embeds=embed_group)
                 # Mark all questions in this batch as posted with the last message ID
                 await service.mark_posted(session, question_ids, msg.id)
 

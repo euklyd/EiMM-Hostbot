@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref, computed, watch } from "vue";
 import type { QuestionResponse } from "../api/types";
+import AnswerContent from "./AnswerContent.vue";
+import FormattedText from "./FormattedText.vue";
+import { stripMarkdownLinks, parseAnswerImages } from "../utils/markdown";
 
 const props = defineProps<{
   question: QuestionResponse;
@@ -41,7 +44,7 @@ const statusText = computed(() => {
 });
 
 const questionPreview = computed(() => {
-  const text = props.question.question_text;
+  const text = stripMarkdownLinks(props.question.question_text);
   if (text.length <= QUESTION_PREVIEW_LIMIT) return text;
   return text.slice(0, QUESTION_PREVIEW_LIMIT) + "...";
 });
@@ -49,8 +52,22 @@ const questionPreview = computed(() => {
 const answerPreview = computed(() => {
   const text = props.question.answer_text;
   if (!text) return null;
-  if (text.length <= ANSWER_PREVIEW_LIMIT) return text;
-  return text.slice(0, ANSWER_PREVIEW_LIMIT) + "...";
+
+  // Strip images and markdown links
+  const { text: textWithoutImages, images } = parseAnswerImages(text);
+  const stripped = stripMarkdownLinks(textWithoutImages);
+
+  // Build preview with optional image indicator
+  let preview = stripped.length <= ANSWER_PREVIEW_LIMIT
+    ? stripped
+    : stripped.slice(0, ANSWER_PREVIEW_LIMIT) + "...";
+
+  if (images.length > 0) {
+    const imgIndicator = images.length === 1 ? "{img}" : `{img x${images.length}}`;
+    preview = preview ? `${preview} ${imgIndicator}` : imgIndicator;
+  }
+
+  return preview;
 });
 
 const isQuestionTruncated = computed(() => {
@@ -212,7 +229,9 @@ watch(isEditing, (editing) => {
         </div>
 
         <!-- Question text -->
-        <div class="text-gray-100 text-sm mb-3">{{ question.question_text }}</div>
+        <div class="text-gray-100 text-sm mb-3">
+          <FormattedText :text="question.question_text" />
+        </div>
 
         <!-- Answer section -->
         <div class="pl-3 border-l-2 border-indigo-500/50">
@@ -249,7 +268,9 @@ watch(isEditing, (editing) => {
 
           <!-- Display mode with answer -->
           <template v-else-if="question.answer_text">
-            <div class="text-gray-100 text-sm whitespace-pre-wrap">{{ question.answer_text }}</div>
+            <div class="text-gray-100 text-sm">
+              <AnswerContent :text="question.answer_text" />
+            </div>
             <button
               v-if="canAnswer && !question.is_posted"
               type="button"
@@ -410,7 +431,9 @@ watch(isEditing, (editing) => {
           <!-- Content -->
           <div class="px-4 py-3">
             <!-- Question text -->
-            <div class="text-gray-100 mb-3">{{ question.question_text }}</div>
+            <div class="text-gray-100 mb-3">
+              <FormattedText :text="question.question_text" />
+            </div>
 
             <!-- Answer section -->
             <div class="pl-4 border-l-2 border-indigo-500/50">
@@ -448,7 +471,9 @@ watch(isEditing, (editing) => {
 
               <!-- Display mode with answer -->
               <template v-else-if="question.answer_text">
-                <div class="text-gray-100 whitespace-pre-wrap">{{ question.answer_text }}</div>
+                <div class="text-gray-100">
+                  <AnswerContent :text="question.answer_text" />
+                </div>
                 <button
                   v-if="canAnswer && !question.is_posted"
                   type="button"

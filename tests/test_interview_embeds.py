@@ -212,9 +212,9 @@ class TestAddQuestionToEmbed:
             answer_text="Test!",
             jump_url="http://discord.com/channels/1/2/3",
         )
-        result, added = add_question_to_embed(embed, question, current_length=0)
-        assert result == AddQuestionResult.SUCCESS
-        assert added > 0
+        output = add_question_to_embed(embed, question, current_length=0)
+        assert output.result == AddQuestionResult.SUCCESS
+        assert output.chars_added > 0
         assert len(embed.fields) >= 1
 
     def test_returns_embed_full_when_no_space(self) -> None:
@@ -230,9 +230,9 @@ class TestAddQuestionToEmbed:
             jump_url="http://discord.com/channels/1/2/3",
         )
         # Pretend embed is almost full
-        result, added = add_question_to_embed(embed, question, current_length=SAFE_EMBED_TOTAL - 50)
-        assert result == AddQuestionResult.EMBED_FULL
-        assert added == 0
+        output = add_question_to_embed(embed, question, current_length=SAFE_EMBED_TOTAL - 50)
+        assert output.result == AddQuestionResult.EMBED_FULL
+        assert output.chars_added == 0
 
     def test_returns_too_long_for_massive_qa(self) -> None:
         """Returns QUESTION_TOO_LONG for impossibly large Q&A."""
@@ -246,9 +246,9 @@ class TestAddQuestionToEmbed:
             answer_text="A" * 3000,  # Total > safe limit
             jump_url="http://discord.com/channels/1/2/3",
         )
-        result, added = add_question_to_embed(embed, question, current_length=0)
-        assert result == AddQuestionResult.QUESTION_TOO_LONG
-        assert added == 0
+        output = add_question_to_embed(embed, question, current_length=0)
+        assert output.result == AddQuestionResult.QUESTION_TOO_LONG
+        assert output.chars_added == 0
 
     def test_chunks_long_question(self) -> None:
         """Long question is split across multiple fields."""
@@ -262,8 +262,8 @@ class TestAddQuestionToEmbed:
             answer_text="Short answer",
             jump_url="http://discord.com/channels/1/2/3",
         )
-        result, added = add_question_to_embed(embed, question, current_length=0)
-        assert result == AddQuestionResult.SUCCESS
+        output = add_question_to_embed(embed, question, current_length=0)
+        assert output.result == AddQuestionResult.SUCCESS
         # Should have multiple fields due to chunking
         assert len(embed.fields) > 1
 
@@ -288,11 +288,11 @@ class TestGenerateAnswerEmbeds:
         """No questions returns empty result."""
         interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
         result = generate_answer_embeds(interviewee, [], prior_answered=0, total_asked=0)
-        assert result.embeds == []
+        assert result.embed_groups == []
         assert result.skipped_questions == []
 
     def test_single_question_single_embed(self) -> None:
-        """Single question produces single embed."""
+        """Single question produces single embed group."""
         interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
         questions = [
             QuestionData(
@@ -305,11 +305,12 @@ class TestGenerateAnswerEmbeds:
             )
         ]
         result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=1)
-        assert len(result.embeds) == 1
+        assert len(result.embed_groups) == 1
+        assert len(result.embed_groups[0]) == 1  # Single embed in the group
         assert len(result.skipped_questions) == 0
 
     def test_new_asker_starts_new_embed(self) -> None:
-        """Different asker triggers new embed."""
+        """Different asker triggers new embed group."""
         interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
         questions = [
             QuestionData(
@@ -330,13 +331,13 @@ class TestGenerateAnswerEmbeds:
             ),
         ]
         result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=2)
-        assert len(result.embeds) == 2
+        assert len(result.embed_groups) == 2
         # First embed should be from Asker1, second from Asker2
-        assert "Asker1" in result.embeds[0].author.name
-        assert "Asker2" in result.embeds[1].author.name
+        assert "Asker1" in result.embed_groups[0][0].author.name
+        assert "Asker2" in result.embed_groups[1][0].author.name
 
     def test_same_asker_same_embed(self) -> None:
-        """Same asker's questions go in same embed."""
+        """Same asker's questions go in same embed group."""
         interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
         questions = [
             QuestionData(
@@ -357,9 +358,9 @@ class TestGenerateAnswerEmbeds:
             ),
         ]
         result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=2)
-        # Both questions should be in same embed (same asker)
-        assert len(result.embeds) == 1
-        assert len(result.embeds[0].fields) >= 2
+        # Both questions should be in same embed group (same asker)
+        assert len(result.embed_groups) == 1
+        assert len(result.embed_groups[0][0].fields) >= 2
 
     def test_too_long_question_is_skipped(self) -> None:
         """Questions too long to embed are added to skipped list."""
@@ -375,7 +376,7 @@ class TestGenerateAnswerEmbeds:
             ),
         ]
         result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=1)
-        assert len(result.embeds) == 0
+        assert len(result.embed_groups) == 0
         assert len(result.skipped_questions) == 1
 
     def test_footer_shows_correct_counts(self) -> None:
@@ -393,11 +394,11 @@ class TestGenerateAnswerEmbeds:
         ]
         result = generate_answer_embeds(interviewee, questions, prior_answered=5, total_asked=10)
         # Should show 6 answered (5 prior + 1 in batch) of 10
-        assert "6" in result.embeds[0].footer.text
-        assert "10" in result.embeds[0].footer.text
+        assert "6" in result.embed_groups[0][0].footer.text
+        assert "10" in result.embed_groups[0][0].footer.text
 
     def test_many_fields_triggers_new_embed(self) -> None:
-        """Exceeding field limit starts new embed."""
+        """Exceeding field limit starts new embed group."""
         interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
         # Create enough questions to exceed SAFE_FIELDS_PER_EMBED
         questions = [
@@ -412,5 +413,5 @@ class TestGenerateAnswerEmbeds:
             for i in range(1, SAFE_FIELDS_PER_EMBED + 5)
         ]
         result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=len(questions))
-        # Should have more than one embed due to field limit
-        assert len(result.embeds) > 1
+        # Should have more than one embed group due to field limit
+        assert len(result.embed_groups) > 1

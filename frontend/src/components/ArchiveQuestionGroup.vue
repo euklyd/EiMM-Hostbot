@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import type { QuestionResponse } from "../api/types";
+import AnswerContent from "./AnswerContent.vue";
+import FormattedText from "./FormattedText.vue";
+import { stripMarkdownLinks } from "../utils/markdown";
 
 const props = defineProps<{
   questions: QuestionResponse[];
@@ -21,6 +24,12 @@ function formatShortDate(dateStr: string): string {
 
 function toggleExpand() {
   isExpanded.value = !isExpanded.value;
+}
+
+function truncateQuestion(text: string, limit: number): string {
+  const stripped = stripMarkdownLinks(text);
+  if (stripped.length <= limit) return stripped;
+  return stripped.slice(0, limit) + "...";
 }
 
 // Expose expand/collapse for parent control
@@ -77,11 +86,15 @@ defineExpose({
 
         <!-- Question (quoted) -->
         <div class="bg-gray-900/50 rounded p-2 sm:p-3 border-l-2 border-gray-500 mb-3">
-          <p class="text-gray-300 text-sm sm:text-base">{{ question.question_text }}</p>
+          <p class="text-gray-300 text-sm sm:text-base">
+            <FormattedText :text="question.question_text" />
+          </p>
         </div>
 
         <!-- Answer -->
-        <p class="text-gray-100 text-sm sm:text-base whitespace-pre-wrap">{{ question.answer_text }}</p>
+        <div class="text-gray-100 text-sm sm:text-base">
+          <AnswerContent :text="question.answer_text" />
+        </div>
         <p v-if="question.answered_at" class="text-gray-500 text-xs mt-2">
           Answered {{ formatDate(question.answered_at) }}
         </p>
@@ -93,14 +106,14 @@ defineExpose({
       <!-- Mobile: just show first question preview -->
       <span class="sm:hidden">
         <span class="text-gray-500">Q{{ questions[0].question_number }}:</span>
-        {{ questions[0].question_text.slice(0, 40) }}{{ questions[0].question_text.length > 40 ? '...' : '' }}
+        {{ truncateQuestion(questions[0].question_text, 40) }}
         <span v-if="questions.length > 1" class="text-gray-500"> +{{ questions.length - 1 }} more</span>
       </span>
       <!-- Desktop: show up to 3 questions -->
       <span class="hidden sm:inline">
         <template v-for="(q, idx) in questions.slice(0, 3)" :key="q.id">
           <span class="text-gray-500">Q{{ q.question_number }}:</span>
-          {{ q.question_text.slice(0, 50) }}{{ q.question_text.length > 50 ? '...' : '' }}
+          {{ truncateQuestion(q.question_text, 50) }}
           <span v-if="idx < Math.min(questions.length, 3) - 1" class="mx-2 text-gray-600">·</span>
         </template>
         <span v-if="questions.length > 3" class="text-gray-500 ml-2">

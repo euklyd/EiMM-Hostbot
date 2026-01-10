@@ -12,11 +12,19 @@ Discord Embed Limits (as of 2024):
 - Title: 256 characters
 """
 
+import re
 from dataclasses import dataclass
 from enum import Enum, auto
 from typing import NamedTuple
 
 import discord
+
+# Bare image URL pattern: URL on its own line ending in common image extensions
+# Matches URLs like https://example.com/image.png or https://imgur.com/abc.jpg?1
+IMAGE_URL_PATTERN = re.compile(
+    r'^\s*(https?://\S+\.(?:png|jpe?g|gif|webp|bmp|svg)(?:\?\S*)?)\s*$',
+    re.IGNORECASE | re.MULTILINE,
+)
 
 # Discord embed character limits
 EMBED_TOTAL_LIMIT = 6000
@@ -84,6 +92,40 @@ class EmbedLength(NamedTuple):
 def escape_markdown_links(text: str) -> str:
     """Escape square brackets to prevent markdown link interference."""
     return text.replace("[", "\\[").replace("]", "\\]")
+
+
+@dataclass
+class ImageData:
+    """An image extracted from answer text."""
+
+    alt: str
+    url: str
+
+
+def extract_images_from_text(text: str) -> tuple[str, list[ImageData]]:
+    """Extract image URLs from text.
+
+    Finds bare image URLs on their own lines and returns the text with
+    those lines removed, plus a list of extracted images.
+
+    Args:
+        text: The answer text potentially containing image URLs
+
+    Returns:
+        Tuple of (cleaned_text, list of ImageData)
+    """
+    images: list[ImageData] = []
+
+    def replace_image(match: re.Match[str]) -> str:
+        url = match.group(1)
+        images.append(ImageData(alt="", url=url))
+        return ""  # Remove image URL line from text
+
+    cleaned = IMAGE_URL_PATTERN.sub(replace_image, text)
+    # Clean up extra whitespace/blank lines left behind
+    cleaned = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned).strip()
+
+    return cleaned, images
 
 
 def split_text_into_chunks(text: str, max_chunk_size: int) -> list[str]:
@@ -206,14 +248,24 @@ def can_fit_simple_qa(
     return current_length + total_addition <= SAFE_EMBED_TOTAL
 
 
+@dataclass
+class AddQuestionOutput:
+    """Result of adding a question to an embed."""
+
+    result: AddQuestionResult
+    chars_added: int
+    images: list[ImageData]  # Images found in answer (for gallery embeds)
+
+
 def add_question_to_embed(
     embed: discord.Embed,
     question: QuestionData,
     current_length: int,
-) -> tuple[AddQuestionResult, int]:
+) -> AddQuestionOutput:
     """Add a question and answer to an embed.
 
     Handles both simple (single-field) and complex (multi-field) cases.
+    Extracts images from answer text and sets the first one on the embed.
 
     Args:
         embed: The embed to add fields to
@@ -221,25 +273,44 @@ def add_question_to_embed(
         current_length: Current character count of embed content
 
     Returns:
-        Tuple of (result status, characters added)
+        AddQuestionOutput with result status, characters added, and extracted images.
         If result is EMBED_FULL, no fields were added and caller should try new embed.
         If result is QUESTION_TOO_LONG, the Q&A cannot fit in any embed.
     """
-    # Check if this Q&A is too long for any embed
-    total_qa_length = len(question.question_text) + len(question.answer_text)
+    # Extract images from answer before processing
+    answer_text, images = extract_images_from_text(question.answer_text)
+
+    # Check if this Q&A is too long for any embed (using cleaned text)
+    total_qa_length = len(question.question_text) + len(answer_text)
     if total_qa_length > SAFE_EMBED_TOTAL - 200:  # Leave room for formatting
-        return (AddQuestionResult.QUESTION_TOO_LONG, 0)
+        return AddQuestionOutput(AddQuestionResult.QUESTION_TOO_LONG, 0, [])
 
     # Check if it would exceed current embed's remaining space
     if current_length + total_qa_length > SAFE_EMBED_TOTAL - 100:
-        return (AddQuestionResult.EMBED_FULL, 0)
+        return AddQuestionOutput(AddQuestionResult.EMBED_FULL, 0, [])
+
+    # Create modified question with cleaned answer text
+    cleaned_question = QuestionData(
+        question_number=question.question_number,
+        asker_name=question.asker_name,
+        asker_avatar_url=question.asker_avatar_url,
+        question_text=question.question_text,
+        answer_text=answer_text if answer_text else "(image)",
+        jump_url=question.jump_url,
+    )
 
     # Try simple case first: everything fits in one field
-    if can_fit_simple_qa(question, current_length):
-        return _add_simple_qa(embed, question)
+    if can_fit_simple_qa(cleaned_question, current_length):
+        result, chars = _add_simple_qa(embed, cleaned_question)
+    else:
+        # Complex case: need to chunk across multiple fields
+        result, chars = _add_chunked_qa(embed, cleaned_question, current_length)
 
-    # Complex case: need to chunk across multiple fields
-    return _add_chunked_qa(embed, question, current_length)
+    # Set first image on embed if present
+    if result == AddQuestionResult.SUCCESS and images:
+        embed.set_image(url=images[0].url)
+
+    return AddQuestionOutput(result, chars, images)
 
 
 def _add_simple_qa(
@@ -306,10 +377,41 @@ def set_embed_footer(
 
 @dataclass
 class EmbedGenerationResult:
-    """Result of generating embeds from a list of questions."""
+    """Result of generating embeds from a list of questions.
 
-    embeds: list[discord.Embed]
+    embed_groups contains lists of embeds that should be sent together in
+    a single message. This is required for Discord image galleries to work -
+    multiple embeds with the same url field display as a gallery only when
+    sent in the same message.
+    """
+
+    embed_groups: list[list[discord.Embed]]  # Groups of embeds to send together
     skipped_questions: list[QuestionData]  # Questions too long to embed
+
+
+def create_gallery_embed(
+    main_embed: discord.Embed,
+    image: ImageData,
+) -> discord.Embed:
+    """Create an embed for additional images in a gallery.
+
+    Discord shows multiple embeds as a gallery when they share the same `url` field.
+    This creates a minimal embed with just an image and matching url.
+
+    Args:
+        main_embed: The main embed that this gallery image accompanies
+        image: The image to display
+
+    Returns:
+        A minimal embed with the image set
+    """
+    embed = discord.Embed(
+        # Use the same url as main embed to trigger gallery display
+        url=main_embed.url if main_embed.url else "https://discord.com",
+        color=main_embed.color,
+    )
+    embed.set_image(url=image.url)
+    return embed
 
 
 def generate_answer_embeds(
@@ -321,6 +423,10 @@ def generate_answer_embeds(
     """Generate a list of embeds from answered questions.
 
     Groups questions by asker and respects all Discord embed limits.
+    Handles images in answers:
+    - First image is displayed on the main embed
+    - Additional images create gallery embeds (in same message for gallery display)
+    - Answers with images force a new embed for subsequent questions
 
     Args:
         interviewee: Data about the person being interviewed
@@ -329,26 +435,38 @@ def generate_answer_embeds(
         total_asked: Total questions asked in the interview
 
     Returns:
-        EmbedGenerationResult with embeds and any skipped questions
+        EmbedGenerationResult with embed_groups (lists of embeds to send together)
+        and any skipped questions
     """
     if not questions:
-        return EmbedGenerationResult(embeds=[], skipped_questions=[])
+        return EmbedGenerationResult(embed_groups=[], skipped_questions=[])
 
-    embeds: list[discord.Embed] = []
+    embed_groups: list[list[discord.Embed]] = []
     skipped: list[QuestionData] = []
     current_embed: discord.Embed | None = None
     current_length = 0
     current_asker: str | None = None
     answered_in_batch = 0
+    force_new_embed = False  # Set after image answers
 
-    def finalize_embed(embed: discord.Embed) -> None:
-        """Add footer and append to results."""
+    def finalize_embed(embed: discord.Embed, gallery_images: list[ImageData] | None = None) -> None:
+        """Add footer, append to results as a group with any gallery embeds."""
         set_embed_footer(
             embed,
             prior_answered + answered_in_batch,
             total_asked,
         )
-        embeds.append(embed)
+
+        # Create a group: main embed + any gallery embeds (must be sent together)
+        group: list[discord.Embed] = [embed]
+
+        # Create additional embeds for gallery images (beyond the first)
+        if gallery_images and len(gallery_images) > 1:
+            for img in gallery_images[1:]:
+                gallery_embed = create_gallery_embed(embed, img)
+                group.append(gallery_embed)
+
+        embed_groups.append(group)
 
     def start_new_embed(question: QuestionData) -> discord.Embed:
         """Create a fresh embed for a new asker."""
@@ -358,42 +476,55 @@ def generate_answer_embeds(
             question.asker_name,
             question.asker_avatar_url,
         )
+        # Set a url so gallery embeds can match it
+        embed.url = "https://discord.com"
         current_length = calculate_base_embed_length(interviewee, question.asker_name)
         return embed
 
+    pending_images: list[ImageData] = []
+
     for question in questions:
-        # New embed needed if: different asker, or too many fields
+        # New embed needed if: different asker, too many fields, or after an image answer
         needs_new_embed = (
             current_asker != question.asker_name
             or current_embed is None
             or len(current_embed.fields) >= SAFE_FIELDS_PER_EMBED
+            or force_new_embed
         )
 
         if needs_new_embed:
             if current_embed is not None and len(current_embed.fields) > 0:
-                finalize_embed(current_embed)
+                finalize_embed(current_embed, pending_images)
+                pending_images = []
             current_embed = start_new_embed(question)
             current_asker = question.asker_name
+            force_new_embed = False
 
         # Try to add the question
-        result, added = add_question_to_embed(current_embed, question, current_length)
+        output = add_question_to_embed(current_embed, question, current_length)
 
-        if result == AddQuestionResult.EMBED_FULL:
+        if output.result == AddQuestionResult.EMBED_FULL:
             # Finalize current and start fresh
             if len(current_embed.fields) > 0:
-                finalize_embed(current_embed)
+                finalize_embed(current_embed, pending_images)
+                pending_images = []
             current_embed = start_new_embed(question)
-            result, added = add_question_to_embed(current_embed, question, current_length)
+            output = add_question_to_embed(current_embed, question, current_length)
 
-        if result == AddQuestionResult.QUESTION_TOO_LONG:
+        if output.result == AddQuestionResult.QUESTION_TOO_LONG:
             skipped.append(question)
         else:
-            current_length += added
+            current_length += output.chars_added
             answered_in_batch += 1
             current_asker = question.asker_name
 
+            # If this answer had images, track them and force new embed for next Q&A
+            if output.images:
+                pending_images = output.images
+                force_new_embed = True
+
     # Don't forget the last embed
     if current_embed is not None and len(current_embed.fields) > 0:
-        finalize_embed(current_embed)
+        finalize_embed(current_embed, pending_images)
 
-    return EmbedGenerationResult(embeds=embeds, skipped_questions=skipped)
+    return EmbedGenerationResult(embed_groups=embed_groups, skipped_questions=skipped)
