@@ -370,9 +370,16 @@ def set_embed_footer(
     embed: discord.Embed,
     answered_count: int,
     total_count: int,
+    extra_images: int = 0,
+    dropped_images: int = 0,
 ) -> None:
-    """Set the footer showing question progress."""
-    embed.set_footer(text=f"{answered_count} questions answered (of {total_count})")
+    """Set the footer showing question progress and optional extra image count."""
+    text = f"{answered_count} questions answered (of {total_count})"
+    if extra_images > 0:
+        text += f" • +{extra_images} more • click images to view all"
+    if dropped_images > 0:
+        text += f" • {dropped_images} image{'s' if dropped_images > 1 else ''} not shown (limit 10)"
+    embed.set_footer(text=text)
 
 
 @dataclass
@@ -451,18 +458,28 @@ def generate_answer_embeds(
 
     def finalize_embed(embed: discord.Embed, gallery_images: list[ImageData] | None = None) -> None:
         """Add footer, append to results as a group with any gallery embeds."""
+        # Discord limits: 10 embeds per message, 4 previewed in gallery
+        # First image is on main embed, so max 9 additional gallery embeds
+        max_gallery_images = 10
+        images_to_show = gallery_images[:max_gallery_images] if gallery_images else []
+        dropped_images = max(0, len(gallery_images) - max_gallery_images) if gallery_images else 0
+        extra_preview = max(0, len(images_to_show) - 4)  # Images beyond the 4 previewed
+
         set_embed_footer(
             embed,
             prior_answered + answered_in_batch,
             total_asked,
+            extra_images=extra_preview,
+            dropped_images=dropped_images,
         )
 
         # Create a group: main embed + any gallery embeds (must be sent together)
         group: list[discord.Embed] = [embed]
 
-        # Create additional embeds for gallery images (beyond the first)
-        if gallery_images and len(gallery_images) > 1:
-            for img in gallery_images[1:]:
+        # Create additional embeds for gallery images (beyond the first, up to 10 total)
+        # Discord previews only 4, but all are visible when clicking to expand
+        if len(images_to_show) > 1:
+            for img in images_to_show[1:]:
                 gallery_embed = create_gallery_embed(embed, img)
                 group.append(gallery_embed)
 

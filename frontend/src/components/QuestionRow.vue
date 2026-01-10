@@ -24,6 +24,16 @@ const saving = ref(false);
 // Character limits for previews
 const QUESTION_PREVIEW_LIMIT = 80;
 const ANSWER_PREVIEW_LIMIT = 60;
+const MAX_IMAGES = 10;
+
+// Count images in edit text for validation
+const editImageCount = computed(() => {
+  const pattern = /^\s*(https?:\/\/\S+\.(?:png|jpe?g|gif|webp|bmp|svg)(?:\?\S*)?)\s*$/gim;
+  const matches = editText.value.match(pattern);
+  return matches ? matches.length : 0;
+});
+
+const tooManyImages = computed(() => editImageCount.value > MAX_IMAGES);
 
 const statusColor = computed(() => {
   if (props.question.is_posted) return "text-green-400";
@@ -228,13 +238,15 @@ watch(isEditing, (editing) => {
           </a>
         </div>
 
-        <!-- Question text -->
-        <div class="text-gray-100 text-sm mb-3">
-          <FormattedText :text="question.question_text" />
+        <!-- Question text (quoted) -->
+        <div class="bg-gray-900/50 rounded p-2 border-l-2 border-gray-500 mb-3">
+          <p class="text-gray-300 text-sm">
+            <FormattedText :text="question.question_text" />
+          </p>
         </div>
 
         <!-- Answer section -->
-        <div class="pl-3 border-l-2 border-indigo-500/50">
+        <div class="pl-3">
           <!-- Editing mode -->
           <template v-if="isEditing">
             <div class="space-y-2">
@@ -245,6 +257,9 @@ watch(isEditing, (editing) => {
                 placeholder="Type your answer..."
                 :disabled="saving"
               ></textarea>
+              <p v-if="tooManyImages" class="text-yellow-400 text-xs">
+                Too many images ({{ editImageCount }}/{{ MAX_IMAGES }} max) — extras won't be shown in Discord
+              </p>
               <div class="flex gap-2">
                 <button
                   type="button"
@@ -430,13 +445,15 @@ watch(isEditing, (editing) => {
 
           <!-- Content -->
           <div class="px-4 py-3">
-            <!-- Question text -->
-            <div class="text-gray-100 mb-3">
-              <FormattedText :text="question.question_text" />
+            <!-- Question text (quoted) -->
+            <div class="bg-gray-900/50 rounded p-3 border-l-2 border-gray-500 mb-3">
+              <p class="text-gray-300">
+                <FormattedText :text="question.question_text" />
+              </p>
             </div>
 
             <!-- Answer section -->
-            <div class="pl-4 border-l-2 border-indigo-500/50">
+            <div class="pl-4">
               <!-- Editing mode -->
               <template v-if="isEditing">
                 <div class="space-y-2">
@@ -448,6 +465,9 @@ watch(isEditing, (editing) => {
                     :disabled="saving"
                     @keydown="handleKeydown"
                   ></textarea>
+                  <p v-if="tooManyImages" class="text-yellow-400 text-xs">
+                    Too many images ({{ editImageCount }}/{{ MAX_IMAGES }} max) — extras won't be shown in Discord
+                  </p>
                   <div class="flex space-x-2">
                     <button
                       type="button"
