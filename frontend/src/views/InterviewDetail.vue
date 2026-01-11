@@ -15,14 +15,34 @@ const store = useInterviewStore();
 const posting = ref(false);
 const postMessage = ref<string | null>(null);
 const hidePosted = ref(false);
+const searchQuery = ref("");
 
-// Filter questions based on hide toggle
+// Filter questions based on hide toggle and search
 const visibleQuestions = computed(() => {
-  if (!hidePosted.value) return store.questions;
-  return store.questions.filter((q) => !q.is_posted);
+  const query = searchQuery.value.trim().toLowerCase();
+
+  // If searching, filter by match and ignore hidePosted toggle
+  if (query) {
+    return store.questions.filter((q) => {
+      const questionMatch = q.question_text.toLowerCase().includes(query);
+      const answerMatch = q.answer_text?.toLowerCase().includes(query) ?? false;
+      return questionMatch || answerMatch;
+    });
+  }
+
+  // No search - apply hidePosted toggle
+  if (hidePosted.value) {
+    return store.questions.filter((q) => !q.is_posted);
+  }
+
+  return store.questions;
 });
 
-const hiddenCount = computed(() => store.postedQuestions.length);
+const hiddenCount = computed(() => {
+  // When searching, no "hidden" count (search overrides toggle)
+  if (searchQuery.value.trim()) return 0;
+  return hidePosted.value ? store.postedQuestions.length : 0;
+});
 
 // Use strings for Discord IDs to avoid precision loss
 const serverId = computed(() => props.serverId);
@@ -196,6 +216,38 @@ async function retryLoad() {
             />
             <span class="text-gray-400">Hide posted</span>
           </label>
+        </div>
+
+        <!-- Search -->
+        <div class="mt-3 sm:mt-4">
+          <div class="relative max-w-xs">
+            <input
+              v-model="searchQuery"
+              type="text"
+              placeholder="Search questions..."
+              class="w-full bg-gray-700 border border-gray-600 rounded-md pl-8 pr-3 py-1.5 text-sm text-gray-100 placeholder-gray-400 focus:outline-none focus:border-indigo-500"
+            />
+            <svg
+              class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+            <button
+              v-if="searchQuery"
+              @click="searchQuery = ''"
+              class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-200"
+            >
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          <p v-if="searchQuery && visibleQuestions.length === 0" class="text-gray-500 text-sm mt-2">
+            No matches found
+          </p>
         </div>
       </div>
 
