@@ -33,18 +33,15 @@ Feature requests and improvements for the EiMM-Hostbot interview system.
 
 ## Discord Embeds
 
-### Image Support in Answers
-- Parse markdown image syntax `![alt](url)` in answer text
-- Use multi-embed gallery trick for multiple images:
-  - First image uses `set_image()` on main Q&A embed
-  - Additional images get their own embeds with same `url` field
-  - Discord renders as image gallery
-- Web UI should render images inline
-
-### Embed Splitting for Image Answers
-- When an answer contains image(s), end the embed after that Q&A
-- Subsequent answers (even from same asker) start a new embed
-- Makes it clear which answer the images belong to
+### Embed Edge Case Tests
+- Add tests for edge cases in embed generation:
+  - Field character limits (name: 256, value: 1024)
+  - Number of fields per embed (max 25)
+  - Total embed character limit (6000)
+  - Image gallery limits (4 preview, 10 max)
+  - Long questions/answers that need chunking
+  - Mixed scenarios (images + long text + multiple askers)
+- Identify more edge cases during implementation
 
 ## Interview Cog
 

@@ -35,6 +35,9 @@ logger = logging.getLogger(__name__)
 # Type variable for decorator return type
 T = TypeVar("T")
 
+# Validation limits
+QUESTION_LENGTH_HARD_LIMIT = 2000  # Reject excessively long questions
+
 
 # =============================================================================
 # WebSocket Broadcasting
@@ -219,6 +222,21 @@ class Interview(commands.Cog):
     @app_commands.describe(question="Your question for the interviewee")
     async def ask(self, ctx: commands.Context, *, question: str) -> None:
         """Submit a question for the current interview."""
+        question = question.strip()
+
+        # Validate question
+        if not question:
+            await ctx.send("Question cannot be empty.", ephemeral=True)
+            return
+
+        if len(question) > QUESTION_LENGTH_HARD_LIMIT:
+            await ctx.send(
+                f"Question too long ({len(question)}/{QUESTION_LENGTH_HARD_LIMIT} chars). "
+                "Please shorten it.",
+                ephemeral=True,
+            )
+            return
+
         async with get_session() as session:
             interview = await service.get_current_interview(session, ctx.guild.id)
             if interview is None:
@@ -260,6 +278,16 @@ class Interview(commands.Cog):
 
         if not question_list:
             await ctx.send("No questions provided.", ephemeral=True)
+            return
+
+        # Check for questions that are too long
+        too_long = [(i + 1, len(q)) for i, q in enumerate(question_list) if len(q) > QUESTION_LENGTH_HARD_LIMIT]
+        if too_long:
+            lines = [f"  #{i}: {length} chars" for i, length in too_long[:5]]
+            msg = f"Some questions exceed {QUESTION_LENGTH_HARD_LIMIT} chars:\n" + "\n".join(lines)
+            if len(too_long) > 5:
+                msg += f"\n  ...and {len(too_long) - 5} more"
+            await ctx.send(msg, ephemeral=True)
             return
 
         async with get_session() as session:

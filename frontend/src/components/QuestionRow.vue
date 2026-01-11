@@ -21,10 +21,12 @@ const isEditing = ref(false);
 const editText = ref(props.question.answer_text || "");
 const saving = ref(false);
 
-// Character limits for previews
+// Character limits for previews and Discord
 const QUESTION_PREVIEW_LIMIT = 80;
 const ANSWER_PREVIEW_LIMIT = 60;
 const MAX_IMAGES = 10;
+const DISCORD_FIELD_VALUE_LIMIT = 1024;
+const MAX_ANSWER_LENGTH = 10000;
 
 // Count images in edit text for validation
 const editImageCount = computed(() => {
@@ -33,7 +35,18 @@ const editImageCount = computed(() => {
   return matches ? matches.length : 0;
 });
 
+// Get text without image URLs for character counting
+const editTextWithoutImages = computed(() => {
+  const pattern = /^\s*https?:\/\/\S+\.(?:png|jpe?g|gif|webp|bmp|svg)(?:\?\S*)?\s*$/gim;
+  return editText.value.replace(pattern, "").trim();
+});
+
+const editCharCount = computed(() => editTextWithoutImages.value.length);
+const totalLength = computed(() => editText.value.length);
+const willBeChunked = computed(() => editCharCount.value > DISCORD_FIELD_VALUE_LIMIT);
 const tooManyImages = computed(() => editImageCount.value > MAX_IMAGES);
+const tooLong = computed(() => totalLength.value > MAX_ANSWER_LENGTH);
+const hasValidationError = computed(() => tooManyImages.value || tooLong.value);
 
 const statusColor = computed(() => {
   if (props.question.is_posted) return "text-green-400";
@@ -150,7 +163,9 @@ function handleKeydown(event: KeyboardEvent) {
     cancelEdit();
   } else if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
-    saveAnswer();
+    if (!hasValidationError.value && editText.value.trim()) {
+      saveAnswer();
+    }
   }
 }
 
@@ -257,14 +272,27 @@ watch(isEditing, (editing) => {
                 placeholder="Type your answer..."
                 :disabled="saving"
               ></textarea>
-              <p v-if="tooManyImages" class="text-yellow-400 text-xs">
-                Too many images ({{ editImageCount }}/{{ MAX_IMAGES }} max) — extras won't be shown in Discord
+              <!-- Validation feedback -->
+              <div class="flex flex-wrap items-center gap-2 text-xs">
+                <span :class="willBeChunked ? 'text-yellow-400' : 'text-gray-500'">
+                  {{ editCharCount }} chars
+                  <span v-if="willBeChunked">(will be split)</span>
+                </span>
+                <span v-if="editImageCount > 0" :class="tooManyImages ? 'text-red-400' : 'text-gray-500'">
+                  · {{ editImageCount }}/{{ MAX_IMAGES }} images
+                </span>
+              </div>
+              <p v-if="tooManyImages" class="text-red-400 text-xs font-medium">
+                Too many images — reduce to {{ MAX_IMAGES }} or fewer to save
+              </p>
+              <p v-if="tooLong" class="text-red-400 text-xs font-medium">
+                Answer too long ({{ totalLength.toLocaleString() }}/{{ MAX_ANSWER_LENGTH.toLocaleString() }} chars)
               </p>
               <div class="flex gap-2">
                 <button
                   type="button"
                   @click="saveAnswer"
-                  :disabled="saving || !editText.trim()"
+                  :disabled="saving || !editText.trim() || hasValidationError"
                   class="flex-1 px-3 py-2 bg-green-600 hover:bg-green-700 active:bg-green-800 disabled:opacity-50 text-white text-sm rounded transition-colors"
                 >
                   {{ saving ? "Saving..." : "Save" }}
@@ -465,14 +493,27 @@ watch(isEditing, (editing) => {
                     :disabled="saving"
                     @keydown="handleKeydown"
                   ></textarea>
-                  <p v-if="tooManyImages" class="text-yellow-400 text-xs">
-                    Too many images ({{ editImageCount }}/{{ MAX_IMAGES }} max) — extras won't be shown in Discord
+                  <!-- Validation feedback -->
+                  <div class="flex flex-wrap items-center gap-3 text-xs">
+                    <span :class="willBeChunked ? 'text-yellow-400' : 'text-gray-500'">
+                      {{ editCharCount }} chars
+                      <span v-if="willBeChunked">(will be split into multiple fields)</span>
+                    </span>
+                    <span v-if="editImageCount > 0" :class="tooManyImages ? 'text-red-400' : 'text-gray-500'">
+                      {{ editImageCount }}/{{ MAX_IMAGES }} images
+                    </span>
+                  </div>
+                  <p v-if="tooManyImages" class="text-red-400 text-xs font-medium">
+                    Too many images — reduce to {{ MAX_IMAGES }} or fewer to save
+                  </p>
+                  <p v-if="tooLong" class="text-red-400 text-xs font-medium">
+                    Answer too long ({{ totalLength.toLocaleString() }}/{{ MAX_ANSWER_LENGTH.toLocaleString() }} chars)
                   </p>
                   <div class="flex space-x-2">
                     <button
                       type="button"
                       @click="saveAnswer"
-                      :disabled="saving || !editText.trim()"
+                      :disabled="saving || !editText.trim() || hasValidationError"
                       class="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm rounded transition-colors"
                     >
                       {{ saving ? "Saving..." : "Save" }}

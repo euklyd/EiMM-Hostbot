@@ -5,16 +5,22 @@ of text processing and embed generation.
 """
 
 from cogs.interview.embeds import (
+    EMBED_FIELD_VALUE_LIMIT,
+    SAFE_ANSWER_CHUNK,
     SAFE_EMBED_TOTAL,
+    SAFE_FIELD_VALUE,
     SAFE_FIELDS_PER_EMBED,
     AddQuestionResult,
+    ImageData,
     IntervieweeData,
     QuestionData,
     add_question_to_embed,
     calculate_base_embed_length,
     can_fit_simple_qa,
     create_blank_embed,
+    create_gallery_embed,
     escape_markdown_links,
+    extract_images_from_text,
     format_question_as_quote,
     generate_answer_embeds,
     set_embed_footer,
@@ -415,3 +421,573 @@ class TestGenerateAnswerEmbeds:
         result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=len(questions))
         # Should have more than one embed group due to field limit
         assert len(result.embed_groups) > 1
+
+
+# =============================================================================
+# Image Extraction Tests
+# =============================================================================
+
+
+class TestExtractImagesFromText:
+    """Tests for extract_images_from_text()."""
+
+    def test_no_images(self) -> None:
+        """Text without images returns unchanged."""
+        text = "Just some regular text with no images."
+        cleaned, images = extract_images_from_text(text)
+        assert cleaned == text
+        assert images == []
+
+    def test_single_image_url(self) -> None:
+        """Single image URL on its own line is extracted."""
+        text = "Here's my answer!\n\nhttps://example.com/image.png"
+        cleaned, images = extract_images_from_text(text)
+        assert "https://example.com/image.png" not in cleaned
+        assert len(images) == 1
+        assert images[0].url == "https://example.com/image.png"
+
+    def test_multiple_image_urls(self) -> None:
+        """Multiple image URLs are all extracted."""
+        text = "Answer text\n\nhttps://example.com/a.png\nhttps://example.com/b.jpg"
+        cleaned, images = extract_images_from_text(text)
+        assert len(images) == 2
+        assert images[0].url == "https://example.com/a.png"
+        assert images[1].url == "https://example.com/b.jpg"
+
+    def test_image_with_query_string(self) -> None:
+        """Image URLs with query strings are extracted."""
+        text = "https://imgur.com/abc123.png?1"
+        cleaned, images = extract_images_from_text(text)
+        assert len(images) == 1
+        assert images[0].url == "https://imgur.com/abc123.png?1"
+
+    def test_various_image_extensions(self) -> None:
+        """Different image extensions are recognized."""
+        extensions = ["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg"]
+        for ext in extensions:
+            text = f"https://example.com/image.{ext}"
+            _, images = extract_images_from_text(text)
+            assert len(images) == 1, f"Failed for .{ext}"
+
+    def test_case_insensitive_extension(self) -> None:
+        """Image extensions are case-insensitive."""
+        text = "https://example.com/IMAGE.PNG"
+        _, images = extract_images_from_text(text)
+        assert len(images) == 1
+
+    def test_inline_url_not_extracted(self) -> None:
+        """URLs inline with other text are NOT extracted."""
+        text = "Check out https://example.com/image.png for more"
+        cleaned, images = extract_images_from_text(text)
+        assert len(images) == 0
+        assert "https://example.com/image.png" in cleaned
+
+    def test_only_images_returns_empty_text(self) -> None:
+        """Answer with only images returns empty cleaned text."""
+        text = "https://example.com/a.png\nhttps://example.com/b.png"
+        cleaned, images = extract_images_from_text(text)
+        assert cleaned == ""
+        assert len(images) == 2
+
+    def test_preserves_text_around_images(self) -> None:
+        """Text before and after images is preserved."""
+        text = "Before text\n\nhttps://example.com/img.png\n\nAfter text"
+        cleaned, images = extract_images_from_text(text)
+        assert "Before text" in cleaned
+        assert "After text" in cleaned
+        assert len(images) == 1
+
+    def test_cleans_extra_whitespace(self) -> None:
+        """Extra blank lines from removed images are cleaned up."""
+        text = "Text\n\n\nhttps://example.com/img.png\n\n\nMore text"
+        cleaned, images = extract_images_from_text(text)
+        # Should not have triple newlines
+        assert "\n\n\n" not in cleaned
+
+
+class TestCreateGalleryEmbed:
+    """Tests for create_gallery_embed()."""
+
+    def test_gallery_embed_has_same_url(self) -> None:
+        """Gallery embed matches main embed's URL for gallery display."""
+        interviewee = IntervieweeData(name="Test", color=0xFF0000, avatar_url="http://avatar.url")
+        main_embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+        main_embed.url = "https://discord.com"
+
+        image = ImageData(alt="", url="https://example.com/image.png")
+        gallery_embed = create_gallery_embed(main_embed, image)
+
+        assert gallery_embed.url == main_embed.url
+
+    def test_gallery_embed_has_same_color(self) -> None:
+        """Gallery embed inherits main embed's color."""
+        interviewee = IntervieweeData(name="Test", color=0xFF0000, avatar_url="http://avatar.url")
+        main_embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        image = ImageData(alt="", url="https://example.com/image.png")
+        gallery_embed = create_gallery_embed(main_embed, image)
+
+        assert gallery_embed.color == main_embed.color
+
+    def test_gallery_embed_has_image(self) -> None:
+        """Gallery embed has the image set."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        main_embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        image = ImageData(alt="", url="https://example.com/image.png")
+        gallery_embed = create_gallery_embed(main_embed, image)
+
+        assert gallery_embed.image is not None
+        assert gallery_embed.image.url == "https://example.com/image.png"
+
+
+# =============================================================================
+# Image Gallery Integration Tests
+# =============================================================================
+
+
+class TestImageGalleryEmbeds:
+    """Tests for image handling in embed generation."""
+
+    def _make_question_with_images(self, num_images: int, text: str = "Answer") -> QuestionData:
+        """Helper to create a question with N image URLs in the answer."""
+        image_urls = "\n".join(
+            f"https://example.com/img{i}.png" for i in range(1, num_images + 1)
+        )
+        answer = f"{text}\n\n{image_urls}" if text else image_urls
+        return QuestionData(
+            question_number=1,
+            asker_name="Asker",
+            asker_avatar_url="http://asker.url",
+            question_text="Question?",
+            answer_text=answer,
+            jump_url="http://discord.com/channels/1/2/3",
+        )
+
+    def test_single_image_on_main_embed(self) -> None:
+        """Single image is set on the main embed."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        questions = [self._make_question_with_images(1)]
+
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=1)
+
+        assert len(result.embed_groups) == 1
+        assert len(result.embed_groups[0]) == 1  # Just main embed, no gallery
+        assert result.embed_groups[0][0].image is not None
+
+    def test_two_images_creates_gallery(self) -> None:
+        """Two images creates main embed + 1 gallery embed."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        questions = [self._make_question_with_images(2)]
+
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=1)
+
+        assert len(result.embed_groups) == 1
+        assert len(result.embed_groups[0]) == 2  # Main + 1 gallery
+
+    def test_four_images_creates_gallery(self) -> None:
+        """Four images creates main embed + 3 gallery embeds."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        questions = [self._make_question_with_images(4)]
+
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=1)
+
+        assert len(result.embed_groups) == 1
+        assert len(result.embed_groups[0]) == 4  # Main + 3 gallery
+
+    def test_ten_images_max_gallery(self) -> None:
+        """Ten images creates full gallery (main + 9 gallery embeds)."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        questions = [self._make_question_with_images(10)]
+
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=1)
+
+        assert len(result.embed_groups) == 1
+        assert len(result.embed_groups[0]) == 10  # Main + 9 gallery
+
+    def test_eleven_images_limited_to_ten(self) -> None:
+        """More than 10 images are limited to 10 embeds."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        questions = [self._make_question_with_images(15)]
+
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=1)
+
+        assert len(result.embed_groups) == 1
+        # Should be capped at 10 total embeds
+        assert len(result.embed_groups[0]) == 10
+
+    def test_image_answer_forces_new_embed(self) -> None:
+        """Answer with images forces next Q&A into new embed."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        questions = [
+            self._make_question_with_images(1),
+            QuestionData(
+                question_number=2,
+                asker_name="Asker",  # Same asker
+                asker_avatar_url="http://asker.url",
+                question_text="Q2?",
+                answer_text="A2 without images",
+                jump_url="http://discord.com/channels/1/2/4",
+            ),
+        ]
+
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=2)
+
+        # Should be 2 embed groups even though same asker
+        assert len(result.embed_groups) == 2
+
+    def test_only_image_answer_shows_placeholder(self) -> None:
+        """Answer with only images shows (image) placeholder."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        question = QuestionData(
+            question_number=1,
+            asker_name="Asker",
+            asker_avatar_url="http://asker.url",
+            question_text="Question?",
+            answer_text="https://example.com/img.png",  # Only an image
+            jump_url="http://discord.com/channels/1/2/3",
+        )
+
+        output = add_question_to_embed(embed, question, current_length=0)
+
+        assert output.result == AddQuestionResult.SUCCESS
+        # The field should contain "(image)" as placeholder
+        field_values = [f.value for f in embed.fields]
+        assert any("(image)" in v for v in field_values)
+
+
+# =============================================================================
+# Footer Tests with Images
+# =============================================================================
+
+
+class TestEmbedFooterWithImages:
+    """Tests for embed footer with image counts."""
+
+    def test_footer_no_extra_images(self) -> None:
+        """Footer with <=4 images shows no extra message."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        set_embed_footer(embed, answered_count=1, total_count=5, extra_images=0)
+
+        assert "more" not in embed.footer.text.lower()
+        assert "click" not in embed.footer.text.lower()
+
+    def test_footer_with_extra_preview_images(self) -> None:
+        """Footer shows click message when 5-10 images."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        set_embed_footer(embed, answered_count=1, total_count=5, extra_images=3)
+
+        assert "+3 more" in embed.footer.text
+        assert "click images to view all" in embed.footer.text
+
+    def test_footer_with_dropped_images(self) -> None:
+        """Footer shows warning when images exceed limit."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        set_embed_footer(embed, answered_count=1, total_count=5, extra_images=6, dropped_images=2)
+
+        assert "2 images not shown" in embed.footer.text
+        assert "limit 10" in embed.footer.text
+
+    def test_footer_with_single_dropped_image(self) -> None:
+        """Footer uses singular 'image' for 1 dropped."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        set_embed_footer(embed, answered_count=1, total_count=5, extra_images=6, dropped_images=1)
+
+        assert "1 image not shown" in embed.footer.text
+        assert "1 images" not in embed.footer.text  # Should be singular
+
+
+# =============================================================================
+# Field and Character Limit Edge Cases
+# =============================================================================
+
+
+class TestFieldLimitEdgeCases:
+    """Tests for embed field character limit edge cases."""
+
+    def test_answer_at_field_value_limit(self) -> None:
+        """Answer exactly at field value limit fits in single field."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        # Create answer close to but under SAFE_FIELD_VALUE
+        answer_text = "A" * (SAFE_FIELD_VALUE - 100)  # Leave room for question formatting
+
+        question = QuestionData(
+            question_number=1,
+            asker_name="Asker",
+            asker_avatar_url="http://asker.url",
+            question_text="Q?",
+            answer_text=answer_text,
+            jump_url="http://discord.com/channels/1/2/3",
+        )
+
+        output = add_question_to_embed(embed, question, current_length=0)
+
+        assert output.result == AddQuestionResult.SUCCESS
+
+    def test_answer_over_field_limit_chunks(self) -> None:
+        """Answer over field limit is chunked into multiple fields."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        # Create answer that definitely needs chunking
+        answer_text = "Word " * 300  # ~1500 chars
+
+        question = QuestionData(
+            question_number=1,
+            asker_name="Asker",
+            asker_avatar_url="http://asker.url",
+            question_text="Q?",
+            answer_text=answer_text,
+            jump_url="http://discord.com/channels/1/2/3",
+        )
+
+        output = add_question_to_embed(embed, question, current_length=0)
+
+        assert output.result == AddQuestionResult.SUCCESS
+        # Should have multiple fields due to chunking
+        assert len(embed.fields) > 1
+
+    def test_long_question_chunks(self) -> None:
+        """Long question is chunked across multiple fields."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        # Long question that needs chunking
+        question_text = "Word " * 250  # ~1250 chars
+
+        question = QuestionData(
+            question_number=1,
+            asker_name="Asker",
+            asker_avatar_url="http://asker.url",
+            question_text=question_text,
+            answer_text="Short answer",
+            jump_url="http://discord.com/channels/1/2/3",
+        )
+
+        output = add_question_to_embed(embed, question, current_length=0)
+
+        assert output.result == AddQuestionResult.SUCCESS
+        # Check for chunked field names like "Question #1 [1/2]"
+        field_names = [f.name for f in embed.fields]
+        assert any("[1/" in name for name in field_names)
+
+    def test_both_question_and_answer_long(self) -> None:
+        """Both long question and answer are properly chunked."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        question = QuestionData(
+            question_number=1,
+            asker_name="Asker",
+            asker_avatar_url="http://asker.url",
+            question_text="Q " * 200,  # ~400 chars
+            answer_text="A " * 600,  # ~1200 chars
+            jump_url="http://discord.com/channels/1/2/3",
+        )
+
+        output = add_question_to_embed(embed, question, current_length=0)
+
+        assert output.result == AddQuestionResult.SUCCESS
+        # Should have question and answer fields
+        field_names = [f.name for f in embed.fields]
+        assert any("Question" in name for name in field_names)
+        assert any("Answer" in name for name in field_names)
+
+
+class TestTotalEmbedLimitEdgeCases:
+    """Tests for total embed character limit edge cases."""
+
+    def test_embed_fills_to_capacity(self) -> None:
+        """Multiple Q&As fill embed until capacity."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+
+        # Create several medium-length questions
+        questions = [
+            QuestionData(
+                question_number=i,
+                asker_name="Asker",
+                asker_avatar_url="http://asker.url",
+                question_text=f"Question number {i} with some content?",
+                answer_text=f"Answer {i} " * 50,  # ~300 chars each
+                jump_url=f"http://discord.com/channels/1/2/{i}",
+            )
+            for i in range(1, 20)
+        ]
+
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=20)
+
+        # Should need multiple embeds due to total char limit
+        assert len(result.embed_groups) >= 2
+
+    def test_qa_exactly_at_remaining_space(self) -> None:
+        """Q&A that exactly fits remaining space succeeds."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        # Small question that should fit even with limited remaining space
+        question = QuestionData(
+            question_number=1,
+            asker_name="Asker",
+            asker_avatar_url="http://asker.url",
+            question_text="Q?",
+            answer_text="A!",
+            jump_url="http://discord.com/channels/1/2/3",
+        )
+
+        # Set current_length to leave just enough room
+        output = add_question_to_embed(embed, question, current_length=SAFE_EMBED_TOTAL - 500)
+
+        assert output.result == AddQuestionResult.SUCCESS
+
+    def test_qa_just_over_remaining_space(self) -> None:
+        """Q&A just over remaining space returns EMBED_FULL."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
+
+        question = QuestionData(
+            question_number=1,
+            asker_name="Asker",
+            asker_avatar_url="http://asker.url",
+            question_text="Question with some content?",
+            answer_text="Answer with content!",
+            jump_url="http://discord.com/channels/1/2/3",
+        )
+
+        # Set current_length to leave very little room
+        output = add_question_to_embed(embed, question, current_length=SAFE_EMBED_TOTAL - 20)
+
+        assert output.result == AddQuestionResult.EMBED_FULL
+
+
+# =============================================================================
+# Mixed Scenario Tests
+# =============================================================================
+
+
+class TestMixedScenarios:
+    """Tests for complex mixed scenarios."""
+
+    def test_images_long_text_multiple_askers(self) -> None:
+        """Complex scenario with images, long text, and asker changes."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+
+        questions = [
+            # Asker1 with image
+            QuestionData(
+                question_number=1,
+                asker_name="Asker1",
+                asker_avatar_url="http://asker1.url",
+                question_text="Q1?",
+                answer_text="Answer 1\n\nhttps://example.com/img1.png",
+                jump_url="http://discord.com/channels/1/2/1",
+            ),
+            # Asker1 again (but should be new embed due to image)
+            QuestionData(
+                question_number=2,
+                asker_name="Asker1",
+                asker_avatar_url="http://asker1.url",
+                question_text="Q2?",
+                answer_text="Answer 2 without image",
+                jump_url="http://discord.com/channels/1/2/2",
+            ),
+            # Asker2 with long answer
+            QuestionData(
+                question_number=3,
+                asker_name="Asker2",
+                asker_avatar_url="http://asker2.url",
+                question_text="Q3?",
+                answer_text="Long " * 300,
+                jump_url="http://discord.com/channels/1/2/3",
+            ),
+        ]
+
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=3)
+
+        # Should have 3 embed groups:
+        # 1. Asker1 Q1 with image
+        # 2. Asker1 Q2 (forced new due to previous image)
+        # 3. Asker2 Q3
+        assert len(result.embed_groups) == 3
+        assert len(result.skipped_questions) == 0
+
+    def test_alternating_askers_with_images(self) -> None:
+        """Alternating askers each with images."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+
+        questions = [
+            QuestionData(
+                question_number=1,
+                asker_name="Asker1",
+                asker_avatar_url="http://asker1.url",
+                question_text="Q1?",
+                answer_text="A1\n\nhttps://example.com/a.png\nhttps://example.com/b.png",
+                jump_url="http://discord.com/channels/1/2/1",
+            ),
+            QuestionData(
+                question_number=2,
+                asker_name="Asker2",
+                asker_avatar_url="http://asker2.url",
+                question_text="Q2?",
+                answer_text="A2\n\nhttps://example.com/c.png",
+                jump_url="http://discord.com/channels/1/2/2",
+            ),
+        ]
+
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=2)
+
+        assert len(result.embed_groups) == 2
+        # First group should have 2 embeds (main + 1 gallery)
+        assert len(result.embed_groups[0]) == 2
+        # Second group should have 1 embed (main with image)
+        assert len(result.embed_groups[1]) == 1
+
+    def test_skipped_question_mixed_with_valid(self) -> None:
+        """Oversized question is skipped while others succeed."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+
+        questions = [
+            QuestionData(
+                question_number=1,
+                asker_name="Asker",
+                asker_avatar_url="http://asker.url",
+                question_text="Q1?",
+                answer_text="A1!",
+                jump_url="http://discord.com/channels/1/2/1",
+            ),
+            QuestionData(
+                question_number=2,
+                asker_name="Asker",
+                asker_avatar_url="http://asker.url",
+                question_text="X" * 3000,  # Way too long
+                answer_text="Y" * 3000,
+                jump_url="http://discord.com/channels/1/2/2",
+            ),
+            QuestionData(
+                question_number=3,
+                asker_name="Asker",
+                asker_avatar_url="http://asker.url",
+                question_text="Q3?",
+                answer_text="A3!",
+                jump_url="http://discord.com/channels/1/2/3",
+            ),
+        ]
+
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=3)
+
+        # Q1 and Q3 should succeed, Q2 skipped
+        assert len(result.skipped_questions) == 1
+        assert result.skipped_questions[0].question_number == 2
+        # Should have embed(s) for Q1 and Q3
+        assert len(result.embed_groups) >= 1
