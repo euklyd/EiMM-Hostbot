@@ -9,12 +9,12 @@ export interface DiscordGuild {
 }
 
 export interface DiscordUser {
-  id: number;
+  id: string; // Discord ID as string to avoid JS precision loss
   username: string;
   discriminator: string;
   avatar: string | null;
   guilds: DiscordGuild[];
-  guild_ids: number[]; // Compact storage for session (used for membership checks)
+  guild_ids: string[]; // Compact storage for session (as strings for precision)
 }
 
 export interface ServerResponse {

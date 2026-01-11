@@ -11,7 +11,8 @@ export const useAuthStore = defineStore("auth", () => {
   const isAuthenticated = computed(() => user.value !== null);
 
   const avatarUrl = computed(() => {
-    if (!user.value?.avatar) return null;
+    // Handle null, undefined, and empty string
+    if (!user.value?.avatar || user.value.avatar === "") return null;
     return `https://cdn.discordapp.com/avatars/${user.value.id}/${user.value.avatar}.png`;
   });
 
@@ -39,12 +40,12 @@ export const useAuthStore = defineStore("auth", () => {
 
   function isMemberOf(guildId: number | string): boolean {
     if (!user.value) return false;
-    const id = typeof guildId === "string" ? parseInt(guildId) : guildId;
+    const idStr = String(guildId);
     // Check guild_ids first (compact session storage), then fall back to guilds
     if (user.value.guild_ids?.length > 0) {
-      return user.value.guild_ids.includes(id);
+      return user.value.guild_ids.includes(idStr);
     }
-    return user.value.guilds.some((g) => parseInt(g.id) === id);
+    return user.value.guilds.some((g) => g.id === idStr);
   }
 
   return {

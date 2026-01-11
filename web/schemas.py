@@ -34,31 +34,46 @@ class DiscordGuild(BaseModel):
 class DiscordUser(BaseModel):
     """User info from Discord OAuth2.
 
-    Session storage uses guild_ids (list of ints) to minimize cookie size.
-    The guilds field is kept for API responses but may be empty.
+    All Discord IDs are serialized as strings to avoid JavaScript precision loss.
     """
 
-    id: int
+    id: str  # Discord ID as string for JS safety
     username: str
     discriminator: str = "0"
     avatar: str | None = None
     guilds: list[DiscordGuild] = []
-    guild_ids: list[int] = []  # Compact storage for session
+    guild_ids: list[str] = []  # Compact storage for session (as strings)
 
-    def is_member_of(self, guild_id: int) -> bool:
+    @field_validator("id", mode="before")
+    @classmethod
+    def convert_id_to_str(cls, v: Any) -> str:
+        """Convert integer ID to string for JavaScript safety."""
+        return str(v) if v is not None else ""
+
+    @field_validator("guild_ids", mode="before")
+    @classmethod
+    def convert_guild_ids_to_str(cls, v: Any) -> list[str]:
+        """Convert integer guild IDs to strings for JavaScript safety."""
+        if v is None:
+            return []
+        return [str(gid) for gid in v]
+
+    def is_member_of(self, guild_id: int | str) -> bool:
         """Check if user is a member of the given guild."""
+        gid_str = str(guild_id)
         # Check guild_ids first (from session), then fall back to guilds
         if self.guild_ids:
-            return guild_id in self.guild_ids
-        return any(int(g.id) == guild_id for g in self.guilds)
+            return gid_str in self.guild_ids
+        return any(g.id == gid_str for g in self.guilds)
 
-    def get_guild(self, guild_id: int) -> DiscordGuild | None:
+    def get_guild(self, guild_id: int | str) -> DiscordGuild | None:
         """Get guild info for a specific guild ID.
 
         Note: May return None if only guild_ids are stored (session mode).
         """
+        gid_str = str(guild_id)
         for g in self.guilds:
-            if int(g.id) == guild_id:
+            if g.id == gid_str:
                 return g
         return None
 

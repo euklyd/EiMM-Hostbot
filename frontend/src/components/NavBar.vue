@@ -1,7 +1,13 @@
 <script setup lang="ts">
+import { ref } from "vue";
 import { useAuthStore } from "../stores/auth";
 
 const auth = useAuthStore();
+const avatarFailed = ref(false);
+
+function onAvatarError() {
+  avatarFailed.value = true;
+}
 </script>
 
 <template>
@@ -33,19 +39,20 @@ const auth = useAuthStore();
             <div class="flex items-center space-x-2 sm:space-x-3">
               <!-- User avatar -->
               <img
-                v-if="auth.avatarUrl"
+                v-if="auth.avatarUrl && !avatarFailed"
                 :src="auth.avatarUrl"
                 :alt="auth.user.username"
                 class="w-7 h-7 sm:w-8 sm:h-8 rounded-full"
+                @error="onAvatarError"
               />
-              <div v-else class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500 flex items-center justify-center">
+              <div v-else class="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-indigo-500 flex items-center justify-center flex-shrink-0">
                 <span class="text-white text-xs sm:text-sm font-medium">
                   {{ auth.user.username.charAt(0).toUpperCase() }}
                 </span>
               </div>
 
-              <!-- Username (hidden on very small screens) -->
-              <span class="hidden xs:inline text-gray-200 text-sm sm:text-base">{{ auth.user.username }}</span>
+              <!-- Username (hidden on small screens) -->
+              <span class="hidden sm:inline text-gray-200 text-sm sm:text-base">{{ auth.user.username }}</span>
 
               <!-- Logout button -->
               <button
