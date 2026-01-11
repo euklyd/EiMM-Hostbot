@@ -177,13 +177,13 @@ class AnswerRequest(BaseModel):
     """Request body for answering a question."""
 
     answer_text: str
-    MAX_ANSWER_LENGTH: int = 10000  # ~11 embed fields worth of text
 
     @field_validator("answer_text")
     @classmethod
     def validate_answer_length(cls, v: str) -> str:
-        if len(v) > cls.MAX_ANSWER_LENGTH:
-            raise ValueError(f"Answer too long ({len(v)}/{cls.MAX_ANSWER_LENGTH} chars)")
+        max_length = 10000  # ~11 embed fields worth of text
+        if len(v) > max_length:
+            raise ValueError(f"Answer too long ({len(v)}/{max_length} chars)")
         return v
 
 
