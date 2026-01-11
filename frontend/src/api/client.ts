@@ -6,6 +6,8 @@ import type {
   InterviewSummary,
   PostAnswersResponse,
   QuestionResponse,
+  SearchRequest,
+  SearchResponse,
   ServerStatsResponse,
   ServerWithInterviewResponse,
   TopAskerResponse,
@@ -122,6 +124,14 @@ export async function deleteQuestion(questionId: number): Promise<void> {
 export async function postAnswers(interviewId: number): Promise<PostAnswersResponse> {
   return request<PostAnswersResponse>(`/api/interviews/${interviewId}/post`, {
     method: "POST",
+  });
+}
+
+// Search endpoints
+export async function searchInterviews(params: SearchRequest): Promise<SearchResponse> {
+  return request<SearchResponse>("/api/search", {
+    method: "POST",
+    body: JSON.stringify(params),
   });
 }
 

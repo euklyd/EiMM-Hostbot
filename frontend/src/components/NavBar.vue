@@ -13,6 +13,16 @@ const auth = useAuthStore();
           <span class="text-lg sm:text-xl font-bold text-white">Discord Interviews</span>
         </router-link>
 
+        <!-- Nav links -->
+        <div class="flex items-center space-x-4">
+          <router-link
+            to="/search"
+            class="text-gray-300 hover:text-white transition-colors text-sm sm:text-base"
+          >
+            Search
+          </router-link>
+        </div>
+
         <!-- User section -->
         <div class="flex items-center space-x-2 sm:space-x-4">
           <template v-if="auth.loading">

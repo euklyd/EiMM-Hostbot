@@ -221,3 +221,91 @@ class TopAskerResponse(BaseModel):
     @classmethod
     def convert_int_to_str(cls, v: Any) -> str | None:
         return str(v) if v is not None else None
+
+
+# =============================================================================
+# Search
+# =============================================================================
+
+
+class SearchRequest(BaseModel):
+    """Request body for search queries."""
+
+    query: str
+    limit: int = 50
+    offset: int = 0
+
+    @field_validator("query")
+    @classmethod
+    def validate_query(cls, v: str) -> str:
+        if not v.strip():
+            raise ValueError("Query cannot be empty")
+        if len(v) > 1000:
+            raise ValueError("Query too long (max 1000 chars)")
+        return v
+
+    @field_validator("limit")
+    @classmethod
+    def validate_limit(cls, v: int) -> int:
+        if v < 1 or v > 100:
+            raise ValueError("Limit must be between 1 and 100")
+        return v
+
+    @field_validator("offset")
+    @classmethod
+    def validate_offset(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("Offset cannot be negative")
+        return v
+
+
+class SearchResultQuestion(BaseModel):
+    """Question info for search results."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    question_number: int
+    asker_id: str
+    asker_name: str
+    question_text: str
+    answer_text: str | None = None
+    asked_at: datetime
+
+    @field_validator("asker_id", mode="before")
+    @classmethod
+    def convert_int_to_str(cls, v: Any) -> str | None:
+        return str(v) if v is not None else None
+
+
+class SearchResultInterview(BaseModel):
+    """Interview context for search results."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    interview_number: int
+    server_id: str
+    server_name: str
+    interviewee_id: str
+    interviewee_name: str
+
+    @field_validator("server_id", "interviewee_id", mode="before")
+    @classmethod
+    def convert_int_to_str(cls, v: Any) -> str | None:
+        return str(v) if v is not None else None
+
+
+class SearchResultEntry(BaseModel):
+    """A single search result entry."""
+
+    question: SearchResultQuestion
+    interview: SearchResultInterview
+
+
+class SearchResponse(BaseModel):
+    """Response for search queries."""
+
+    results: list[SearchResultEntry]
+    total_count: int
+    query: str  # Echo back the query for display

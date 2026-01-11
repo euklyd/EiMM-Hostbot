@@ -24,6 +24,11 @@ const routes = [
     component: () => import("./views/InterviewArchive.vue"),
     props: true,
   },
+  {
+    path: "/search",
+    name: "search",
+    component: () => import("./views/Search.vue"),
+  },
 ];
 
 const router = createRouter({

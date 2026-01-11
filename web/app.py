@@ -58,10 +58,11 @@ def create_app(bot: Bot | None = None) -> FastAPI:
         )
 
     # Include API routers
-    from .routes import auth, interviews
+    from .routes import auth, interviews, search
 
     app.include_router(auth.router)
     app.include_router(interviews.router)
+    app.include_router(search.router)
 
     # Mount static files for Vue frontend (if built)
     static_dir = Path(__file__).parent / "static"

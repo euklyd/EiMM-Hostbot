@@ -113,3 +113,40 @@ export interface QuestionAnsweredMessage extends WebSocketMessage {
     question_id: number;
   };
 }
+
+// Search types
+export interface SearchRequest {
+  query: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface SearchResultQuestion {
+  id: number;
+  question_number: number;
+  asker_id: string;
+  asker_name: string;
+  question_text: string;
+  answer_text: string | null;
+  asked_at: string;
+}
+
+export interface SearchResultInterview {
+  id: number;
+  interview_number: number;
+  server_id: string;
+  server_name: string;
+  interviewee_id: string;
+  interviewee_name: string;
+}
+
+export interface SearchResultEntry {
+  question: SearchResultQuestion;
+  interview: SearchResultInterview;
+}
+
+export interface SearchResponse {
+  results: SearchResultEntry[];
+  total_count: number;
+  query: string;
+}
