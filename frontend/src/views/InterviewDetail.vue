@@ -14,6 +14,15 @@ const store = useInterviewStore();
 
 const posting = ref(false);
 const postMessage = ref<string | null>(null);
+const hidePosted = ref(false);
+
+// Filter questions based on hide toggle
+const visibleQuestions = computed(() => {
+  if (!hidePosted.value) return store.questions;
+  return store.questions.filter((q) => !q.is_posted);
+});
+
+const hiddenCount = computed(() => store.postedQuestions.length);
 
 // Use strings for Discord IDs to avoid precision loss
 const serverId = computed(() => props.serverId);
@@ -170,6 +179,15 @@ function formatDate(dateStr: string): string {
             <span class="text-gray-400">Posted:</span>
             <span class="text-white ml-1">{{ store.postedQuestions.length }}</span>
           </div>
+          <!-- Hide posted toggle -->
+          <label v-if="store.postedQuestions.length > 0" class="flex items-center gap-1.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              v-model="hidePosted"
+              class="w-3.5 h-3.5 rounded border-gray-600 bg-gray-700 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-0 cursor-pointer"
+            />
+            <span class="text-gray-400">Hide posted</span>
+          </label>
         </div>
       </div>
 
@@ -187,8 +205,16 @@ function formatDate(dateStr: string): string {
 
       <!-- Mobile: Card list -->
       <div class="md:hidden space-y-2">
+        <!-- Hidden questions notice -->
+        <div
+          v-if="hidePosted && hiddenCount > 0"
+          class="text-center py-2 text-gray-500 text-sm bg-gray-800/50 rounded-lg border border-gray-700"
+        >
+          {{ hiddenCount }} posted question{{ hiddenCount === 1 ? '' : 's' }} hidden
+        </div>
+
         <QuestionRow
-          v-for="question in store.questions"
+          v-for="question in visibleQuestions"
           :key="question.id"
           :question="question"
           :can-answer="canAnswer"
@@ -234,8 +260,14 @@ function formatDate(dateStr: string): string {
             </tr>
           </thead>
           <tbody>
+            <!-- Hidden questions notice -->
+            <tr v-if="hidePosted && hiddenCount > 0">
+              <td :colspan="canDelete ? 8 : 7" class="text-center py-2 text-gray-500 text-sm border-t border-gray-700">
+                {{ hiddenCount }} posted question{{ hiddenCount === 1 ? '' : 's' }} hidden
+              </td>
+            </tr>
             <QuestionRow
-              v-for="question in store.questions"
+              v-for="question in visibleQuestions"
               :key="question.id"
               :question="question"
               :can-answer="canAnswer"

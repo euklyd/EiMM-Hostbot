@@ -17,11 +17,6 @@ Feature requests and improvements for the EiMM-Hostbot interview system.
 - Add a refresh button on the server list page to manually refresh the cache
 - Create `/api/auth/refresh-guilds` endpoint that clears cache and refetches
 
-### Hide Posted Questions
-- Allow interviewee to hide/show questions that have already been posted to Discord
-- Beyond just collapsing - actually filter them out of the list
-- Toggle or filter control in the UI
-
 ### Tests for Web Routes
 - Add pytest tests for FastAPI routes:
   - Auth flow (login, callback, logout, me)
@@ -30,18 +25,6 @@ Feature requests and improvements for the EiMM-Hostbot interview system.
   - WebSocket authentication
 - Use `httpx.AsyncClient` with `app` for testing
 - Mock Discord OAuth responses
-
-## Discord Embeds
-
-### Embed Edge Case Tests
-- Add tests for edge cases in embed generation:
-  - Field character limits (name: 256, value: 1024)
-  - Number of fields per embed (max 25)
-  - Total embed character limit (6000)
-  - Image gallery limits (4 preview, 10 max)
-  - Long questions/answers that need chunking
-  - Mixed scenarios (images + long text + multiple askers)
-- Identify more edge cases during implementation
 
 ## Interview Cog
 
