@@ -405,17 +405,19 @@ async def post_answers(
     # Post embeds to Discord
     question_ids = [q.id for q in questions]
     posted_count = 0
+    last_msg = None
 
-    for embed in result.embeds:
+    for embed_group in result.embed_groups:
         try:
-            msg = await channel.send(embed=embed)
-            posted_count += 1
+            # Send each group as a single message (required for image galleries)
+            last_msg = await channel.send(embeds=embed_group)
+            posted_count += len(embed_group)
         except Exception as e:
             logger.error(f"Failed to post embed: {e}")
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Failed to post to Discord") from e
 
     # Mark questions as posted
-    await service.mark_posted(db, question_ids, msg.id if result.embeds else 0)
+    await service.mark_posted(db, question_ids, last_msg.id if last_msg else 0)
     await db.commit()
 
     logger.info(f"Posted {posted_count} embeds with {len(questions)} answers for interview {interview_id}")

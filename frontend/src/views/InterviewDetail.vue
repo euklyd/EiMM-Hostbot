@@ -87,6 +87,14 @@ async function handlePost() {
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleString();
 }
+
+async function retryLoad() {
+  await Promise.all([
+    store.fetchServer(serverId.value),
+    store.fetchInterview(interviewIdNum.value),
+    store.fetchQuestions(interviewIdNum.value),
+  ]);
+}
 </script>
 
 <template>
@@ -109,7 +117,7 @@ function formatDate(dateStr: string): string {
     <div v-else-if="store.error" class="bg-red-900/50 border border-red-700 rounded-lg p-6">
       <p class="text-red-200 mb-4">{{ store.error }}</p>
       <button
-        @click="store.fetchInterview(interviewIdNum)"
+        @click="retryLoad"
         class="px-4 py-2 bg-red-700 hover:bg-red-600 text-white rounded transition-colors"
       >
         Retry

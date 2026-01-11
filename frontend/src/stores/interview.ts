@@ -20,6 +20,10 @@ export const useInterviewStore = defineStore("interview", () => {
   // WebSocket
   let ws: WebSocket | null = null;
   const wsConnected = ref(false);
+  let wsServerId: string | null = null;
+  let wsReconnectAttempts = 0;
+  let wsReconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  const WS_MAX_RECONNECT_DELAY = 30000; // 30 seconds max
 
   // Computed
   const unansweredQuestions = computed(() =>
@@ -141,10 +145,17 @@ export const useInterviewStore = defineStore("interview", () => {
 
   // WebSocket management
   function connectWebSocket(serverId: string) {
+    // Clear any pending reconnect
+    if (wsReconnectTimeout) {
+      clearTimeout(wsReconnectTimeout);
+      wsReconnectTimeout = null;
+    }
+
     if (ws) {
       ws.close();
     }
 
+    wsServerId = serverId;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
     const wsUrl = `${protocol}//${window.location.host}/api/ws/${serverId}`;
 
@@ -152,12 +163,18 @@ export const useInterviewStore = defineStore("interview", () => {
 
     ws.onopen = () => {
       wsConnected.value = true;
+      wsReconnectAttempts = 0; // Reset on successful connection
       console.log("WebSocket connected");
     };
 
-    ws.onclose = () => {
+    ws.onclose = (event) => {
       wsConnected.value = false;
-      console.log("WebSocket disconnected");
+      console.log("WebSocket disconnected", event.code, event.reason);
+
+      // Auto-reconnect if we have a server ID and weren't intentionally disconnected
+      if (wsServerId && event.code !== 4001 && event.code !== 4003) {
+        scheduleReconnect();
+      }
     };
 
     ws.onerror = (event) => {
@@ -174,7 +191,32 @@ export const useInterviewStore = defineStore("interview", () => {
     };
   }
 
+  function scheduleReconnect() {
+    if (!wsServerId) return;
+
+    // Exponential backoff: 1s, 2s, 4s, 8s, ... up to max
+    const delay = Math.min(1000 * Math.pow(2, wsReconnectAttempts), WS_MAX_RECONNECT_DELAY);
+    wsReconnectAttempts++;
+
+    console.log(`WebSocket reconnecting in ${delay}ms (attempt ${wsReconnectAttempts})`);
+
+    wsReconnectTimeout = setTimeout(() => {
+      if (wsServerId) {
+        connectWebSocket(wsServerId);
+      }
+    }, delay);
+  }
+
   function disconnectWebSocket() {
+    // Clear any pending reconnect
+    if (wsReconnectTimeout) {
+      clearTimeout(wsReconnectTimeout);
+      wsReconnectTimeout = null;
+    }
+
+    wsServerId = null; // Prevent auto-reconnect
+    wsReconnectAttempts = 0;
+
     if (ws) {
       ws.close();
       ws = null;
