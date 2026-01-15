@@ -182,7 +182,7 @@ async def get_questions(
 
     query = query.order_by(Question.question_number)
     result = await session.execute(query)
-    return list(result.scalars().all())
+    return result.scalars().all()
 
 
 async def get_question(session: AsyncSession, question_id: int) -> Question | None:

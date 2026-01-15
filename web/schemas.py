@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_serializer, field_validator
 
 # =============================================================================
 # Discord OAuth2 User
@@ -13,13 +13,27 @@ from pydantic import BaseModel, ConfigDict, field_validator
 
 
 class DiscordGuild(BaseModel):
-    """Minimal guild info from Discord OAuth2."""
+    """Minimal guild info from Discord OAuth2.
 
-    id: str  # Discord returns as string
+    IDs are stored as int internally for type safety, serialized as strings for JS.
+    """
+
+    id: int  # Stored as int, serialized as string for JS safety
     name: str
     icon: str | None = None
     owner: bool = False
     permissions: str = "0"  # Permission bitfield as string
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def coerce_id_to_int(cls, v: Any) -> int:
+        """Coerce string ID from Discord API to int."""
+        return int(v) if v is not None else 0
+
+    @field_serializer("id")
+    def serialize_id_as_str(self, v: int) -> str:
+        """Serialize ID as string for JavaScript safety."""
+        return str(v)
 
     @property
     def permissions_int(self) -> int:
@@ -34,46 +48,54 @@ class DiscordGuild(BaseModel):
 class DiscordUser(BaseModel):
     """User info from Discord OAuth2.
 
-    All Discord IDs are serialized as strings to avoid JavaScript precision loss.
+    IDs are stored as int internally for type safety, serialized as strings for JS.
     """
 
-    id: str  # Discord ID as string for JS safety
+    id: int  # Stored as int, serialized as string for JS safety
     username: str
     discriminator: str = "0"
     avatar: str | None = None
     guilds: list[DiscordGuild] = []
-    guild_ids: list[str] = []  # Compact storage for session (as strings)
+    guild_ids: list[int] = []  # Compact storage for session (as ints internally)
 
     @field_validator("id", mode="before")
     @classmethod
-    def convert_id_to_str(cls, v: Any) -> str:
-        """Convert integer ID to string for JavaScript safety."""
-        return str(v) if v is not None else ""
+    def coerce_id_to_int(cls, v: Any) -> int:
+        """Coerce string/int ID to int."""
+        return int(v) if v is not None else 0
 
     @field_validator("guild_ids", mode="before")
     @classmethod
-    def convert_guild_ids_to_str(cls, v: Any) -> list[str]:
-        """Convert integer guild IDs to strings for JavaScript safety."""
+    def coerce_guild_ids_to_int(cls, v: Any) -> list[int]:
+        """Coerce guild IDs to ints."""
         if v is None:
             return []
+        return [int(gid) for gid in v]
+
+    @field_serializer("id")
+    def serialize_id_as_str(self, v: int) -> str:
+        """Serialize ID as string for JavaScript safety."""
+        return str(v)
+
+    @field_serializer("guild_ids")
+    def serialize_guild_ids_as_str(self, v: list[int]) -> list[str]:
+        """Serialize guild IDs as strings for JavaScript safety."""
         return [str(gid) for gid in v]
 
-    def is_member_of(self, guild_id: int | str) -> bool:
+    def is_member_of(self, guild_id: int) -> bool:
         """Check if user is a member of the given guild."""
-        gid_str = str(guild_id)
         # Check guild_ids first (from session), then fall back to guilds
         if self.guild_ids:
-            return gid_str in self.guild_ids
-        return any(g.id == gid_str for g in self.guilds)
+            return guild_id in self.guild_ids
+        return any(g.id == guild_id for g in self.guilds)
 
-    def get_guild(self, guild_id: int | str) -> DiscordGuild | None:
+    def get_guild(self, guild_id: int) -> DiscordGuild | None:
         """Get guild info for a specific guild ID.
 
         Note: May return None if only guild_ids are stored (session mode).
         """
-        gid_str = str(guild_id)
         for g in self.guilds:
-            if g.id == gid_str:
+            if g.id == guild_id:
                 return g
         return None
 
