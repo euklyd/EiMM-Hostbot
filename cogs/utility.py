@@ -4,6 +4,7 @@ import random
 import dice
 import discord
 import requests
+from discord import app_commands
 from discord.ext import commands
 
 from core.bot import Bot
@@ -31,8 +32,9 @@ class Utility(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot = bot
 
-    @commands.command()
-    async def avatar(self, ctx: commands.Context, user: discord.User | None) -> None:
+    @commands.hybrid_command(description="Fetch the avatar URL for a user")
+    @app_commands.describe(user="User to fetch avatar for (defaults to yourself)")
+    async def avatar(self, ctx: commands.Context, user: discord.User | None = None) -> None:
         """
         Fetch the avatar URL for a user.
 
@@ -42,23 +44,30 @@ class Utility(commands.Cog):
             user = ctx.author
         await ctx.send(str(user.display_avatar.with_static_format("png")))
 
-    @commands.command()
+    @commands.hybrid_command(description="Send an emoji, but big")
     @commands.has_permissions(manage_messages=True)
-    async def bigmoji(self, ctx: commands.Context, emoji: discord.PartialEmoji | discord.Emoji) -> None:
-        """
-        Send an emoji, but big.
-        """
-        await ctx.send(emoji.url)
-        await ctx.message.delete()
+    @app_commands.describe(emoji="The emoji to enlarge")
+    async def bigmoji(self, ctx: commands.Context, emoji: str) -> None:
+        """Send an emoji, but big."""
+        # Try to parse as a custom emoji
+        partial = discord.PartialEmoji.from_str(emoji)
+        if partial.id is None:
+            await ctx.send("Please provide a custom emoji (not a unicode emoji).")
+            return
+        await ctx.send(partial.url)
+        # For prefix commands, delete the invoking message
+        if ctx.message and ctx.interaction is None:
+            await ctx.message.delete()
 
-    @commands.command()
+    @commands.hybrid_command(description="Check if the bot is alive")
     async def ping(self, ctx: commands.Context) -> None:
         """
         Call-and-response to check if the bot is alive.
         """
         await ctx.send("pong")
 
-    @commands.command()
+    @commands.hybrid_command(description="Roll dice using standard notation")
+    @app_commands.describe(expr="Dice expression like 2d6+3")
     async def roll(self, ctx: commands.Context, expr: str) -> None:
         """
         Roll dice.
@@ -68,14 +77,16 @@ class Utility(commands.Cog):
         result: list[int] = list(dice.roll(expr))
         await ctx.send(f"{sum(result)} = `{result}`")
 
-    @commands.command()
+    @commands.hybrid_command(description="Truncate a message to a given length")
+    @app_commands.describe(size="Maximum length", message="Text to truncate")
     async def trunc(self, ctx: commands.Context, size: int, *, message: str) -> None:
         """
         Truncate a message to <size> characters.
         """
         await ctx.send(f"`{message[:size]}`")
 
-    @commands.command()
+    @commands.hybrid_command(description="Choose randomly from a comma-separated list")
+    @app_commands.describe(n="Number of items to choose", message="Comma-separated list of choices")
     async def choose(self, ctx: commands.Context, n: int = 1, *, message: str) -> None:
         """
         Choose from a list of items.
@@ -99,14 +110,17 @@ class Moderation(commands.Cog):
     def __init__(self, bot: Bot):
         self.bot = bot
 
-    @commands.command()
+    @commands.hybrid_command(description="Clear messages en masse")
     @commands.has_permissions(administrator=True)
+    @app_commands.describe(num="Number of messages to delete")
     async def clear(self, ctx: commands.Context, num: int) -> None:
         """
         Clear messages en masse.
         """
         assert type(ctx.channel) is discord.TextChannel
-        deleted = await ctx.channel.purge(limit=num + 1)  # num+1 because the trigger message is counted too
+        # For prefix commands, include the trigger message; for slash, don't add 1
+        limit = num + 1 if ctx.interaction is None else num
+        deleted = await ctx.channel.purge(limit=limit)
         deletion_message = await ctx.send(f"*Cleared {len(deleted)} messages.*")
         await deletion_message.delete(delay=5)
 

@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 
 import discord
 import yaml
+from discord import app_commands
 from discord.ext import commands
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
@@ -17,6 +18,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 from core.bot import Bot
 from utils import spreadsheet
+from utils.members import resolve_members
 
 session_maker: "Callable[[], Session] | None" = None
 
@@ -89,23 +91,17 @@ class HostBot(commands.Cog):
 
         hbs.Base.metadata.create_all(engine)
 
-    @commands.group(invoke_without_command=True)
+    @commands.hybrid_group(invoke_without_command=True, fallback="help")
     @commands.has_permissions(administrator=True)
     async def init(self, ctx: commands.Context) -> None:
-        """
-        HostBot server initialization commandgroup.
-        """
+        """HostBot server initialization commands."""
         await ctx.send(f"This isn't a command! Use `{ctx.bot.default_command_prefix}help init`.")
 
     @init.command(name="server")
     @commands.has_permissions(administrator=True)
+    @app_commands.describe(yml_config="Server configuration in YAML format")
     async def init_server(self, ctx: commands.Context, *, yml_config: str) -> None:
-        """
-        Initialize a game server with channels and roles.
-
-        For instructions and examples, see:
-        https://github.com/euklyd/EiMM-Hostbot/blob/master/cogs/hostbot_readme.md
-        """
+        """Initialize a game server with channels and roles."""
         session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is not None:
@@ -209,9 +205,7 @@ class HostBot(commands.Cog):
     @init.command(name="badly")
     @commands.has_permissions(administrator=True)
     async def init_badly(self, ctx: commands.Context) -> None:
-        """
-        Provides a way to initialize a server late for people who don't read the manual.
-        """
+        """Initialize a server late for people who don't read the manual."""
         session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is not None:
@@ -366,13 +360,9 @@ class HostBot(commands.Cog):
 
     @init.command(name="pmlist")
     @commands.has_permissions(administrator=True)
+    @app_commands.describe(playerlist="Line-separated list of player usernames")
     async def init_pmlist(self, ctx: commands.Context, *, playerlist: str) -> None:
-        """
-        Create Role PM channels for players and enrole each, no sheet involved.
-
-        Must be used after "init server".
-        Unlike "init rolepms", passes in a linebreak-separated list as the playerlist argument.
-        """
+        """Create Role PM channels for players and enrole each."""
         session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
@@ -457,11 +447,7 @@ class HostBot(commands.Cog):
     @init.command(name="reset")
     @commands.is_owner()
     async def init_reset(self, ctx: commands.Context) -> None:
-        """
-        Delete previously created channels and roles.
-
-        If Role PMs and Roles have been created using 'init rolepms', deletes those too.
-        """
+        """Delete previously created channels and roles."""
         session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is None:
@@ -528,21 +514,14 @@ class HostBot(commands.Cog):
 
     @init.command(name="setrole")
     @commands.has_permissions(administrator=True)
+    @app_commands.describe(role_type="Role type: host, player, dead, or spec", role="The role to associate")
     async def init_setrole(
         self,
         ctx: commands.Context,
         role_type: str,
         role: discord.Role,
     ) -> None:
-        """
-        Set the roles hostbot associates with each type.
-
-        Valid channel types are:
-        - host
-        - player
-        - dead
-        - spec
-        """
+        """Set the roles hostbot associates with each type."""
         valid_types = {"host", "player", "dead", "spec"}
 
         session = get_session()
@@ -559,29 +538,24 @@ class HostBot(commands.Cog):
             new_role = hbs.Role(id=role.id, type=role_type, server_id=ctx.guild.id)
             session.add(new_role)
         session.commit()
-        await ctx.message.add_reaction(ctx.bot.greentick)
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send(f"Set {role_type} role to {role.mention}.")
 
     @init.command(name="setchan")
     @commands.has_permissions(administrator=True)
+    @app_commands.describe(
+        channel_type="Channel type: announcements, flips, gamechat, graveyard, confessionals, or rolepms",
+        channel="The channel or category to associate",
+    )
     async def init_setchan(
         self,
         ctx: commands.Context,
         channel_type: str,
-        channel: discord.CategoryChannel | discord.TextChannel,
+        channel: discord.abc.GuildChannel,
     ) -> None:
-        """
-        Set the channels hostbot associates with each type.
-
-        Valid channel types are:
-        - announcements
-        - flips
-        - gamechat
-        - graveyard
-        - confessionals
-        - rolepms
-
-        As rolepms is a category channel, it must be specified either through exact text name (case-sensitive) or channel ID snowflake.
-        """
+        """Set the channels hostbot associates with each type."""
         valid_types = {"announcements", "flips", "gamechat", "graveyard", "confessionals", "rolepms"}
 
         session = get_session()
@@ -611,7 +585,10 @@ class HostBot(commands.Cog):
                 session.add(channel_row)
 
         session.commit()
-        await ctx.message.add_reaction(ctx.bot.greentick)
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send(f"Set {channel_type} to {channel.mention}.")
 
     # @init.command(name='setrole')
     # async def init_setrole(self, ctx: commands.Context, role_type: str, role: discord.Role):
@@ -619,9 +596,7 @@ class HostBot(commands.Cog):
 
     @init.command(name="status")
     async def init_status(self, ctx: commands.Context) -> None:
-        """
-        List game server info and number of people in each game-related role.
-        """
+        """List game server info and number of people in each game-related role."""
         session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if server is None:
@@ -727,15 +702,13 @@ class HostBot(commands.Cog):
         self.confessional_cooldowns[user.id].append(datetime.utcnow())
         return True
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.guild_only()
+    @app_commands.describe(msg="Your confessional message")
     async def confessional(self, ctx: commands.Context, *, msg: str) -> None:
-        """
-        Send a confessional from your Role PM to the graveyard.
-
-        Only usable by living players, and only in their Role PMs. Has a cooldown timer, so don't spam it.
-        """
-        if "@everyone" in ctx.message.content.lower():
+        """Send a confessional from your Role PM to the graveyard."""
+        # Check for @everyone in the message content
+        if "@everyone" in msg.lower():
             await ctx.send(ctx.author.mention)
             return
         session = get_session()
@@ -745,7 +718,6 @@ class HostBot(commands.Cog):
         player_roles = session.query(hbs.Role).filter_by(type="player", server_id=ctx.guild.id).all()
         if len(player_roles) == 0:
             await ctx.send("This server isn't set up for EiMM.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         player_roles = [ctx.guild.get_role(player_role.id) for player_role in player_roles]
         found = False
@@ -757,12 +729,10 @@ class HostBot(commands.Cog):
             logging.debug(player_roles)
             logging.debug(ctx.author.roles)
             await ctx.send("This command is only usable by living players.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         if not self.is_rolepm(ctx, server):
             await ctx.send("Confessionals belong in your role PM.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         if self._inc_cooldown(ctx.author) is False:
@@ -773,12 +743,10 @@ class HostBot(commands.Cog):
                 f"Stop sending confessionals so fast!\n"
                 f"*(Max {cooldown_max} per {cooldown_delta}; {hours}:{mins:02}:{secs:02} to go.)*"
             )
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         if len(msg) > 1900:
             await ctx.send("Your confessional is too long! Please keep it below 1900 characters.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         session.query(hbs.Channel).filter_by(type="graveyard", server_id=ctx.guild.id).one_or_none()
         confs_channel = session.query(hbs.Channel).filter_by(type="confessionals", server_id=ctx.guild.id).one_or_none()
@@ -786,26 +754,25 @@ class HostBot(commands.Cog):
         msg = msg.replace("@everyone", "@\u200beveryone").replace("@here", "@\u200bhere")  # \u200b aka zero-width space
         conf = f"**Confessional from {ctx.author}:**\n>>> {msg}"
         await confs_channel.send(conf)
-        await ctx.message.add_reaction(ctx.bot.greentick)
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send("Confessional sent!", ephemeral=True)
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.guild_only()
     async def gameavatars(self, ctx: commands.Context) -> None:
-        """
-        List all avatar URLs for all players and hosts.
-        """
+        """List all avatar URLs for all players and hosts."""
         session = get_session()
         player_role_rows = session.query(hbs.Role).filter_by(type="player", server_id=ctx.guild.id).all()
         host_role = session.query(hbs.Role).filter_by(type="host", server_id=ctx.guild.id).one_or_none()
         gamechat_channel = session.query(hbs.Channel).filter_by(type="gamechat", server_id=ctx.guild.id).one_or_none()
         if host_role is None or gamechat_channel is None or player_role_rows is None or len(player_role_rows) == 0:
             await ctx.send("This server isn't set up for EiMM.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         if ctx.channel.id == gamechat_channel.id:
             await ctx.send("Don't spam up gamechat with this, thanks.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         player_roles: list[discord.Role] = []
@@ -834,33 +801,45 @@ class HostBot(commands.Cog):
         for r in replies:
             await ctx.send(r)
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.has_permissions(administrator=True)
     @commands.guild_only()
+    @app_commands.describe(role="The role to add", members="Members to add (@mentions or user IDs)")
     async def enrole(
         self,
         ctx: commands.Context,
         role: discord.Role,
-        mentions: commands.Greedy[discord.Member],
+        *,
+        members: str,
     ) -> None:
-        """
-        Add members to a role en masse.
+        """Add members to a role en masse."""
+        resolved = await resolve_members(ctx.guild, members)
+        if not resolved:
+            await ctx.send("No valid members found.")
+            return
 
-        Ping as many members as you want on a single line. This command sometimes takes a while, don't worry about it.
-        """
-        await ctx.message.add_reaction(ctx.bot.waitemoji)
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.add_reaction(ctx.bot.waitemoji)
+        else:
+            await ctx.send("Adding members to role...", ephemeral=True)
+
         try:
-            for member in mentions:
+            for member in resolved:
                 if role not in member.roles:
                     logging.debug(f"enroling {member}")
                     await member.edit(roles=member.roles + [role])
                 else:
                     logging.debug(f"skipping enroling {member}")
         except Exception as e:
-            await ctx.message.add_reaction(ctx.bot.redtick)
+            if ctx.interaction is None and ctx.message:
+                await ctx.message.add_reaction(ctx.bot.redtick)
             raise e
-        await ctx.message.clear_reactions()
-        await ctx.message.add_reaction(ctx.bot.greentick)
+
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.clear_reactions()
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send(f"Added {len(resolved)} member(s) to {role.mention}.")
 
     @staticmethod
     def is_rolepm(ctx: commands.Context, server: hbs.Server) -> bool:
@@ -869,183 +848,182 @@ class HostBot(commands.Cog):
             return True
         return ctx.channel.category.id in [c.id for c in server.channels if c.type == "rolepms"]
 
-    @commands.group(invoke_without_command=True)
-    async def addspec(self, ctx: commands.Context, specs: commands.Greedy[discord.Member]) -> None:
-        """
-        Add a spectator to your Role PM.
-
-        Usable by players and hosts, and only from your Role PM channel.
-        """
+    @commands.hybrid_group(invoke_without_command=True, fallback="add")
+    @app_commands.describe(members="Spectators to add (@mentions or user IDs)")
+    async def addspec(self, ctx: commands.Context, *, members: str) -> None:
+        """Add a spectator to your Role PM."""
         session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if not server:
             await ctx.send("This server isn't a game server.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         elif server.addspec_on is False:
             await ctx.send("Adding specs to channels isn't enabled on this server.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         if not self.is_rolepm(ctx, server):
             await ctx.send("This isn't a Role PM channel.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         # check if author has any of the player/host roles
         if not has_role(ctx, ["player", "host"]):
             await ctx.send("Only players and hosts can add spectators to a role PM.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        specs = await resolve_members(ctx.guild, members)
+        if not specs:
+            await ctx.send("No valid members found.")
             return
 
         spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="spec").one_or_none()
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
         badspecs = []
+        added = []
         for spec in specs:
             if spec_role not in spec.roles:
                 badspecs.append(spec)
-                await ctx.message.add_reaction(ctx.bot.redtick)
                 continue
 
             # now we can do the actual function:
             await ctx.channel.set_permissions(spec, read_messages=True)
-            await ctx.message.add_reaction(ctx.bot.greentick)
+            added.append(spec)
 
         if badspecs:
             badspec_msg = ", ".join([str(spec) for spec in badspecs])
             await ctx.send(f"Failed to add {badspec_msg}: only spectators can be added to a role PM!")
 
+        if added:
+            if ctx.interaction is None and ctx.message:
+                await ctx.message.add_reaction(ctx.bot.greentick)
+            else:
+                added_msg = ", ".join([str(spec) for spec in added])
+                await ctx.send(f"Added {added_msg} to this channel.")
+
     @addspec.command(name="all")
     async def addspec_all(self, ctx: commands.Context) -> None:
-        """
-        Add all spectators to your Role PM.
-
-        Usable by players and hosts, and only from your Role PM channel. @mention a user, or provide their full Discord username or server nick exactly (case-sensitive). If it's multiple words, "use quotes".
-        """
+        """Add all spectators to your Role PM."""
         session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if not server:
             await ctx.send("This server isn't a game server.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         elif server.addspec_on is False:
             await ctx.send("Adding specs to channels isn't enabled on this server.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         if not self.is_rolepm(ctx, server):
             await ctx.send("This isn't a Role PM channel.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         # check if author has any of the player/host roles
         if not has_role(ctx, ["player", "host"]):
             await ctx.send("Only players and hosts can add spectators to a role PM.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="spec").one_or_none()
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
         # now we can do the actual function:
-        # await ctx.channel.edit(overwrites={spec_role: discord.PermissionOverwrite(read_messages=True)})
         await ctx.channel.set_permissions(spec_role, read_messages=True)
-        await ctx.message.add_reaction(ctx.bot.greentick)
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send("Added all spectators to this channel.")
 
     @addspec.command(name="rm")
-    async def addspec_rm(self, ctx: commands.Context, specs: commands.Greedy[discord.Member]) -> None:
-        """
-        Remove one or more spectators from your role PM.
-
-        Usable by players and hosts, and only from your Role PM channel.
-        """
+    @app_commands.describe(members="Spectators to remove (@mentions or user IDs)")
+    async def addspec_rm(self, ctx: commands.Context, *, members: str) -> None:
+        """Remove one or more spectators from your role PM."""
         session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if not server:
             await ctx.send("This server isn't a game server.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         elif server.addspec_on is False:
             await ctx.send("Adding specs to channels isn't enabled on this server.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         if not self.is_rolepm(ctx, server):
             await ctx.send("This isn't a Role PM channel.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         # check if author has any of the player/host roles
         if not has_role(ctx, ["player", "host"]):
             await ctx.send("Only players and hosts can remove spectators from a role PM.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
+            return
+
+        specs = await resolve_members(ctx.guild, members)
+        if not specs:
+            await ctx.send("No valid members found.")
             return
 
         spec_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="spec").one_or_none()
         spec_role = ctx.guild.get_role(spec_role_id.id)
 
+        removed = []
         for spec in specs:
             if spec_role not in spec.roles:
-                await ctx.message.add_reaction(ctx.bot.redtick)
                 continue
             # now we can do the actual function:
             await ctx.channel.set_permissions(spec, read_messages=False)
-        await ctx.message.add_reaction(ctx.bot.greentick)
+            removed.append(spec)
+
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        elif removed:
+            removed_msg = ", ".join([str(spec) for spec in removed])
+            await ctx.send(f"Removed {removed_msg} from this channel.")
+        else:
+            await ctx.send("No spectators were removed.")
 
     @addspec.command(name="off")
     async def addspec_off(self, ctx: commands.Context) -> None:
-        """
-        Disables players from being able to add spectators to their Role PMs.
-
-        Usable by hosts only.
-        """
+        """Disable players from being able to add spectators to their Role PMs."""
         session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if not server:
             await ctx.send("This server isn't a game server.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="host").one_or_none()
         host_role = ctx.guild.get_role(host_role_id.id)
         if host_role not in ctx.author.roles and ctx.author != ctx.guild.owner:
             await ctx.send("Only hosts can toggle this setting.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         server.addspec_on = False
         session.commit()
 
-        await ctx.message.add_reaction(ctx.bot.greentick)
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send("Adding spectators to channels has been disabled.")
 
     @addspec.command(name="on")
     async def addspec_on(self, ctx: commands.Context) -> None:
-        """
-        Enables players to add spectators to their Role PMs.
-
-        Usable by hosts only.
-        """
+        """Enable players to add spectators to their Role PMs."""
         session = get_session()
 
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         if not server:
             await ctx.send("This server isn't a game server.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         host_role_id = session.query(hbs.Role).filter_by(server_id=ctx.guild.id, type="host").one_or_none()
         host_role = ctx.guild.get_role(host_role_id.id)
         if host_role not in ctx.author.roles and ctx.author != ctx.guild.owner:
             await ctx.send("Only hosts can toggle this setting.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         server.addspec_on = True
         session.commit()
 
-        await ctx.message.add_reaction(ctx.bot.greentick)
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send("Adding spectators to channels has been enabled.")
 
     async def _lockunlock(self, ctx: commands.Context, lock: bool = True) -> None:
         session = get_session()
@@ -1054,34 +1032,34 @@ class HostBot(commands.Cog):
 
         if not server:
             await ctx.send("This server isn't a game server.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         if not self.is_rolepm(ctx, server):
             await ctx.send("This isn't a Role PM channel.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         if not has_role(ctx, ["player", "host"]):
             await ctx.send("Only players and hosts can lock/unlock Role PMs.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         if not has_role(ctx, ["host"]) and not server.players_can_lock and lock is True:
             await ctx.send("Locking is currently disabled for players; only hosts can lock role PMs.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         assert isinstance(ctx.channel, discord.TextChannel), "Expected guild TextChannel"
         if lock and ctx.channel.name[0] != LOCK_EMOJI:
             await ctx.channel.edit(name=f"{LOCK_EMOJI}{ctx.channel.name}")
-            await ctx.message.add_reaction(ctx.bot.greentick)
+            if ctx.interaction is None and ctx.message:
+                await ctx.message.add_reaction(ctx.bot.greentick)
+            else:
+                await ctx.send("Locked.")
         elif lock:
             await ctx.send("You're already locked.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
         elif not lock and ctx.channel.name[0] == LOCK_EMOJI:
             await ctx.channel.edit(name=ctx.channel.name[1:])
-            await ctx.message.add_reaction(ctx.bot.greentick)
+            if ctx.interaction is None and ctx.message:
+                await ctx.message.add_reaction(ctx.bot.greentick)
+            else:
+                await ctx.send("Unlocked.")
         else:
             await ctx.send("You need to be locked to unlock.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
 
     @staticmethod
     async def _unlock_all(ctx: commands.Context) -> None:
@@ -1111,16 +1089,19 @@ class HostBot(commands.Cog):
     async def _enable_locking(ctx: commands.Context) -> None:
         if not has_role(ctx, ["host"]):
             await ctx.send("Only hosts may enable locking.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
         session = get_session()
         server = session.query(hbs.Server).filter_by(id=ctx.guild.id).one_or_none()
         server.players_can_lock = True
         session.commit()
-        await ctx.message.add_reaction(ctx.bot.greentick)
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send("Locking has been enabled for players.")
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.guild_only()
+    @app_commands.describe(str_that_might_be_on="Use 'on' to enable locking for players")
     async def lock(self, ctx: commands.Context, str_that_might_be_on: str = "") -> None:
         """Lock your actions."""
         if str_that_might_be_on.lower() == "on":
@@ -1130,8 +1111,9 @@ class HostBot(commands.Cog):
             return
         await self._lockunlock(ctx, True)
 
-    @commands.command()
+    @commands.hybrid_command()
     @commands.guild_only()
+    @app_commands.describe(all="Use 'all' to unlock all Role PMs (hosts only)")
     async def unlock(self, ctx: commands.Context, all: str = "not all") -> None:
         """Unlock your actions."""
         if all.lower() != "all":
@@ -1140,10 +1122,11 @@ class HostBot(commands.Cog):
 
         if not has_role(ctx, ["host"]):
             await ctx.send("Only the host can unlock all Role PMs.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         await self._unlock_all(ctx)
+        if ctx.interaction:
+            await ctx.send("Unlocked all Role PMs.")
 
     # TODO on this... need to:
     #  (a) do db updates

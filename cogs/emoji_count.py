@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 import aiohttp
 import discord
+from discord import app_commands
 from discord.ext import commands
 from sqlalchemy import create_engine, func
 from sqlalchemy.orm import Session, sessionmaker
@@ -101,13 +102,32 @@ def get_count(ctx: commands.Context, emoji_id: int, oldest: date) -> int:
 class Emoji(commands.Cog):
     """Emoji management."""
 
-    @commands.group(invoke_without_command=True)
+    @staticmethod
+    def _resolve_emoji(ctx: commands.Context, em: discord.Emoji | str | int | None) -> int | None:
+        """Resolve an emoji reference to an emoji ID."""
+        if em is None:
+            return None
+        if isinstance(em, discord.Emoji):
+            return em.id
+        if isinstance(em, int):
+            return em
+        # String: try to parse as ID or emoji mention
+        if em.isdigit():
+            return int(em)
+        # Try to match <:name:id> format
+        match = re.match(r"<a?:\w+:(\d+)>", em)
+        if match:
+            return int(match.group(1))
+        return None
+
+    @commands.hybrid_group(invoke_without_command=True, fallback="info")
     @commands.has_permissions(manage_emojis=True)
     async def emoji(self, ctx: commands.Context) -> None:
+        """Emoji management commands."""
         await ctx.send("nah")
         # await emoji_head(ctx)  # if you wanted to do this by default? idk
 
-    @emoji.command(name="enable")
+    @emoji.command(name="enable", description="Enable emoji counting on this server")
     @commands.has_permissions(administrator=True)
     async def emoji_enable(self, ctx: commands.Context) -> None:
         """
@@ -122,7 +142,7 @@ class Emoji(commands.Cog):
         else:
             await ctx.send("Emoji counting already enabled; use `disable` to turn it off.")
 
-    @emoji.command(name="disable")
+    @emoji.command(name="disable", description="Disable emoji counting on this server")
     @commands.has_permissions(administrator=True)
     async def emoji_disable(self, ctx: commands.Context) -> None:
         """
@@ -137,19 +157,19 @@ class Emoji(commands.Cog):
         else:
             await ctx.send("Emoji counting not enabled; use `enable` to turn it on.")
 
-    @emoji.command(name="count")
+    @emoji.command(name="count", description="Count emoji usage over a time period")
     @commands.has_permissions(manage_emojis=True)
-    async def emoji_count(self, ctx: commands.Context, em: discord.Emoji | int, days: int | None = 30) -> None:
+    @app_commands.describe(em="Emoji or emoji ID", days="Number of days to count (default 30)")
+    async def emoji_count(self, ctx: commands.Context, em: str, days: int = 30) -> None:
         """
         Count the times an emoji has been used in the last <days> days.
 
         Only returns uses for emojis belonging to this server, and only uses on this server.
         """
-        if type(em) is discord.Emoji:
-            assert type(em) is discord.Emoji
-            emoji_id = em.id
-        else:
-            emoji_id = em
+        emoji_id = self._resolve_emoji(ctx, em)
+        if emoji_id is None:
+            await ctx.send("Could not resolve emoji.")
+            return
 
         oldest = datetime.utcnow().date() - timedelta(days=days)
 
@@ -167,13 +187,18 @@ class Emoji(commands.Cog):
             n_days = f"{days} days"
         await ctx.send(f"{ctx.bot.get_emoji(emoji_id)} has been used `{n_times}` in the last `{n_days}`.")
 
-    @emoji.command(name="stats")
+    @emoji.command(name="stats", description="Detailed stats for an emoji")
     @commands.has_permissions(manage_emojis=True)
+    @app_commands.describe(
+        em="Emoji or emoji ID",
+        days="Number of days to analyze (default 30)",
+        force="Use -f to check deleted emojis by ID",
+    )
     async def emoji_stats(
         self,
         ctx: commands.Context,
-        em: discord.Emoji | int | None = None,
-        days: int | None = 30,
+        em: str | None = None,
+        days: int = 30,
         force: str = "",
     ) -> None:
         """
@@ -181,15 +206,10 @@ class Emoji(commands.Cog):
 
         Use -f as a third option to check for previous, now-deleted emoji using their ID snowflakes.
         """
-        if em is None:
+        emoji_id = self._resolve_emoji(ctx, em)
+        if emoji_id is None:
             await ctx.send(f"That's not an emoji on **{ctx.guild}**.")
             return
-
-        if type(em) is discord.Emoji:
-            assert type(em) is discord.Emoji
-            emoji_id = em.id
-        else:
-            emoji_id = int(em)
 
         if force != "-f" and emoji_id not in [e.id for e in ctx.guild.emojis]:
             await ctx.send(f"That's not the ID of an emoji in **{ctx.guild}**.")
@@ -235,8 +255,9 @@ class Emoji(commands.Cog):
             freq = f"Most frequent user: `{max_user}` (`{user_counts[0][1]}` uses)"
         await ctx.send(f"{ctx.bot.get_emoji(emoji_id)} has been used `{n_times}` in the last `{n_days}`.\n{freq}.")
 
-    @emoji.command(name="head")
+    @emoji.command(name="head", description="Display the most frequently used emojis")
     @commands.has_permissions(manage_emojis=True)
+    @app_commands.describe(days="Time period in days", num="Number of emojis to show", anim="Include animated emojis")
     async def emoji_head(self, ctx: commands.Context, days: int = 30, num: int = 5, anim: bool = False) -> None:
         """
         Display the most frequently emojis for the current server.
@@ -278,8 +299,9 @@ class Emoji(commands.Cog):
 
         await ctx.send(reply)
 
-    @emoji.command(name="tail")
+    @emoji.command(name="tail", description="Display the least frequently used emojis")
     @commands.has_permissions(manage_emojis=True)
+    @app_commands.describe(days="Time period in days", num="Number of emojis to show", anim="Include animated emojis")
     async def emoji_tail(self, ctx: commands.Context, days: int = 30, num: int = 5, anim: bool = False) -> None:
         """
         Display the least frequently emojis for the current server.
@@ -323,8 +345,9 @@ class Emoji(commands.Cog):
 
         await ctx.send(reply)
 
-    @emoji.command(name="all")
+    @emoji.command(name="all", description="Display counts for all emojis")
     @commands.has_permissions(manage_emojis=True)
+    @app_commands.describe(days="Time period in days", anim="Include animated emojis")
     async def emoji_all(self, ctx: commands.Context, days: int = 30, anim: bool = False) -> None:
         """
         Display counts for all emojis for the current server.
@@ -366,7 +389,7 @@ class Emoji(commands.Cog):
         await ctx.send(reply)
         await utils.menu.menu_list(ctx, emoji_ls)  # we don't actually care to select anything
 
-    @emoji.command(name="export")
+    @emoji.command(name="export", description="Export emoji usage data to CSV")
     @commands.has_permissions(manage_emojis=True)
     async def emoji_export(self, ctx: commands.Context) -> None:
         """
@@ -419,11 +442,11 @@ class Emoji(commands.Cog):
 
         await ctx.send("Alright, _nerd_.", file=discord.File(filename))
 
-    @commands.group(invoke_without_command=True)
+    @commands.hybrid_group(invoke_without_command=True, fallback="info")
     @commands.has_permissions(manage_emojis=True)
     async def evemoji(self, ctx: commands.Context) -> None:
         """Event Emoji command group."""
-        pass
+        await ctx.send("Use a subcommand: add, rm, ls")
 
     async def ditto_add(self, ctx: commands.Context, session: Session) -> str | None:
         """Interactive menu to get or confirm the name of the most recent game."""
@@ -452,37 +475,59 @@ class Emoji(commands.Cog):
         events = ", ".join(ls_events)
         await ctx.send(f"Please rerun the command with the event you want. The previous three events were {events}.")
 
-    @evemoji.command(name="add")
+    @evemoji.command(name="add", description="Add a new Event Emoji")
     @commands.has_permissions(manage_emojis=True)
+    @app_commands.describe(
+        event="Event name (or 'ditto' for previous event)",
+        owner="Member who owns this emoji",
+        emojiname="Name for the new emoji",
+        emoji="Existing emoji to copy (paste the emoji)",
+        image="Image file to upload as emoji",
+    )
     async def evemoji_add(
         self,
         ctx: commands.Context,
         event: str,
         owner: discord.Member,
         emojiname: str,
-        # emoji: Union[discord.Emoji, discord.Attachment],  # TODO(dpy2.0)
-        emoji: discord.Emoji | discord.PartialEmoji | None,
+        emoji: str | None = None,
+        image: discord.Attachment | None = None,
     ) -> None:
         """Add a new Event Emoji."""
         emoji_url: str | None = None
         if emoji:
-            emoji_url = str(emoji.url)
-        elif len(ctx.message.attachments) == 1:
-            attachment: discord.Attachment = ctx.message.attachments[0]
-            if attachment.size > MAX_ATTACHMENT_SIZE:
-                await ctx.send(f"Attachment too large ({attachment.size} bytes; max {MAX_ATTACHMENT_SIZE}).")
-                await ctx.message.add_reaction(ctx.bot.redtick)
+            # Parse the emoji string to get the URL
+            partial = discord.PartialEmoji.from_str(emoji)
+            if partial.id is not None:
+                emoji_url = str(partial.url)
+            else:
+                await ctx.send("Invalid emoji format. Please provide a custom emoji.")
                 return
-            emoji_url = str(attachment.url)
         else:
-            await ctx.send("Must either specify an emoji or upload an image.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
+            # Check for attachment from slash command param or prefix message
+            attachment = image
+            if attachment is None and ctx.message and len(ctx.message.attachments) == 1:
+                attachment = ctx.message.attachments[0]
+
+            if attachment:
+                if attachment.size > MAX_ATTACHMENT_SIZE:
+                    await ctx.send(f"Attachment too large ({attachment.size} bytes; max {MAX_ATTACHMENT_SIZE}).")
+                    if ctx.interaction is None and ctx.message:
+                        await ctx.message.add_reaction(ctx.bot.redtick)
+                    return
+                emoji_url = str(attachment.url)
+            else:
+                await ctx.send("Must either specify an emoji or upload an image.")
+                if ctx.interaction is None and ctx.message:
+                    await ctx.message.add_reaction(ctx.bot.redtick)
+                return
 
         async with aiohttp.ClientSession() as aiosession:
             async with aiosession.get(emoji_url) as resp:
                 if resp.status != 200:
                     await ctx.send("Error retrieving emoji data.")
-                    await ctx.message.add_reaction(ctx.bot.redtick)
+                    if ctx.interaction is None and ctx.message:
+                        await ctx.message.add_reaction(ctx.bot.redtick)
                     return
                 emoji_bytes: bytes = await resp.content.read()
 
@@ -494,7 +539,8 @@ class Emoji(commands.Cog):
             )
         except Exception as e:
             await ctx.send(f"Upload error: {e}")
-            await ctx.message.add_reaction(ctx.bot.redtick)
+            if ctx.interaction is None and ctx.message:
+                await ctx.message.add_reaction(ctx.bot.redtick)
             return
 
         session = get_session()
@@ -515,10 +561,14 @@ class Emoji(commands.Cog):
         )
         session.add(event_emoji)
         session.commit()
-        await ctx.message.add_reaction(ctx.bot.greentick)
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send(f"Added {created_emoji} for {owner} ({event}).")
 
-    @evemoji.command(name="rm")
+    @evemoji.command(name="rm", description="Remove an event emoji")
     @commands.has_permissions(manage_emojis=True)
+    @app_commands.describe(emoji="The event emoji to remove")
     async def evemoji_rm(
         self,
         ctx: commands.Context,
@@ -531,7 +581,8 @@ class Emoji(commands.Cog):
         )
         if not event_emoji:
             await ctx.send(f"{emoji} is not registered as an Event Emoji.")
-            await ctx.message.add_reaction(ctx.bot.redtick)
+            if ctx.interaction is None and ctx.message:
+                await ctx.message.add_reaction(ctx.bot.redtick)
             return
         fetched_emoji = await ctx.guild.fetch_emoji(event_emoji.emoji_id)
         if fetched_emoji:
@@ -540,16 +591,22 @@ class Emoji(commands.Cog):
             await ctx.send("Emoji not found so cannot delete, but will be set inactive.")
         event_emoji.active = False
         session.commit()
-        await ctx.message.add_reaction(ctx.bot.greentick)
+        if ctx.interaction is None and ctx.message:
+            await ctx.message.add_reaction(ctx.bot.greentick)
+        else:
+            await ctx.send("Event emoji removed.")
 
-    @evemoji.command(name="ls")
+    @evemoji.command(name="ls", description="List all active Event Emojis")
     @commands.has_permissions(manage_emojis=True)
+    @app_commands.describe(
+        sort="Sort order: alphabetical, usage, date, owner, event",
+        days="Time period for usage counts (default 30)",
+    )
     async def evemoji_ls(
         self,
         ctx: commands.Context,
-        sort: str | None = "alphabetical",
-        # active: Optional[bool] = True,
-        days: int | None = 30,
+        sort: str = "alphabetical",
+        days: int = 30,
     ) -> None:
         """
         List all (active) Event Emojis.

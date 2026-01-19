@@ -551,9 +551,7 @@ class TestImageGalleryEmbeds:
 
     def _make_question_with_images(self, num_images: int, text: str = "Answer") -> QuestionData:
         """Helper to create a question with N image URLs in the answer."""
-        image_urls = "\n".join(
-            f"https://example.com/img{i}.png" for i in range(1, num_images + 1)
-        )
+        image_urls = "\n".join(f"https://example.com/img{i}.png" for i in range(1, num_images + 1))
         answer = f"{text}\n\n{image_urls}" if text else image_urls
         return QuestionData(
             question_number=1,

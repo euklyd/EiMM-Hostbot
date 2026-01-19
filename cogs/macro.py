@@ -1,6 +1,7 @@
 import random
 
 import discord
+from discord import app_commands
 from discord.ext import commands
 from imgurpython.imgur.models.image import Image
 
@@ -32,8 +33,9 @@ class Macro(commands.Cog):
                     break
         return discord.Embed().set_image(url=image.link)
 
-    @commands.command()
-    async def bidoof(self, ctx: commands.Context, key: str | None) -> None:
+    @commands.hybrid_command(description="Post a random Bidoof image")
+    @app_commands.describe(key="Optional key to retrieve a specific Bidoof")
+    async def bidoof(self, ctx: commands.Context, key: str | None = None) -> None:
         """
         I can't make a Mafia Bidoof bot *without* this command.
 
@@ -55,8 +57,9 @@ class Macro(commands.Cog):
         em = self._retrieve_album_image([BIDOOF_ALBUM], key=key)
         await ctx.send(embed=em)
 
-    @commands.command()
-    async def sadcat(self, ctx: commands.Context, key: str | None) -> None:
+    @commands.hybrid_command(description="Post a random sadcat image")
+    @app_commands.describe(key="Optional key to retrieve a specific sadcat")
+    async def sadcat(self, ctx: commands.Context, key: str | None = None) -> None:
         """
         Post a random sadcat.
 

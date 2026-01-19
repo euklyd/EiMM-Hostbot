@@ -22,7 +22,7 @@ import discord
 # Bare image URL pattern: URL on its own line ending in common image extensions
 # Matches URLs like https://example.com/image.png or https://imgur.com/abc.jpg?1
 IMAGE_URL_PATTERN = re.compile(
-    r'^\s*(https?://\S+\.(?:png|jpe?g|gif|webp|bmp|svg)(?:\?\S*)?)\s*$',
+    r"^\s*(https?://\S+\.(?:png|jpe?g|gif|webp|bmp|svg)(?:\?\S*)?)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
 
@@ -123,7 +123,7 @@ def extract_images_from_text(text: str) -> tuple[str, list[ImageData]]:
 
     cleaned = IMAGE_URL_PATTERN.sub(replace_image, text)
     # Clean up extra whitespace/blank lines left behind
-    cleaned = re.sub(r'\n\s*\n\s*\n', '\n\n', cleaned).strip()
+    cleaned = re.sub(r"\n\s*\n\s*\n", "\n\n", cleaned).strip()
 
     return cleaned, images
 

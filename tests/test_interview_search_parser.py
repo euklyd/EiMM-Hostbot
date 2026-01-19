@@ -198,7 +198,7 @@ class TestComplexQueries:
 
     def test_complex_scryfall_style(self) -> None:
         """Scryfall-style complex query."""
-        result = parse_query('(asker:alice or asker:bob) -has:image after:2024-01')
+        result = parse_query("(asker:alice or asker:bob) -has:image after:2024-01")
         assert isinstance(result, AndNode)
         assert len(result.children) == 3
         # First child is OR of askers

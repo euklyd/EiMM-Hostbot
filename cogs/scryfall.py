@@ -12,6 +12,7 @@ from typing import Any
 import aiohttp
 import discord
 import requests
+from discord import app_commands
 from discord.ext import commands
 from fuzzywuzzy import process
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
@@ -84,7 +85,8 @@ class Cards(commands.Cog):
     def db_session(self) -> async_sessionmaker[AsyncSession]:
         return async_sessionmaker(self.db, expire_on_commit=False, class_=AsyncSession)
 
-    @commands.command()
+    @commands.hybrid_command(description="Search Scryfall for Magic: The Gathering cards")
+    @app_commands.describe(expr="Search query (Scryfall syntax supported)")
     async def oracle(self, ctx: commands.Context, *, expr: str) -> None:
         """
         Search Scryfall for Magic: The Gathering cards.
@@ -231,7 +233,8 @@ class Cards(commands.Cog):
 
         return await self._card_menu(ctx, card_embeds)
 
-    @commands.command()
+    @commands.hybrid_command(description="Search YGOPro for Yu-Gi-Oh cards (images)")
+    @app_commands.describe(query="Card name to search for")
     async def ygo(self, ctx: commands.Context, *, query: str) -> None:
         """
         Search YGOPro for Yu-Gi-Oh cards, as images.
@@ -240,7 +243,8 @@ class Cards(commands.Cog):
         """
         await self._ygo(ctx, query, text_only=False)
 
-    @commands.command()
+    @commands.hybrid_command(description="Search YGOPro for Yu-Gi-Oh cards (text)")
+    @app_commands.describe(query="Card name to search for")
     async def ygot(self, ctx: commands.Context, *, query: str) -> None:
         """
         Search YGOPro for Yu-Gi-Oh cards, as text.
@@ -498,7 +502,10 @@ class Cards(commands.Cog):
             return discord.Colour(color_dict[card["type"].lower()])
         return None
 
-    @commands.command(name="dt")
+    @commands.hybrid_command(name="dt", description="Pull Duel Terminal cards")
+    @app_commands.describe(
+        dt_num="Duel Terminal number (1-7, 5a/5b, 6a/6b, 7a/7b)", num_cards="Number of cards to pull"
+    )
     async def duel_terminal(self, ctx: commands.Context, dt_num: str, num_cards: int = 1) -> None:
         """
         Pull Duel Terminal cards.
@@ -591,8 +598,9 @@ class Cards(commands.Cog):
 
         await ctx.send(result)
 
-    @commands.command(name="ygocsv")
-    async def collection_to_csv(self, ctx: commands.Context) -> None:
+    @commands.hybrid_command(name="ygocsv", description="Export a YGOProDeck collection CSV to detailed format")
+    @app_commands.describe(file="YGOProDeck collection CSV file")
+    async def collection_to_csv(self, ctx: commands.Context, file: discord.Attachment | None = None) -> None:
         """
         Exports a YGOProDeck collection CSV to something more detailed.
 
@@ -600,8 +608,14 @@ class Cards(commands.Cog):
         """
         ENDPOINT = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
 
-        if len(ctx.message.attachments) != 1:
-            await ctx.send(f"Attach exactly one (1) item! ({len(ctx.message.attachments)} found.)")
+        # Handle attachment from either slash command parameter or prefix message
+        attachment = file
+        if attachment is None and ctx.message:
+            if len(ctx.message.attachments) == 1:
+                attachment = ctx.message.attachments[0]
+
+        if attachment is None:
+            await ctx.send("Attach exactly one (1) CSV file!")
             return
 
         ls_cards = requests.get(ENDPOINT).json()["data"]
@@ -610,7 +624,6 @@ class Cards(commands.Cog):
         for card in ls_cards:
             cards[card["id"]] = card
 
-        attachment = ctx.message.attachments[0]
         with io.BytesIO() as buffer:
             await attachment.save(buffer)
             csv_contents = [line.decode("utf-8") for line in buffer.readlines()]
@@ -665,7 +678,8 @@ class Cards(commands.Cog):
                 "Processed your collection.", file=discord.File(csv_out, filename=f"{ctx.author} collection.csv")
             )
 
-    @commands.command(name="sftext", aliases=["sftest"])
+    @commands.hybrid_command(name="sftext", aliases=["sftest"], description="Search Scryfall (returns first result)")
+    @app_commands.describe(expr="Search query")
     async def sftest(self, ctx: commands.Context, *, expr: str) -> None:
         embeds = await self._scryfall_search(expr)
         if embeds:

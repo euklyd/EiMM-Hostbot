@@ -231,8 +231,7 @@ class Interview(commands.Cog):
 
         if len(question) > QUESTION_LENGTH_HARD_LIMIT:
             await ctx.send(
-                f"Question too long ({len(question)}/{QUESTION_LENGTH_HARD_LIMIT} chars). "
-                "Please shorten it.",
+                f"Question too long ({len(question)}/{QUESTION_LENGTH_HARD_LIMIT} chars). Please shorten it.",
                 ephemeral=True,
             )
             return
@@ -257,11 +256,15 @@ class Interview(commands.Cog):
             await session.commit()
 
             # Broadcast to WebSocket clients
-            broadcast_event(ctx.guild.id, "new_question", {
-                "question_id": q.id,
-                "question_number": q.question_number,
-                "asker_name": ctx.author.display_name,
-            })
+            broadcast_event(
+                ctx.guild.id,
+                "new_question",
+                {
+                    "question_id": q.id,
+                    "question_number": q.question_number,
+                    "asker_name": ctx.author.display_name,
+                },
+            )
 
             await ctx.send(
                 f"Question #{q.question_number} submitted for {interview.interviewee_name}!",
@@ -313,11 +316,15 @@ class Interview(commands.Cog):
 
             # Broadcast each new question to WebSocket clients
             for q_id, q_num in added:
-                broadcast_event(ctx.guild.id, "new_question", {
-                    "question_id": q_id,
-                    "question_number": q_num,
-                    "asker_name": ctx.author.display_name,
-                })
+                broadcast_event(
+                    ctx.guild.id,
+                    "new_question",
+                    {
+                        "question_id": q_id,
+                        "question_number": q_num,
+                        "asker_name": ctx.author.display_name,
+                    },
+                )
 
             await ctx.send(
                 f"Submitted {len(added)} questions (#{added[0][1]}-#{added[-1][1]}) for {interview.interviewee_name}!",
@@ -689,12 +696,16 @@ class Interview(commands.Cog):
             await session.commit()
 
             # Broadcast to WebSocket clients
-            broadcast_event(ctx.guild.id, "interview_started", {
-                "interview_id": interview.id,
-                "interview_number": interview.interview_number,
-                "interviewee_id": str(interviewee.id),
-                "interviewee_name": interviewee.display_name,
-            })
+            broadcast_event(
+                ctx.guild.id,
+                "interview_started",
+                {
+                    "interview_id": interview.id,
+                    "interview_number": interview.interview_number,
+                    "interviewee_id": str(interviewee.id),
+                    "interviewee_name": interviewee.display_name,
+                },
+            )
 
             embed = discord.Embed(
                 title=f"Interview #{interview.interview_number}: {interviewee.display_name}",
@@ -718,9 +729,13 @@ class Interview(commands.Cog):
             await session.commit()
 
             # Broadcast to WebSocket clients
-            broadcast_event(ctx.guild.id, "interview_ended", {
-                "interview_id": interview.id,
-            })
+            broadcast_event(
+                ctx.guild.id,
+                "interview_ended",
+                {
+                    "interview_id": interview.id,
+                },
+            )
 
             await ctx.send(f"Interview with {interview.interviewee_name} has ended.")
 
