@@ -65,7 +65,7 @@ def mock_ctx(mock_bot: MagicMock, mock_member: MagicMock, mock_channel: MagicMoc
     ctx.guild = mock_guild
     ctx.send = AsyncMock()
     ctx.me = MagicMock()
-    ctx.me.permissions_in = MagicMock(return_value=MagicMock(manage_messages=True))
+    ctx.channel.permissions_for = MagicMock(return_value=MagicMock(manage_messages=True))
     return ctx
 
 

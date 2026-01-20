@@ -188,7 +188,7 @@ class Cards(commands.Cog):
 
             await msg.edit(embed=card_embeds[i])
 
-        if ctx.me.permissions_in(ctx.channel).manage_messages:
+        if ctx.channel.permissions_for(ctx.me).manage_messages:
             await msg.clear_reactions()
         else:
             await msg.remove_reaction(ARROW_LEFT, member=ctx.bot.user)
