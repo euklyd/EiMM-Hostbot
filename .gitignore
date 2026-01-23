@@ -9,4 +9,5 @@ __pycache__
 docker-compose.override.yml
 CLAUDE.md
 .claude/
+.worktrees/
 BACKLOG.md
