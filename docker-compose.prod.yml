@@ -1,0 +1,50 @@
+# Production docker-compose with Caddy reverse proxy for HTTPS
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# Before deploying:
+#   1. Copy .env.example to .env and fill in all values
+#   2. Update Caddyfile with your domain
+#   3. Configure DNS A record pointing to your VPS IP
+#   4. Add OAuth redirect in Discord Developer Portal:
+#      https://yourdomain.com/auth/callback
+
+services:
+  bot:
+    # Override dev settings for production
+    ports: []  # Don't expose directly - Caddy handles external traffic
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://eimm:${DB_PASSWORD}@postgres:5432/eimm
+      - BACKUP_RETENTION_DAYS=7
+      - PGPASSWORD=${DB_PASSWORD}
+      # Enable web interface in production
+      - WEB_ENABLED=true
+      - WEB_PORT=8080
+      - SESSION_SECRET=${SESSION_SECRET}
+      - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
+      - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
+      - DISCORD_REDIRECT_URI=${DISCORD_REDIRECT_URI}
+    restart: unless-stopped
+
+  postgres:
+    # Don't expose database port in production
+    ports: []
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - bot
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+  caddy_config:

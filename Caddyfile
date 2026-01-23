@@ -1,0 +1,30 @@
+# Caddyfile for EiMM-Hostbot
+#
+# Replace YOUR_DOMAIN with your actual domain (e.g., interviews.example.com)
+# Caddy automatically provisions HTTPS via Let's Encrypt
+
+YOUR_DOMAIN {
+	# Reverse proxy to the bot's web interface
+	reverse_proxy bot:8080
+
+	# Optional: Enable compression
+	encode gzip
+
+	# Optional: Security headers
+	header {
+		# Prevent clickjacking
+		X-Frame-Options "SAMEORIGIN"
+		# XSS protection
+		X-Content-Type-Options "nosniff"
+		# Referrer policy
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# Logging
+	log {
+		output file /data/access.log {
+			roll_size 10mb
+			roll_keep 5
+		}
+	}
+}
