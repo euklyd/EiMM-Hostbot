@@ -1,11 +1,22 @@
 # Caddyfile for EiMM-Hostbot
 #
-# Replace YOUR_DOMAIN with your actual domain (e.g., interviews.example.com)
+# Replace YOUR_DOMAIN with your actual domain (e.g., example.com)
 # Caddy automatically provisions HTTPS via Let's Encrypt
+#
+# The interview web app is served at /iv/
 
 YOUR_DOMAIN {
-	# Reverse proxy to the bot's web interface
-	reverse_proxy bot:8080
+	# Reverse proxy /iv/* to the bot's web interface
+	# strip_path_prefix removes /iv so backend sees /api/*, /auth/*, etc.
+	handle_path /iv/* {
+		reverse_proxy bot:8080
+	}
+
+	# Redirect /iv to /iv/ for consistency
+	redir /iv /iv/ permanent
+
+	# Optional: Redirect root to /iv/
+	# redir / /iv/ permanent
 
 	# Optional: Enable compression
 	encode gzip

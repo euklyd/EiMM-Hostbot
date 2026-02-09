@@ -23,13 +23,17 @@ class ApiError extends Error {
   }
 }
 
+// Get base path from Vite config (e.g., "/iv" for yourdomain.com/iv/)
+const basePath = import.meta.env.BASE_URL.replace(/\/$/, ""); // Remove trailing slash
+
 async function request<T>(
   path: string,
   options: RequestInit = {},
 ): Promise<T> {
-  console.debug(`[API] ${options.method ?? "GET"} ${path}`);
+  const fullPath = `${basePath}${path}`;
+  console.debug(`[API] ${options.method ?? "GET"} ${fullPath}`);
 
-  const response = await fetch(path, {
+  const response = await fetch(fullPath, {
     ...options,
     credentials: "include", // Include session cookies
     headers: {

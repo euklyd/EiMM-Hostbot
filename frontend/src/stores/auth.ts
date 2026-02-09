@@ -31,11 +31,13 @@ export const useAuthStore = defineStore("auth", () => {
   }
 
   function login(redirect = "/") {
-    window.location.href = `/auth/login?redirect=${encodeURIComponent(redirect)}`;
+    const base = import.meta.env.BASE_URL.replace(/\/$/, ""); // Remove trailing slash
+    window.location.href = `${base}/auth/login?redirect=${encodeURIComponent(redirect)}`;
   }
 
   function logout() {
-    window.location.href = "/auth/logout";
+    const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+    window.location.href = `${base}/auth/logout`;
   }
 
   function isMemberOf(guildId: number | string): boolean {

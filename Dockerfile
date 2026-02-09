@@ -1,10 +1,14 @@
 # Stage 1: Build frontend
 FROM node:20-slim AS frontend
 
+# Base path for the frontend (e.g., "/iv" for yourdomain.com/iv/)
+ARG VITE_BASE_PATH=/iv/
+
 WORKDIR /frontend
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
 RUN npm run build
 
 # Stage 2: Python application
