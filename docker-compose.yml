@@ -22,7 +22,7 @@ services:
       - "8080:8080"  # Web interface
     volumes:
       - ./conf:/app/conf:ro  # Bot config (includes token)
-      - ./databases:/app/databases  # SQLite databases
+      - databases:/app/databases  # SQLite databases
       - backups:/app/backups  # Pre-migration backups
     restart: on-failure
 
@@ -46,3 +46,4 @@ services:
 volumes:
   postgres_data:
   backups:
+  databases:
