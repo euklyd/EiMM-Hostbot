@@ -8,9 +8,10 @@ status = None
 
 extensions = [
     # Core cogs
-    "eimm",
     "hostbot",
     "macro",
+    # eimm requires conf/google_creds.json (Google Sheets service account credentials)
+    # "eimm",
     # Interview is a complex cog and is not part of the core utility; you're welcome to use it but it is complex.
     # "interview",
     # Utility cogs (formerly plugins)
