@@ -123,14 +123,17 @@ async def callback(
 
 
 @router.get("/logout")
-async def logout(request: Request) -> RedirectResponse:
+async def logout(
+    request: Request,
+    redirect: str = Query(default="/", description="URL to redirect to after logout"),
+) -> RedirectResponse:
     """Log out by clearing the session."""
     user = request.session.get("user")
     if user:
         logger.info(f"User logged out: {user.get('username')} (ID: {user.get('id')})")
 
     request.session.clear()
-    return RedirectResponse("/", status_code=status.HTTP_302_FOUND)
+    return RedirectResponse(redirect, status_code=status.HTTP_302_FOUND)
 
 
 @router.get("/me", response_model=DiscordUser | None)
