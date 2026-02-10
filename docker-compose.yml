@@ -23,7 +23,7 @@ services:
     volumes:
       - ./conf:/app/conf:ro  # Bot config (includes token)
       - ./databases:/app/databases  # SQLite databases
-      - ./backups:/app/backups  # Pre-migration backups (bind mount)
+      - backups:/app/backups  # Pre-migration backups
     restart: on-failure
 
   postgres:
@@ -45,3 +45,4 @@ services:
 
 volumes:
   postgres_data:
+  backups:
