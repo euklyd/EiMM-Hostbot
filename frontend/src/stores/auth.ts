@@ -32,7 +32,7 @@ export const useAuthStore = defineStore("auth", () => {
 
   function login(redirect?: string) {
     const base = import.meta.env.BASE_URL.replace(/\/$/, ""); // Remove trailing slash
-    const redirectPath = redirect ?? base || "/";
+    const redirectPath = redirect ?? (base || "/");
     window.location.href = `${base}/auth/login?redirect=${encodeURIComponent(redirectPath)}`;
   }
 
