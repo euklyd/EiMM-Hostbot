@@ -157,7 +157,8 @@ export const useInterviewStore = defineStore("interview", () => {
 
     wsServerId = serverId;
     const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/api/ws/${serverId}`;
+    const basePath = import.meta.env.BASE_URL.replace(/\/$/, "");
+    const wsUrl = `${protocol}//${window.location.host}${basePath}/api/ws/${serverId}`;
 
     ws = new WebSocket(wsUrl);
 
