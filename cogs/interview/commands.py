@@ -10,6 +10,7 @@ import asyncio
 import logging
 import re
 from collections.abc import Callable
+from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING, Annotated, Any, TypeVar
 
 import discord
@@ -142,6 +143,35 @@ def is_interviewee() -> Callable[[T], T]:
             return False
 
         return interview.interviewee_id == ctx.author.id
+
+    return commands.check(predicate)
+
+
+def is_interviewee_or_manager() -> Callable[[T], T]:
+    """Check if user is the current interviewee OR has the manager role."""
+
+    async def predicate(ctx: commands.Context) -> bool:
+        if ctx.guild is None:
+            return False
+
+        async with get_session() as session:
+            interview = await service.get_current_interview(session, ctx.guild.id)
+            server = await service.get_server(session, ctx.guild.id)
+
+        # Check interviewee
+        if interview is not None and interview.interviewee_id == ctx.author.id:
+            return True
+
+        # Check manager/admin
+        if ctx.author.guild_permissions.administrator:
+            return True
+
+        if server is not None and server.manager_role_id is not None:
+            role = ctx.guild.get_role(server.manager_role_id)
+            if role is not None and role in ctx.author.roles:
+                return True
+
+        return False
 
     return commands.check(predicate)
 
@@ -384,6 +414,29 @@ class Interview(commands.Cog):
                 )
                 return
 
+            # Check reinterview restrictions
+            server = await service.get_server(session, ctx.guild.id)
+            if server is not None:
+                reinterview_blocked = []
+                for candidate in valid_candidates:
+                    if not server.reinterviews_allowed:
+                        latest = await service.get_latest_interview_for_user(session, ctx.guild.id, candidate.id)
+                        if latest is not None:
+                            reinterview_blocked.append(candidate.display_name)
+                    elif server.reinterview_days > 0:
+                        latest = await service.get_latest_interview_for_user(session, ctx.guild.id, candidate.id)
+                        if latest is not None and latest.ended_at is not None:
+                            cooldown_end = latest.ended_at + timedelta(days=server.reinterview_days)
+                            if datetime.now(UTC) < cooldown_end:
+                                reinterview_blocked.append(candidate.display_name)
+
+                if reinterview_blocked:
+                    await ctx.send(
+                        f"Cannot vote for (reinterview restricted): {', '.join(reinterview_blocked)}",
+                        ephemeral=True,
+                    )
+                    return
+
             # Remove any existing votes first (allows override)
             await service.remove_vote(session, ctx.guild.id, ctx.author.id)
 
@@ -437,29 +490,63 @@ class Interview(commands.Cog):
 
     @commands.hybrid_command(name="votals")
     @commands.guild_only()
-    async def votals(self, ctx: commands.Context) -> None:
+    @app_commands.describe(flag="Use -f for full details (shows who voted for whom)")
+    async def votals(self, ctx: commands.Context, flag: str | None = None) -> None:
         """See the current vote standings."""
         if await self._require_setup(ctx) is None:
             return
 
+        full_mode = flag is not None and "-f" in flag
+
         async with get_session() as session:
-            votals = await service.get_votals(session, ctx.guild.id)
+            user_votes = await service.get_user_votes(session, ctx.guild.id, ctx.author.id)
 
-        if not votals:
-            await ctx.send("No votes yet!")
-            return
+            if full_mode:
+                detailed = await service.get_votals_detailed(session, ctx.guild.id)
 
-        lines = []
-        for candidate_id, count in votals:
-            member = ctx.guild.get_member(candidate_id)
-            name = member.display_name if member else f"<@{candidate_id}>"
-            lines.append(f"**{name}**: {count} vote{'s' if count != 1 else ''}")
+                if not detailed:
+                    await ctx.send("No votes yet!")
+                    return
+
+                lines = []
+                for candidate_id, voter_ids in detailed:
+                    member = ctx.guild.get_member(candidate_id)
+                    name = member.display_name if member else f"<@{candidate_id}>"
+                    voter_names = []
+                    for vid in voter_ids:
+                        voter = ctx.guild.get_member(vid)
+                        voter_names.append(voter.display_name if voter else f"<@{vid}>")
+                    count = len(voter_ids)
+                    lines.append(f"**{name}**: {count} vote{'s' if count != 1 else ''} ({', '.join(voter_names)})")
+            else:
+                votals_data = await service.get_votals(session, ctx.guild.id)
+
+                if not votals_data:
+                    await ctx.send("No votes yet!")
+                    return
+
+                lines = []
+                for candidate_id, count in votals_data:
+                    member = ctx.guild.get_member(candidate_id)
+                    name = member.display_name if member else f"<@{candidate_id}>"
+                    lines.append(f"**{name}**: {count} vote{'s' if count != 1 else ''}")
 
         embed = discord.Embed(
             title="Vote Standings",
             description="\n".join(lines),
             color=discord.Color.blue(),
         )
+
+        # Footer with invoker's own votes
+        if user_votes:
+            vote_mentions = []
+            for v in user_votes:
+                m = ctx.guild.get_member(v.candidate_id)
+                vote_mentions.append(m.display_name if m else str(v.candidate_id))
+            embed.set_footer(text=f"Your votes: {', '.join(vote_mentions)}")
+        else:
+            embed.set_footer(text="You haven't voted yet.")
+
         await ctx.send(embed=embed)
 
     # =========================================================================
@@ -604,8 +691,12 @@ class Interview(commands.Cog):
                 "`iv start @user` - Start interview with user\n"
                 "`iv end` - End current interview\n"
                 "`iv settings` - View current settings\n"
+                "`iv stats [@member]` - View interview statistics\n"
                 "`iv channel <answer|backstage|voting> #channel` - Update channels\n"
                 "`iv setmanager @role` - Set manager role\n"
+                "`iv setaudience @role` - Set audience/stage role\n"
+                "`iv stage <grant|revoke|list|clear>` - Manage stage access\n"
+                "`iv reinterview <on|off|set N>` - Configure reinterviews\n"
                 "`iv enable` / `iv disable` - Toggle interviews\n"
             ),
             color=discord.Color.blue(),
@@ -684,6 +775,9 @@ class Interview(commands.Cog):
                 )
                 return
 
+            # Clear votes from previous interview
+            await service.clear_votes(session, ctx.guild.id)
+
             # Start interview
             interview = await service.start_interview(
                 session,
@@ -693,27 +787,51 @@ class Interview(commands.Cog):
                 op_channel_id=ctx.channel.id,
                 op_message_id=ctx.message.id if ctx.message else None,
             )
+
+            # Add default question if configured
+            if server.default_question:
+                await service.add_question(
+                    session,
+                    interview_id=interview.id,
+                    asker_id=self.bot.user.id,
+                    asker_name=self.bot.user.display_name,
+                    question_text=server.default_question,
+                    source_guild_id=ctx.guild.id,
+                    source_channel_id=ctx.channel.id,
+                    source_message_id=ctx.message.id if ctx.message else 0,
+                )
+
             await session.commit()
 
-            # Broadcast to WebSocket clients
-            broadcast_event(
-                ctx.guild.id,
-                "interview_started",
-                {
-                    "interview_id": interview.id,
-                    "interview_number": interview.interview_number,
-                    "interviewee_id": str(interviewee.id),
-                    "interviewee_name": interviewee.display_name,
-                },
-            )
+        # Clear audience role (outside DB session — Discord API calls)
+        if server.audience_role_id is not None:
+            role = ctx.guild.get_role(server.audience_role_id)
+            if role is not None:
+                for member in role.members:
+                    try:
+                        await member.remove_roles(role, reason="New interview started")
+                    except discord.HTTPException:
+                        logger.warning(f"Failed to remove audience role from {member}")
 
-            embed = discord.Embed(
-                title=f"Interview #{interview.interview_number}: {interviewee.display_name}",
-                description=f"Use `{ctx.prefix}ask <question>` to submit questions!",
-                color=discord.Color.green(),
-            )
-            embed.set_thumbnail(url=interviewee.display_avatar.url)
-            await ctx.send(embed=embed)
+        # Broadcast to WebSocket clients
+        broadcast_event(
+            ctx.guild.id,
+            "interview_started",
+            {
+                "interview_id": interview.id,
+                "interview_number": interview.interview_number,
+                "interviewee_id": str(interviewee.id),
+                "interviewee_name": interviewee.display_name,
+            },
+        )
+
+        embed = discord.Embed(
+            title=f"Interview #{interview.interview_number}: {interviewee.display_name}",
+            description=f"Use `{ctx.prefix}ask <question>` to submit questions!",
+            color=discord.Color.green(),
+        )
+        embed.set_thumbnail(url=interviewee.display_avatar.url)
+        await ctx.send(embed=embed)
 
     @iv.command(name="end")
     @is_manager()
@@ -801,6 +919,24 @@ class Interview(commands.Cog):
             value=channel_mention(server.voting_channel_id) if server.voting_channel_id else "Any",
             inline=True,
         )
+        embed.add_field(
+            name="Audience Role",
+            value=role_mention(server.audience_role_id),
+            inline=True,
+        )
+
+        # Reinterview setting
+        if not server.reinterviews_allowed:
+            reinterview_str = "Disabled"
+        elif server.reinterview_days > 0:
+            reinterview_str = f"{server.reinterview_days} day cooldown"
+        else:
+            reinterview_str = "No limit"
+        embed.add_field(
+            name="Reinterviews",
+            value=reinterview_str,
+            inline=True,
+        )
 
         await ctx.send(embed=embed)
 
@@ -856,6 +992,177 @@ class Interview(commands.Cog):
 
         await ctx.send(f"Manager role set to {role.mention}.")
 
+    @iv.command(name="setaudience")
+    @commands.has_permissions(administrator=True)
+    @app_commands.describe(role="The role for interview stage/audience access")
+    async def iv_setaudience(self, ctx: commands.Context, role: discord.Role) -> None:
+        """Set the audience role (admin only)."""
+        async with get_session() as session:
+            await service.get_or_create_server(session, ctx.guild.id, ctx.guild.name)
+            await service.update_server_config(session, ctx.guild.id, audience_role_id=role.id)
+            await session.commit()
+
+        await ctx.send(f"Audience role set to {role.mention}.")
+
+    @iv.group(name="reinterview", fallback="show")
+    @is_manager()
+    async def iv_reinterview(self, ctx: commands.Context) -> None:
+        """View reinterview settings."""
+        async with get_session() as session:
+            server = await service.get_server(session, ctx.guild.id)
+
+        if server is None:
+            await ctx.send(
+                f"Interview system not set up. Use `{ctx.prefix}iv setup #answer #backstage` first.",
+                ephemeral=True,
+            )
+            return
+
+        if not server.reinterviews_allowed:
+            status = "Reinterviews are **disabled**."
+        elif server.reinterview_days > 0:
+            status = f"Reinterviews allowed after **{server.reinterview_days}** day cooldown."
+        else:
+            status = "Reinterviews allowed with **no limit**."
+
+        await ctx.send(status, ephemeral=True)
+
+    @iv_reinterview.command(name="on")
+    @is_manager()
+    async def iv_reinterview_on(self, ctx: commands.Context) -> None:
+        """Allow reinterviews."""
+        async with get_session() as session:
+            await service.get_or_create_server(session, ctx.guild.id, ctx.guild.name)
+            await service.update_server_config(session, ctx.guild.id, reinterviews_allowed=True)
+            await session.commit()
+
+        await ctx.send("Reinterviews enabled.")
+
+    @iv_reinterview.command(name="off")
+    @is_manager()
+    async def iv_reinterview_off(self, ctx: commands.Context) -> None:
+        """Disallow reinterviews."""
+        async with get_session() as session:
+            await service.get_or_create_server(session, ctx.guild.id, ctx.guild.name)
+            await service.update_server_config(session, ctx.guild.id, reinterviews_allowed=False)
+            await session.commit()
+
+        await ctx.send("Reinterviews disabled.")
+
+    @iv_reinterview.command(name="set")
+    @is_manager()
+    @app_commands.describe(days="Cooldown in days before someone can be reinterviewed (0 = no limit)")
+    async def iv_reinterview_set(self, ctx: commands.Context, days: int) -> None:
+        """Set reinterview cooldown in days."""
+        if days < 0:
+            await ctx.send("Days must be 0 or greater.", ephemeral=True)
+            return
+
+        async with get_session() as session:
+            await service.get_or_create_server(session, ctx.guild.id, ctx.guild.name)
+            await service.update_server_config(session, ctx.guild.id, reinterview_days=days)
+            await session.commit()
+
+        if days == 0:
+            await ctx.send("Reinterview cooldown removed (no limit).")
+        else:
+            await ctx.send(f"Reinterview cooldown set to {days} day{'s' if days != 1 else ''}.")
+
+    @iv.command(name="stats")
+    @interviews_enabled()
+    @app_commands.describe(member="View stats for a specific member (optional)")
+    async def iv_stats(self, ctx: commands.Context, member: discord.Member | None = None) -> None:
+        """View interview statistics."""
+        async with get_session() as session:
+            if member is not None:
+                # Member-specific stats
+                interviews = await service.get_member_interviews(session, ctx.guild.id, member.id)
+                question_count = await service.get_member_question_count(session, ctx.guild.id, member.id)
+
+                embed = discord.Embed(
+                    title=f"Interview Stats: {member.display_name}",
+                    color=member.color if member.color.value else discord.Color.blue(),
+                )
+                embed.set_thumbnail(url=member.display_avatar.url)
+
+                if interviews:
+                    interview_lines = []
+                    for iv_record in interviews:
+                        q_count = await service.count_questions(session, iv_record.id)
+                        a_count = await service.count_questions(session, iv_record.id, answered_only=True)
+                        status = "ongoing" if iv_record.is_current else f"<t:{int(iv_record.started_at.timestamp())}:d>"
+                        interview_lines.append(
+                            f"**#{iv_record.interview_number}** ({status}) — {q_count} Q / {a_count} A"
+                        )
+                    embed.add_field(
+                        name=f"Interviewed ({len(interviews)} time{'s' if len(interviews) != 1 else ''})",
+                        value="\n".join(interview_lines),
+                        inline=False,
+                    )
+                else:
+                    embed.add_field(name="Interviewed", value="Never", inline=False)
+
+                embed.add_field(
+                    name="Questions Asked",
+                    value=str(question_count),
+                    inline=True,
+                )
+            else:
+                # Server-wide stats
+                stats = await service.get_server_stats(session, ctx.guild.id)
+                interview = await service.get_current_interview(session, ctx.guild.id)
+                top_askers = await service.get_top_askers(session, ctx.guild.id, limit=5)
+
+                embed = discord.Embed(
+                    title="Interview Statistics",
+                    color=discord.Color.blue(),
+                )
+
+                if interview is not None:
+                    q_count = await service.count_questions(session, interview.id)
+                    a_count = await service.count_questions(session, interview.id, answered_only=True)
+                    embed.add_field(
+                        name="Current Interview",
+                        value=f"**{interview.interviewee_name}** (#{interview.interview_number}) — {q_count} Q / {a_count} A",
+                        inline=False,
+                    )
+
+                embed.add_field(name="Total Interviews", value=str(stats["total_interviews"]), inline=True)
+                embed.add_field(name="Total Questions", value=str(stats["total_questions"]), inline=True)
+                embed.add_field(
+                    name="Avg Questions/Interview",
+                    value=f"{stats['avg_questions_per_interview']:.1f}",
+                    inline=True,
+                )
+
+                if top_askers:
+                    asker_lines = [f"**{name}**: {count}" for _, name, count in top_askers]
+                    embed.add_field(
+                        name="Top Askers",
+                        value="\n".join(asker_lines),
+                        inline=False,
+                    )
+
+                # List recent interviews
+                recent = await service.get_interview_archive(session, ctx.guild.id, limit=10)
+                if recent:
+                    archive_lines = []
+                    for iv_record in recent:
+                        if iv_record.is_current:
+                            continue
+                        date_str = f"<t:{int(iv_record.started_at.timestamp())}:d>"
+                        archive_lines.append(
+                            f"#{iv_record.interview_number} **{iv_record.interviewee_name}** ({date_str})"
+                        )
+                    if archive_lines:
+                        embed.add_field(
+                            name="Recent Interviews",
+                            value="\n".join(archive_lines),
+                            inline=False,
+                        )
+
+        await ctx.send(embed=embed)
+
     @iv.command(name="enable")
     @is_manager()
     async def iv_enable(self, ctx: commands.Context) -> None:
@@ -876,6 +1183,248 @@ class Interview(commands.Cog):
             await session.commit()
 
         await ctx.send("Interview system disabled.")
+
+    # =========================================================================
+    # Stage Commands (audience role management)
+    # =========================================================================
+
+    @iv.group(name="stage", fallback="list")
+    @is_interviewee_or_manager()
+    async def iv_stage(self, ctx: commands.Context) -> None:
+        """List members with the audience/stage role."""
+        server = await self._require_setup(ctx)
+        if server is None:
+            return
+
+        if server.audience_role_id is None:
+            await ctx.send(
+                f"No audience role configured. Use `{ctx.prefix}iv setaudience @role` first.",
+                ephemeral=True,
+            )
+            return
+
+        role = ctx.guild.get_role(server.audience_role_id)
+        if role is None:
+            await ctx.send("Audience role not found in this server.", ephemeral=True)
+            return
+
+        if not role.members:
+            await ctx.send(f"No members currently have {role.mention}.", ephemeral=True)
+            return
+
+        lines = [m.display_name for m in role.members]
+        embed = discord.Embed(
+            title=f"Stage Members ({len(lines)})",
+            description="\n".join(lines),
+            color=discord.Color.blue(),
+        )
+        await ctx.send(embed=embed)
+
+    @iv_stage.command(name="grant")
+    @is_interviewee_or_manager()
+    @app_commands.describe(
+        member1="Member to grant stage access",
+        member2="Additional member (optional)",
+        member3="Additional member (optional)",
+        member4="Additional member (optional)",
+        member5="Additional member (optional)",
+    )
+    async def iv_stage_grant(
+        self,
+        ctx: commands.Context,
+        member1: discord.Member,
+        member2: discord.Member | None = None,
+        member3: discord.Member | None = None,
+        member4: discord.Member | None = None,
+        member5: discord.Member | None = None,
+    ) -> None:
+        """Grant audience/stage role to members."""
+        server = await self._require_setup(ctx)
+        if server is None:
+            return
+
+        if server.audience_role_id is None:
+            await ctx.send(
+                f"No audience role configured. Use `{ctx.prefix}iv setaudience @role` first.",
+                ephemeral=True,
+            )
+            return
+
+        role = ctx.guild.get_role(server.audience_role_id)
+        if role is None:
+            await ctx.send("Audience role not found in this server.", ephemeral=True)
+            return
+
+        members = [m for m in [member1, member2, member3, member4, member5] if m is not None]
+        granted = []
+        for member in members:
+            if role not in member.roles:
+                await member.add_roles(role, reason="Interview stage access granted")
+                granted.append(member.display_name)
+
+        if granted:
+            await ctx.send(f"Granted stage access to: {', '.join(granted)}")
+        else:
+            await ctx.send("All specified members already have stage access.", ephemeral=True)
+
+    @iv_stage.command(name="revoke")
+    @is_interviewee_or_manager()
+    @app_commands.describe(
+        member1="Member to revoke stage access from",
+        member2="Additional member (optional)",
+        member3="Additional member (optional)",
+        member4="Additional member (optional)",
+        member5="Additional member (optional)",
+    )
+    async def iv_stage_revoke(
+        self,
+        ctx: commands.Context,
+        member1: discord.Member,
+        member2: discord.Member | None = None,
+        member3: discord.Member | None = None,
+        member4: discord.Member | None = None,
+        member5: discord.Member | None = None,
+    ) -> None:
+        """Revoke audience/stage role from members."""
+        server = await self._require_setup(ctx)
+        if server is None:
+            return
+
+        if server.audience_role_id is None:
+            await ctx.send(
+                f"No audience role configured. Use `{ctx.prefix}iv setaudience @role` first.",
+                ephemeral=True,
+            )
+            return
+
+        role = ctx.guild.get_role(server.audience_role_id)
+        if role is None:
+            await ctx.send("Audience role not found in this server.", ephemeral=True)
+            return
+
+        members = [m for m in [member1, member2, member3, member4, member5] if m is not None]
+        revoked = []
+        for member in members:
+            if role in member.roles:
+                await member.remove_roles(role, reason="Interview stage access revoked")
+                revoked.append(member.display_name)
+
+        if revoked:
+            await ctx.send(f"Revoked stage access from: {', '.join(revoked)}")
+        else:
+            await ctx.send("None of the specified members had stage access.", ephemeral=True)
+
+    @iv_stage.command(name="mgrant", with_app_command=False)
+    @is_interviewee_or_manager()
+    async def iv_stage_mgrant(
+        self,
+        ctx: commands.Context,
+        members: commands.Greedy[discord.Member],
+    ) -> None:
+        """Grant stage access to many members at once (prefix only)."""
+        if not members:
+            await ctx.send("Mention one or more members to grant stage access to.", ephemeral=True)
+            return
+
+        server = await self._require_setup(ctx)
+        if server is None:
+            return
+
+        if server.audience_role_id is None:
+            await ctx.send(
+                f"No audience role configured. Use `{ctx.prefix}iv setaudience @role` first.",
+                ephemeral=True,
+            )
+            return
+
+        role = ctx.guild.get_role(server.audience_role_id)
+        if role is None:
+            await ctx.send("Audience role not found in this server.", ephemeral=True)
+            return
+
+        granted = []
+        for member in members:
+            if role not in member.roles:
+                await member.add_roles(role, reason="Interview stage access granted")
+                granted.append(member.display_name)
+
+        if granted:
+            await ctx.send(
+                f"Granted stage access to {len(granted)} member{'s' if len(granted) != 1 else ''}: {', '.join(granted)}"
+            )
+        else:
+            await ctx.send("All specified members already have stage access.", ephemeral=True)
+
+    @iv_stage.command(name="mrevoke", with_app_command=False)
+    @is_interviewee_or_manager()
+    async def iv_stage_mrevoke(
+        self,
+        ctx: commands.Context,
+        members: commands.Greedy[discord.Member],
+    ) -> None:
+        """Revoke stage access from many members at once (prefix only)."""
+        if not members:
+            await ctx.send("Mention one or more members to revoke stage access from.", ephemeral=True)
+            return
+
+        server = await self._require_setup(ctx)
+        if server is None:
+            return
+
+        if server.audience_role_id is None:
+            await ctx.send(
+                f"No audience role configured. Use `{ctx.prefix}iv setaudience @role` first.",
+                ephemeral=True,
+            )
+            return
+
+        role = ctx.guild.get_role(server.audience_role_id)
+        if role is None:
+            await ctx.send("Audience role not found in this server.", ephemeral=True)
+            return
+
+        revoked = []
+        for member in members:
+            if role in member.roles:
+                await member.remove_roles(role, reason="Interview stage access revoked")
+                revoked.append(member.display_name)
+
+        if revoked:
+            await ctx.send(
+                f"Revoked stage access from {len(revoked)} member{'s' if len(revoked) != 1 else ''}: {', '.join(revoked)}"
+            )
+        else:
+            await ctx.send("None of the specified members had stage access.", ephemeral=True)
+
+    @iv_stage.command(name="clear")
+    @is_interviewee_or_manager()
+    async def iv_stage_clear(self, ctx: commands.Context) -> None:
+        """Remove audience/stage role from all members."""
+        server = await self._require_setup(ctx)
+        if server is None:
+            return
+
+        if server.audience_role_id is None:
+            await ctx.send(
+                f"No audience role configured. Use `{ctx.prefix}iv setaudience @role` first.",
+                ephemeral=True,
+            )
+            return
+
+        role = ctx.guild.get_role(server.audience_role_id)
+        if role is None:
+            await ctx.send("Audience role not found in this server.", ephemeral=True)
+            return
+
+        count = 0
+        for member in role.members:
+            await member.remove_roles(role, reason="Interview stage cleared")
+            count += 1
+
+        if count > 0:
+            await ctx.send(f"Removed stage access from {count} member{'s' if count != 1 else ''}.")
+        else:
+            await ctx.send("No members had stage access.", ephemeral=True)
 
     # =========================================================================
     # Opt-out Commands

@@ -97,6 +97,27 @@ async def get_interview(session: AsyncSession, interview_id: int) -> Interview |
     return result.scalar_one_or_none()
 
 
+async def get_latest_interview_for_user(
+    session: AsyncSession,
+    server_id: int,
+    user_id: int,
+) -> Interview | None:
+    """Get the most recent interview where user was the interviewee.
+
+    Used for reinterview cooldown enforcement.
+    """
+    result = await session.execute(
+        select(Interview)
+        .where(
+            Interview.server_id == server_id,
+            Interview.interviewee_id == user_id,
+        )
+        .order_by(Interview.started_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_interview_archive(
     session: AsyncSession,
     server_id: int,
@@ -341,6 +362,44 @@ async def get_votals(
     return [(int(row[0]), int(row[1])) for row in result.all()]
 
 
+async def get_votals_detailed(
+    session: AsyncSession,
+    server_id: int,
+) -> list[tuple[int, list[int]]]:
+    """Get vote details per candidate for a server.
+
+    Returns list of (candidate_id, [voter_ids]) tuples, ordered by vote count desc.
+    """
+    # Get all votes for this server, ordered by candidate
+    result = await session.execute(select(Vote.candidate_id, Vote.voter_id).where(Vote.server_id == server_id))
+    rows = result.all()
+
+    # Group voter_ids by candidate
+    candidates: dict[int, list[int]] = {}
+    for candidate_id, voter_id in rows:
+        candidates.setdefault(int(candidate_id), []).append(int(voter_id))
+
+    # Sort by vote count descending
+    return sorted(candidates.items(), key=lambda x: len(x[1]), reverse=True)
+
+
+async def clear_votes(
+    session: AsyncSession,
+    server_id: int,
+) -> int:
+    """Remove all votes for a server.
+
+    Returns the number of votes removed.
+    """
+    result = await session.execute(select(Vote).where(Vote.server_id == server_id))
+    votes = result.scalars().all()
+
+    for vote in votes:
+        await session.delete(vote)
+
+    return len(votes)
+
+
 # =============================================================================
 # Server Config
 # =============================================================================
@@ -580,6 +639,41 @@ async def get_top_askers(
         .limit(limit)
     )
     return [(int(row[0]), str(row[1]), int(row[2])) for row in result.all()]
+
+
+async def get_member_question_count(
+    session: AsyncSession,
+    server_id: int,
+    user_id: int,
+) -> int:
+    """Count questions asked by a member across all interviews in a server."""
+    result = await session.execute(
+        select(func.count(Question.id))
+        .join(Interview, Question.interview_id == Interview.id)
+        .where(
+            Interview.server_id == server_id,
+            Question.asker_id == user_id,
+            Question.deleted_at.is_(None),
+        )
+    )
+    return result.scalar() or 0
+
+
+async def get_member_interviews(
+    session: AsyncSession,
+    server_id: int,
+    user_id: int,
+) -> list[Interview]:
+    """Get interviews where user was the interviewee, most recent first."""
+    result = await session.execute(
+        select(Interview)
+        .where(
+            Interview.server_id == server_id,
+            Interview.interviewee_id == user_id,
+        )
+        .order_by(Interview.started_at.desc())
+    )
+    return list(result.scalars().all())
 
 
 async def get_server_stats(

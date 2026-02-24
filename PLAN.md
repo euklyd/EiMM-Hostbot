@@ -14,6 +14,7 @@ Modernize the EiMM-Hostbot Discord bot with these changes:
 | 6 | ✅ Complete | Upgrade discord.py v1.7.3 → v2.x |
 | 7 | ✅ Complete | Add unit tests with pytest (219 tests) |
 | 8 | ✅ Complete | Overhaul interview cog: PostgreSQL + web admin UI |
+| 8b | 🔧 In Progress | [Interview missing features](docs/design-plans/2026-02-20-interview-missing-features.md): commands, migration, tests |
 
 ---
 
@@ -353,7 +354,8 @@ Which features are available via Discord vs Web:
 
 7. **Write migration script** (deferred)
    - Import existing SQLite data
-   - Import Google Sheets Q&A history (optional, for archive)
+   - Import Google Sheets Q&A history (4 spreadsheets, gspread)
+   - See [interview missing features plan](docs/design-plans/2026-02-20-interview-missing-features.md)
 
 8. **Update Docker Compose** ✅
    - Combined bot+web container
