@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import { useAuthStore } from "../stores/auth";
+import { useThemeStore, THEMES } from "../stores/theme";
 
 const auth = useAuthStore();
+const themeStore = useThemeStore();
 const avatarFailed = ref(false);
 
 function onAvatarError() {
@@ -39,6 +41,24 @@ function onAvatarError() {
       >
         Search
       </router-link>
+    </div>
+
+    <!-- Theme selector (desktop only) -->
+    <div class="hidden md:block px-3 py-3 border-t border-gray-700">
+      <p class="text-gray-400 text-xs mb-2 px-1">Theme</p>
+      <div class="flex gap-2">
+        <button
+          v-for="t in THEMES"
+          :key="t.id"
+          :title="t.label"
+          @click="themeStore.setTheme(t.id)"
+          class="w-6 h-6 rounded-full border-2 transition-all"
+          :style="{ backgroundColor: t.swatch }"
+          :class="themeStore.theme === t.id
+            ? 'border-indigo-500 scale-110'
+            : 'border-gray-600 hover:border-gray-400'"
+        />
+      </div>
     </div>
 
     <!-- User section -->

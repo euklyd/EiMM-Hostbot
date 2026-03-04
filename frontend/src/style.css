@@ -31,6 +31,47 @@ body {
   font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
+/* Light theme */
+[data-theme="light"] {
+  color-scheme: light;
+
+  /* Gray scale inverted: darkest values become lightest surfaces */
+  --color-white:    #111111;  /* text-white (headings) → near-black */
+  --color-gray-50:  #000000;
+  --color-gray-100: #111111;
+  --color-gray-200: #202124;  /* body text */
+  --color-gray-300: #3c4043;  /* secondary text */
+  --color-gray-400: #5f6368;  /* muted text */
+  --color-gray-500: #9aa0a6;  /* disabled */
+  --color-gray-600: #bdc1c6;  /* muted borders */
+  --color-gray-700: #e0e0e0;  /* borders */
+  --color-gray-750: #f1f3f4;  /* elevated surfaces */
+  --color-gray-800: #f8f9fa;  /* cards/surfaces */
+  --color-gray-850: #ffffff;  /* main content bg */
+  --color-gray-900: #f1f3f4;  /* sidebar */
+
+  /* Red: invert so error states work on light bg */
+  --color-red-200:  #991b1b;  /* text-red-200 → dark red */
+  --color-red-700:  #dc2626;  /* border-red-700 → visible red */
+  --color-red-900:  #fff5f5;  /* bg-red-900/50 → very light red */
+
+  /* Green: invert for light bg */
+  --color-green-400: #15803d;  /* text-green-400 → dark green */
+  --color-green-900: #f0fdf4;  /* bg-green-900/50 → very light green */
+}
+
+[data-theme="light"] ::-webkit-scrollbar-track {
+  background: #f1f3f4;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: #bdc1c6;
+}
+
+[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: #9aa0a6;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
