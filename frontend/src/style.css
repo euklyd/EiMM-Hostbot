@@ -1,19 +1,33 @@
 @import "tailwindcss";
 
-/* Custom theme overrides */
-:root {
-  --discord-dark: #36393f;
-  --discord-darker: #2f3136;
-  --discord-darkest: #202225;
-  --discord-blurple: #5865f2;
-  --discord-green: #3ba55c;
-  --discord-yellow: #faa61a;
-  --discord-red: #ed4245;
+/* Discord color palette — remaps Tailwind's gray and indigo scales */
+@theme {
+  /* Gray scale → Discord surface colors */
+  --color-gray-50:  #f2f3f5;
+  --color-gray-100: #e3e5e8;
+  --color-gray-200: #dbdee1;
+  --color-gray-300: #b5bac1;
+  --color-gray-400: #80848e;
+  --color-gray-500: #6d6f78;
+  --color-gray-600: #4e5058;
+  --color-gray-700: #3f4147;
+  --color-gray-750: #383a40;
+  --color-gray-800: #2b2d31;
+  --color-gray-900: #1e1f22;
+
+  /* Indigo scale → Discord blurple */
+  --color-indigo-300: #9ca8f5;
+  --color-indigo-400: #8891f2;
+  --color-indigo-500: #5865f2;
+  --color-indigo-600: #5865f2;
+  --color-indigo-700: #4752c4;
+  --color-indigo-800: #4752c4;
+  --color-indigo-900: #3c45a5;
 }
 
 body {
-  @apply bg-gray-900 text-gray-100 min-h-screen;
-  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  @apply bg-gray-900 text-gray-200 min-h-screen;
+  font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
 /* Custom scrollbar */
@@ -22,14 +36,14 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--discord-darkest);
+  background: #1e1f22;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--discord-darker);
+  background: #3f4147;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--discord-dark);
+  background: #4e5058;
 }

@@ -165,3 +165,9 @@ After implementation:
 2. `uv run pyright` — type-check clean
 3. `uv run pytest` — all tests pass (existing 219 + new)
 4. Manual test in Discord: stage commands, reinterview enforcement, votals --full, stats display
+
+---
+
+## Backlog (not planned)
+
+- Additional CSS themes that users can choose between
