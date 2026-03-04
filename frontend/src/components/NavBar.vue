@@ -1,11 +1,16 @@
 <script setup lang="ts">
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import { useAuthStore } from "../stores/auth";
 import { useThemeStore, THEMES } from "../stores/theme";
 
 const auth = useAuthStore();
 const themeStore = useThemeStore();
 const avatarFailed = ref(false);
+const showThemePicker = ref(false);
+
+const activeThemeSwatch = computed(
+  () => THEMES.find((t) => t.id === themeStore.theme)?.swatch ?? "#2b2d31"
+);
 
 function onAvatarError() {
   avatarFailed.value = true;
@@ -43,6 +48,10 @@ function onAvatarError() {
       </router-link>
     </div>
 
+    <!-- TODO(mobile-nav): The mobile top bar is intentionally kept minimal for now.
+         As nav links and features grow, reconsider freely — a hamburger drawer,
+         bottom tab bar, or collapsible menu are all on the table. -->
+
     <!-- Theme selector (desktop only) -->
     <div class="hidden md:block px-3 py-3 border-t border-gray-700">
       <p class="text-gray-400 text-xs mb-2 px-1">Theme</p>
@@ -52,6 +61,41 @@ function onAvatarError() {
           :key="t.id"
           :title="t.label"
           @click="themeStore.setTheme(t.id)"
+          class="w-6 h-6 rounded-full border-2 transition-all"
+          :style="{ backgroundColor: t.swatch }"
+          :class="themeStore.theme === t.id
+            ? 'border-indigo-500 scale-110'
+            : 'border-gray-600 hover:border-gray-400'"
+        />
+      </div>
+    </div>
+
+    <!-- Mobile theme picker -->
+    <div class="relative md:hidden mr-1">
+      <!-- Transparent overlay closes the picker on outside click -->
+      <div v-if="showThemePicker" class="fixed inset-0 z-40" @click="showThemePicker = false" />
+
+      <button
+        @click="showThemePicker = !showThemePicker"
+        class="p-1 rounded hover:bg-gray-700 transition-colors"
+        title="Change theme"
+      >
+        <!-- Current theme shown as a colored dot -->
+        <span
+          class="block w-5 h-5 rounded-full border-2 border-gray-500"
+          :style="{ backgroundColor: activeThemeSwatch }"
+        />
+      </button>
+
+      <div
+        v-if="showThemePicker"
+        class="absolute right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg p-2 flex gap-2 shadow-lg z-50"
+      >
+        <button
+          v-for="t in THEMES"
+          :key="t.id"
+          :title="t.label"
+          @click="themeStore.setTheme(t.id); showThemePicker = false"
           class="w-6 h-6 rounded-full border-2 transition-all"
           :style="{ backgroundColor: t.swatch }"
           :class="themeStore.theme === t.id
