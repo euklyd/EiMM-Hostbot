@@ -171,3 +171,4 @@ After implementation:
 ## Backlog (not planned)
 
 - Additional CSS themes that users can choose between
+- Server list sidebar (second column, Discord-style) for users in multiple interview-enabled servers; auto-select and hide if only one server

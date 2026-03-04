@@ -13,6 +13,7 @@
   --color-gray-700: #3f4147;
   --color-gray-750: #383a40;
   --color-gray-800: #2b2d31;
+  --color-gray-850: #313338;
   --color-gray-900: #1e1f22;
 
   /* Indigo scale → Discord blurple */
@@ -26,7 +27,7 @@
 }
 
 body {
-  @apply bg-gray-900 text-gray-200 min-h-screen;
+  @apply bg-gray-850 text-gray-200 min-h-screen;
   font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
