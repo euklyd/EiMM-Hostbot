@@ -4,6 +4,10 @@ import type { QuestionResponse } from "../api/types";
 import AnswerContent from "./AnswerContent.vue";
 import FormattedText from "./FormattedText.vue";
 import { stripMarkdownLinks, parseAnswerImages } from "../utils/markdown";
+import { useThemeStore } from "../stores/theme";
+
+const themeStore = useThemeStore();
+const isSheetsTheme = computed(() => themeStore.theme.startsWith("sheets"));
 
 const props = defineProps<{
   question: QuestionResponse;
@@ -192,7 +196,21 @@ watch(isEditing, (editing) => {
           <div class="flex items-center gap-2 mb-1">
             <span class="text-gray-400 text-sm font-medium">#{{ question.question_number }}</span>
             <span class="text-gray-400 text-sm truncate">{{ question.asker_name }}</span>
-            <span :class="statusDotColor" class="inline-block w-2 h-2 rounded-full flex-shrink-0"></span>
+            <!-- Status: dot (default) or Sheets-style checkbox -->
+            <template v-if="isSheetsTheme">
+              <svg v-if="question.is_posted" class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 18 18" fill="none">
+                <rect x="1" y="1" width="16" height="16" rx="2" fill="#34a853"/>
+                <path d="M4.5 9l3 3 6-6" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+              <svg v-else-if="question.answer_text" class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 18 18" fill="none">
+                <rect x="1" y="1" width="16" height="16" rx="2" fill="#fbbc04"/>
+                <path d="M5 9h8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+              </svg>
+              <svg v-else class="w-3.5 h-3.5 flex-shrink-0" viewBox="0 0 18 18" fill="none">
+                <rect x="1" y="1" width="16" height="16" rx="2" stroke="#9aa0a6" stroke-width="1.5"/>
+              </svg>
+            </template>
+            <span v-else :class="statusDotColor" class="inline-block w-2 h-2 rounded-full flex-shrink-0"></span>
           </div>
           <!-- Question preview -->
           <p class="text-gray-100 text-sm line-clamp-2">{{ question.question_text }}</p>
@@ -246,7 +264,7 @@ watch(isEditing, (editing) => {
             v-if="question.jump_url"
             :href="question.jump_url"
             target="_blank"
-            class="text-indigo-400"
+            class="text-indigo-400 jump-link"
             @click.stop
           >
             Jump to Discord
@@ -370,7 +388,7 @@ watch(isEditing, (editing) => {
       </td>
 
       <!-- Asker -->
-      <td class="px-2 py-1.5 text-gray-400 text-sm w-28 truncate">
+      <td class="px-2 py-1.5 text-gray-400 text-sm w-28 truncate asker-cell">
         {{ question.asker_name }}
       </td>
 
@@ -385,6 +403,7 @@ watch(isEditing, (editing) => {
       <!-- Answer preview -->
       <td
         class="px-2 py-1.5 text-sm w-48 cursor-pointer"
+        :class="{ 'empty-answer-cell': isSheetsTheme && !question.answer_text }"
         :title="isAnswerTruncated ? (question.answer_text ?? undefined) : undefined"
         @click.stop="expandAndEdit"
       >
@@ -395,7 +414,20 @@ watch(isEditing, (editing) => {
 
       <!-- Status -->
       <td class="px-2 py-1.5 text-center w-12" :title="statusText">
-        <span :class="statusDotColor" class="inline-block w-2 h-2 rounded-full"></span>
+        <template v-if="isSheetsTheme">
+          <svg v-if="question.is_posted" class="w-4 h-4 inline" viewBox="0 0 18 18" fill="none">
+            <rect x="1" y="1" width="16" height="16" rx="2" fill="#34a853"/>
+            <path d="M4.5 9l3 3 6-6" stroke="white" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <svg v-else-if="question.answer_text" class="w-4 h-4 inline" viewBox="0 0 18 18" fill="none">
+            <rect x="1" y="1" width="16" height="16" rx="2" fill="#fbbc04"/>
+            <path d="M5 9h8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          <svg v-else class="w-4 h-4 inline" viewBox="0 0 18 18" fill="none">
+            <rect x="1" y="1" width="16" height="16" rx="2" stroke="#9aa0a6" stroke-width="1.5"/>
+          </svg>
+        </template>
+        <span v-else :class="statusDotColor" class="inline-block w-2 h-2 rounded-full"></span>
       </td>
 
       <!-- Jump link -->
@@ -404,7 +436,7 @@ watch(isEditing, (editing) => {
           v-if="question.jump_url"
           :href="question.jump_url"
           target="_blank"
-          class="text-indigo-400 hover:text-indigo-300"
+          class="text-indigo-400 hover:text-indigo-300 jump-link"
           title="Jump to message"
           @click.stop
         >
@@ -452,7 +484,7 @@ watch(isEditing, (editing) => {
                 v-if="question.jump_url"
                 :href="question.jump_url"
                 target="_blank"
-                class="text-indigo-400 hover:text-indigo-300 text-xs"
+                class="text-indigo-400 hover:text-indigo-300 text-xs jump-link"
                 @click.stop
               >
                 Jump to message

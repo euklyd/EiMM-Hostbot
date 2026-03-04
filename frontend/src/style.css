@@ -72,6 +72,133 @@ body {
   background: #9aa0a6;
 }
 
+/* ─── Sheets: combined ────────────────────────────────────────────────────── */
+/* Green Sheets chrome (sheets-ui) + spreadsheet data tables (sheets-data).   */
+/* UI uses Google Sans; table cell content uses monospace.                    */
+[data-theme="sheets"] {
+  color-scheme: light;
+
+  --color-white:    #111111;
+  --color-gray-50:  #000000;
+  --color-gray-100: #111111;
+  --color-gray-200: #202124;
+  --color-gray-300: #3c4043;
+  --color-gray-400: #5f6368;
+  --color-gray-500: #9aa0a6;
+  --color-gray-600: #bdc1c6;
+  --color-gray-700: #e2e3e4;   /* cell border color */
+  --color-gray-750: #f3f3f3;
+  --color-gray-800: #f8f9fa;
+  --color-gray-850: #ffffff;
+  --color-gray-900: #eaf3eb;   /* sidebar: green tint */
+
+  /* Indigo → Sheets green */
+  --color-indigo-300: #5bb974;
+  --color-indigo-400: #34a853;
+  --color-indigo-500: #188038;
+  --color-indigo-600: #188038;
+  --color-indigo-700: #137333;
+  --color-indigo-800: #0d652d;
+  --color-indigo-900: #e6f4ea;
+
+  /* Status colors */
+  --color-red-200:   #991b1b;
+  --color-red-700:   #dc2626;
+  --color-red-900:   #fff5f5;
+  --color-green-400: #137333;
+  --color-green-900: #e6f4ea;
+
+  /* Slightly reduced radius — boxy but not harsh */
+  --radius-sm: 1px;
+  --radius:    2px;
+  --radius-md: 3px;
+  --radius-lg: 4px;
+  --radius-xl: 4px;
+}
+
+[data-theme="sheets"] body {
+  font-family: "Google Sans", "Roboto", Arial, sans-serif;
+}
+
+/* Cell-bordered tables */
+[data-theme="sheets"] table {
+  border-collapse: collapse;
+}
+[data-theme="sheets"] th,
+[data-theme="sheets"] td {
+  border: 1px solid #e2e3e4;
+}
+[data-theme="sheets"] thead th {
+  background: #e6f4ea;   /* green-tinted header row */
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+}
+
+/* Table cell content uses monospace; UI chrome stays sans-serif */
+[data-theme="sheets"] td {
+  font-family: "Roboto Mono", "Courier New", Courier, monospace;
+}
+
+/* "Post answers" button */
+[data-theme="sheets"] .post-btn {
+  background-color: #aaddee;
+  border-radius: 9999px;
+  color: #111111;
+}
+[data-theme="sheets"] .post-btn:hover {
+  background-color: #93cfe6;
+}
+
+/* Asker column: bold Google blue */
+[data-theme="sheets"] .asker-cell {
+  color: #1a73e8;
+  font-weight: 600;
+}
+
+/* Empty answer cell: light green fill (classic Sheets empty-cell highlight) */
+[data-theme="sheets"] .empty-answer-cell {
+  background-color: #b7e1cd;
+}
+
+/* Jump links: Google blue instead of theme green */
+[data-theme="sheets"] .jump-link,
+[data-theme="sheets"] .jump-link svg {
+  color: #1a73e8;
+}
+[data-theme="sheets"] .jump-link:hover {
+  color: #4285f4;
+}
+
+[data-theme="sheets"] ::-webkit-scrollbar-track  { background: #f1f3f4; }
+[data-theme="sheets"] ::-webkit-scrollbar-thumb  { background: #bdc1c6; }
+[data-theme="sheets"] ::-webkit-scrollbar-thumb:hover { background: #9aa0a6; }
+
+/* Green sidebar: scoped overrides so only the nav gets the Sheets green   */
+/* chrome — main content variables are unaffected.                         */
+[data-theme="sheets"] nav {
+  background-color: #188038;
+
+  /* Text on dark green */
+  --color-white:    #ffffff;
+  --color-gray-200: rgba(255,255,255,0.92);  /* username */
+  --color-gray-300: rgba(255,255,255,0.85);  /* nav links */
+  --color-gray-400: rgba(255,255,255,0.62);  /* Theme label, muted */
+  --color-gray-500: rgba(255,255,255,0.42);  /* very muted */
+
+  /* Borders + hover bg on green */
+  --color-gray-600: rgba(255,255,255,0.2);
+  --color-gray-700: rgba(255,255,255,0.15);  /* border-t, hover:bg-gray-700 */
+
+  /* Indigo in sidebar context */
+  --color-indigo-300: rgba(255,255,255,0.9);  /* hover:text-indigo-300 */
+  --color-indigo-400: rgba(255,255,255,0.9);  /* text links */
+  --color-indigo-500: rgba(255,255,255,0.75); /* active swatch ring + avatar bg */
+  --color-indigo-600: #0d652d;  /* login button: darker green (visible on sidebar) */
+  --color-indigo-700: #0a5426;
+  --color-indigo-800: #07421f;
+}
+
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

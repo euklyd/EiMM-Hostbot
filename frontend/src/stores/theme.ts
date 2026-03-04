@@ -1,17 +1,19 @@
 import { defineStore } from "pinia";
 import { ref } from "vue";
 
-export type Theme = "discord" | "light";
+export type Theme = "discord" | "light" | "sheets";
 
 export interface ThemeMeta {
   id: Theme;
   label: string;
+  /** Color shown in the sidebar swatch picker */
   swatch: string;
 }
 
 export const THEMES: ThemeMeta[] = [
   { id: "discord", label: "Discord", swatch: "#2b2d31" },
-  { id: "light", label: "Light", swatch: "#ffffff" },
+  { id: "light",   label: "Light",   swatch: "#e8eaed" },
+  { id: "sheets",  label: "Sheets",  swatch: "#188038" },
 ];
 
 export const useThemeStore = defineStore("theme", () => {
