@@ -131,6 +131,34 @@ export const useInterviewStore = defineStore("interview", () => {
     }
   }
 
+  async function toggleStashQuestion(questionId: number) {
+    try {
+      const updated = await api.toggleStashQuestion(questionId);
+      const index = questions.value.findIndex((q) => q.id === questionId);
+      if (index !== -1) {
+        questions.value[index] = updated;
+      }
+      return updated;
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : "Failed to stash question";
+      throw e;
+    }
+  }
+
+  async function clearAnswer(questionId: number) {
+    try {
+      const updated = await api.clearAnswer(questionId);
+      const index = questions.value.findIndex((q) => q.id === questionId);
+      if (index !== -1) {
+        questions.value[index] = updated;
+      }
+      return updated;
+    } catch (e) {
+      error.value = e instanceof Error ? e.message : "Failed to clear answer";
+      throw e;
+    }
+  }
+
   async function postAnswers(interviewId: number) {
     try {
       const result = await api.postAnswers(interviewId);
@@ -300,6 +328,8 @@ export const useInterviewStore = defineStore("interview", () => {
     fetchQuestions,
     answerQuestion,
     deleteQuestion,
+    toggleStashQuestion,
+    clearAnswer,
     postAnswers,
     connectWebSocket,
     disconnectWebSocket,

@@ -125,6 +125,18 @@ export async function deleteQuestion(questionId: number): Promise<void> {
   });
 }
 
+export async function toggleStashQuestion(questionId: number): Promise<QuestionResponse> {
+  return request<QuestionResponse>(`/api/questions/${questionId}/stash`, {
+    method: "PUT",
+  });
+}
+
+export async function clearAnswer(questionId: number): Promise<QuestionResponse> {
+  return request<QuestionResponse>(`/api/questions/${questionId}/answer`, {
+    method: "DELETE",
+  });
+}
+
 export async function postAnswers(interviewId: number): Promise<PostAnswersResponse> {
   return request<PostAnswersResponse>(`/api/interviews/${interviewId}/post`, {
     method: "POST",

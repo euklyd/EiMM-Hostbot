@@ -85,6 +85,14 @@ async function handleDelete(questionId: number) {
   await store.deleteQuestion(questionId);
 }
 
+async function handleStash(questionId: number) {
+  await store.toggleStashQuestion(questionId);
+}
+
+async function handleClearAnswer(questionId: number) {
+  await store.clearAnswer(questionId);
+}
+
 async function handlePost() {
   posting.value = true;
   postMessage.value = null;
@@ -281,6 +289,8 @@ async function retryLoad() {
           :can-delete="canDelete"
           @answer="handleAnswer"
           @delete="handleDelete"
+          @stash="handleStash"
+          @clear-answer="handleClearAnswer"
         />
 
         <!-- Empty state -->

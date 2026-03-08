@@ -195,6 +195,7 @@ async def get_questions(
             query = query.where(
                 Question.answer_text.isnot(None),
                 Question.is_posted == False,  # noqa: E712
+                Question.is_stashed == False,  # noqa: E712
             )
         case QuestionFilter.POSTED:
             query = query.where(Question.is_posted == True)  # noqa: E712
@@ -227,6 +228,25 @@ async def answer_question(
 
     question.answer_text = answer_text
     question.answered_at = datetime.now(UTC)
+    return question
+
+
+async def set_stashed(session: AsyncSession, question_id: int, stashed: bool) -> Question | None:
+    """Set the stash state of a question. Returns the question if found, None otherwise."""
+    question = await get_question(session, question_id)
+    if question is None:
+        return None
+    question.is_stashed = stashed
+    return question
+
+
+async def clear_answer(session: AsyncSession, question_id: int) -> Question | None:
+    """Clear the answer from a question. Returns the question if found, None otherwise."""
+    question = await get_question(session, question_id)
+    if question is None:
+        return None
+    question.answer_text = None
+    question.answered_at = None
     return question
 
 

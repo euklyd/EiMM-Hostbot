@@ -18,6 +18,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   answer: [questionId: number, answerText: string];
   delete: [questionId: number];
+  stash: [questionId: number];
+  clearAnswer: [questionId: number];
 }>();
 
 const isExpanded = ref(false);
@@ -161,6 +163,17 @@ function cancelEdit() {
 function confirmDelete() {
   if (confirm("Delete this question? This cannot be undone.")) {
     emit("delete", props.question.id);
+  }
+}
+
+function toggleStash() {
+  emit("stash", props.question.id);
+}
+
+function confirmClearAnswer() {
+  if (confirm("Clear this answer? The question will return to unanswered.")) {
+    isEditing.value = false;
+    emit("clearAnswer", props.question.id);
   }
 }
 
@@ -350,14 +363,14 @@ watch(isEditing, (editing) => {
             <div class="text-gray-100 text-sm">
               <AnswerContent :text="question.answer_text" />
             </div>
-            <button
-              v-if="canAnswer && !question.is_posted"
-              type="button"
-              @click="startEditing"
-              class="text-indigo-400 text-sm mt-2"
-            >
-              Edit answer
-            </button>
+            <div v-if="canAnswer && !question.is_posted" class="flex gap-3 mt-2">
+              <button type="button" @click="startEditing" class="text-indigo-400 text-sm">
+                Edit answer
+              </button>
+              <button type="button" @click="confirmClearAnswer" class="text-gray-400 text-sm">
+                Clear answer
+              </button>
+            </div>
           </template>
 
           <!-- Display mode without answer -->
@@ -374,15 +387,26 @@ watch(isEditing, (editing) => {
           </template>
         </div>
 
-        <!-- Delete button -->
-        <button
-          v-if="canDelete"
-          type="button"
-          @click.stop="confirmDelete"
-          class="mt-3 text-red-400 text-sm"
-        >
-          Delete question
-        </button>
+        <!-- Action buttons -->
+        <div v-if="canAnswer || canDelete" class="mt-3 flex gap-3">
+          <button
+            v-if="canAnswer && !question.is_posted"
+            type="button"
+            @click.stop="toggleStash"
+            class="text-sm"
+            :class="question.is_stashed ? 'text-yellow-400' : 'text-gray-400'"
+          >
+            {{ question.is_stashed ? 'Unstash' : 'Stash' }}
+          </button>
+          <button
+            v-if="canDelete"
+            type="button"
+            @click.stop="confirmDelete"
+            class="text-red-400 text-sm"
+          >
+            Delete question
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -508,6 +532,15 @@ watch(isEditing, (editing) => {
                 Jump to message
               </a>
               <button
+                v-if="canAnswer && !question.is_posted"
+                type="button"
+                @click.stop="toggleStash"
+                class="text-xs"
+                :class="question.is_stashed ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-400 hover:text-gray-300'"
+              >
+                {{ question.is_stashed ? 'Unstash' : 'Stash' }}
+              </button>
+              <button
                 v-if="canDelete"
                 type="button"
                 @click.stop="confirmDelete"
@@ -587,14 +620,22 @@ watch(isEditing, (editing) => {
                 <div class="text-gray-100">
                   <AnswerContent :text="question.answer_text" />
                 </div>
-                <button
-                  v-if="canAnswer && !question.is_posted"
-                  type="button"
-                  @click="startEditing"
-                  class="text-xs text-indigo-400 hover:text-indigo-300 mt-2"
-                >
-                  Edit answer
-                </button>
+                <div v-if="canAnswer && !question.is_posted" class="flex gap-3 mt-2">
+                  <button
+                    type="button"
+                    @click="startEditing"
+                    class="text-xs text-indigo-400 hover:text-indigo-300"
+                  >
+                    Edit answer
+                  </button>
+                  <button
+                    type="button"
+                    @click="confirmClearAnswer"
+                    class="text-xs text-gray-400 hover:text-gray-300"
+                  >
+                    Clear answer
+                  </button>
+                </div>
               </template>
 
               <!-- Display mode without answer -->

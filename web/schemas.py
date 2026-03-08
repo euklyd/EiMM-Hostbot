@@ -187,6 +187,7 @@ class QuestionResponse(BaseModel):
     question_text: str
     answer_text: str | None = None
     is_posted: bool
+    is_stashed: bool
     asked_at: datetime
     answered_at: datetime | None = None
     jump_url: str

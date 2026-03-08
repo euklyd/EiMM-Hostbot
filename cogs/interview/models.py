@@ -126,6 +126,7 @@ class Question(Base):
 
     # Status
     is_posted: Mapped[bool] = mapped_column(Boolean, default=False)
+    is_stashed: Mapped[bool] = mapped_column(Boolean, default=False)
 
     # Timestamps
     asked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

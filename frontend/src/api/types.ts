@@ -60,6 +60,7 @@ export interface QuestionResponse {
   question_text: string;
   answer_text: string | null;
   is_posted: boolean;
+  is_stashed: boolean;
   asked_at: string;
   answered_at: string | null;
   jump_url: string;

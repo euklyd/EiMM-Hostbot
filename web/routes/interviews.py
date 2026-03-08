@@ -302,6 +302,65 @@ async def answer_question(
     return QuestionResponse.model_validate(updated)
 
 
+@router.put("/questions/{question_id}/stash", response_model=QuestionResponse)
+async def stash_question(
+    question_id: int,
+    user: CurrentUser,
+    db: DbSession,
+) -> QuestionResponse:
+    """Toggle stash on a question. Stashed questions are excluded from batch posting.
+
+    Only the interviewee can stash questions.
+    """
+    question = await service.get_question(db, question_id)
+    if question is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Question not found")
+
+    interview = await service.get_interview(db, question.interview_id)
+    if interview is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Interview not found")
+
+    if interview.interviewee_id != user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the interviewee can stash questions")
+
+    updated = await service.set_stashed(db, question_id, not question.is_stashed)
+    await db.commit()
+
+    logger.info(f"Question {question_id} stash={updated.is_stashed} by {user.username}")
+    return QuestionResponse.model_validate(updated)
+
+
+@router.delete("/questions/{question_id}/answer", response_model=QuestionResponse)
+async def clear_answer(
+    question_id: int,
+    user: CurrentUser,
+    db: DbSession,
+) -> QuestionResponse:
+    """Clear the answer from a question.
+
+    Only the interviewee can clear answers. Cannot clear an already-posted answer.
+    """
+    question = await service.get_question(db, question_id)
+    if question is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Question not found")
+
+    interview = await service.get_interview(db, question.interview_id)
+    if interview is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Interview not found")
+
+    if interview.interviewee_id != user.id:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only the interviewee can clear answers")
+
+    if question.is_posted:
+        raise HTTPException(status.HTTP_409_CONFLICT, "Cannot clear an already-posted answer")
+
+    updated = await service.clear_answer(db, question_id)
+    await db.commit()
+
+    logger.info(f"Question {question_id} answer cleared by {user.username}")
+    return QuestionResponse.model_validate(updated)
+
+
 @router.delete("/questions/{question_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_question(
     question_id: int,
