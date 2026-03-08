@@ -69,6 +69,20 @@ async def sync(ctx: commands.Context, guild_id: int | None = None) -> None:
 
 @commands.command()
 @commands.is_owner()
+async def unsync(ctx: commands.Context, guild_id: int) -> None:
+    """
+    Clear guild-specific slash commands, leaving only global ones.
+
+    Useful for removing duplicate commands caused by a previous ##sync <guild_id>.
+    """
+    guild = discord.Object(id=guild_id)
+    ctx.bot.tree.clear_commands(guild=guild)
+    await ctx.bot.tree.sync(guild=guild)
+    await ctx.send(f"Cleared guild-specific commands from {guild_id}.")
+
+
+@commands.command()
+@commands.is_owner()
 async def shutdown(ctx: commands.Context) -> None:
     """
     Zzz.
@@ -160,6 +174,7 @@ async def main() -> None:
         bot.add_command(reload)
         bot.add_command(unload)
         bot.add_command(sync)
+        bot.add_command(unsync)
 
         logging.warning("starting bot")
 
