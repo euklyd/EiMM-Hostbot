@@ -1462,9 +1462,8 @@ class Interview(commands.Cog):
             await ctx.send("You weren't opted out.", ephemeral=True)
 
     @opt.command(name="list")
-    @is_manager()
     async def opt_list(self, ctx: commands.Context) -> None:
-        """List users who have opted out (manager only)."""
+        """List users who have opted out."""
         async with get_session() as session:
             opt_outs = await service.get_opt_outs(session, ctx.guild.id)
 
