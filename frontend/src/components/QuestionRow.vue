@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import type { QuestionResponse } from "../api/types";
 import AnswerContent from "./AnswerContent.vue";
 import FormattedText from "./FormattedText.vue";
@@ -24,6 +24,8 @@ const isExpanded = ref(false);
 const isEditing = ref(false);
 const editText = ref(props.question.answer_text || "");
 const saving = ref(false);
+const mobileTextareaRef = ref<HTMLTextAreaElement | null>(null);
+const desktopTextareaRef = ref<HTMLTextAreaElement | null>(null);
 
 // Character limits for previews and Discord
 const QUESTION_PREVIEW_LIMIT = 80;
@@ -173,10 +175,24 @@ function handleKeydown(event: KeyboardEvent) {
   }
 }
 
+function autoResize(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = el.scrollHeight + "px";
+}
+
+function onTextareaInput(event: Event) {
+  autoResize(event.target as HTMLTextAreaElement);
+}
+
 // Auto-expand when entering edit mode from external trigger
 watch(isEditing, (editing) => {
   if (editing) {
     isExpanded.value = true;
+    nextTick(() => {
+      autoResize(mobileTextareaRef.value);
+      autoResize(desktopTextareaRef.value);
+    });
   }
 });
 </script>
@@ -284,11 +300,13 @@ watch(isEditing, (editing) => {
           <template v-if="isEditing">
             <div class="space-y-2">
               <textarea
+                ref="mobileTextareaRef"
                 v-model="editText"
-                class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-gray-100 text-sm resize-none focus:outline-none focus:border-indigo-500"
+                class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-gray-100 text-sm resize-none max-h-64 overflow-y-auto focus:outline-none focus:border-indigo-500"
                 rows="4"
                 placeholder="Type your answer..."
                 :disabled="saving"
+                @input="onTextareaInput"
               ></textarea>
               <!-- Validation feedback -->
               <div class="flex flex-wrap items-center gap-2 text-xs">
@@ -518,12 +536,14 @@ watch(isEditing, (editing) => {
               <template v-if="isEditing">
                 <div class="space-y-2">
                   <textarea
+                    ref="desktopTextareaRef"
                     v-model="editText"
-                    class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-gray-100 resize-none focus:outline-none focus:border-indigo-500"
+                    class="w-full bg-gray-700 border border-gray-600 rounded-md p-2 text-gray-100 resize-none max-h-64 overflow-y-auto focus:outline-none focus:border-indigo-500"
                     rows="3"
                     placeholder="Type your answer... (Ctrl+Enter to save, Esc to cancel)"
                     :disabled="saving"
                     @keydown="handleKeydown"
+                    @input="onTextareaInput"
                   ></textarea>
                   <!-- Validation feedback -->
                   <div class="flex flex-wrap items-center gap-3 text-xs">
