@@ -344,6 +344,8 @@ async function retryLoad() {
               :can-delete="canDelete"
               @answer="handleAnswer"
               @delete="handleDelete"
+              @stash="handleStash"
+              @clear-answer="handleClearAnswer"
             />
           </tbody>
         </table>

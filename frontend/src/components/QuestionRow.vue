@@ -367,7 +367,7 @@ watch(isEditing, (editing) => {
               <button type="button" @click="startEditing" class="text-indigo-400 text-sm">
                 Edit answer
               </button>
-              <button type="button" @click="confirmClearAnswer" class="text-gray-400 text-sm">
+              <button type="button" @click="confirmClearAnswer" class="text-gray-400 text-sm cursor-pointer">
                 Clear answer
               </button>
             </div>
@@ -393,7 +393,7 @@ watch(isEditing, (editing) => {
             v-if="canAnswer && !question.is_posted"
             type="button"
             @click.stop="toggleStash"
-            class="text-sm"
+            class="text-sm cursor-pointer"
             :class="question.is_stashed ? 'text-yellow-400' : 'text-gray-400'"
           >
             {{ question.is_stashed ? 'Unstash' : 'Stash' }}
@@ -402,7 +402,7 @@ watch(isEditing, (editing) => {
             v-if="canDelete"
             type="button"
             @click.stop="confirmDelete"
-            class="text-red-400 text-sm"
+            class="text-red-400 text-sm cursor-pointer"
           >
             Delete question
           </button>
@@ -493,7 +493,7 @@ watch(isEditing, (editing) => {
         <button
           type="button"
           @click.stop="confirmDelete"
-          class="text-red-400 hover:text-red-300"
+          class="text-red-400 hover:text-red-300 cursor-pointer"
           title="Delete question"
         >
           <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -535,7 +535,7 @@ watch(isEditing, (editing) => {
                 v-if="canAnswer && !question.is_posted"
                 type="button"
                 @click.stop="toggleStash"
-                class="text-xs"
+                class="text-xs cursor-pointer"
                 :class="question.is_stashed ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-400 hover:text-gray-300'"
               >
                 {{ question.is_stashed ? 'Unstash' : 'Stash' }}
@@ -544,7 +544,7 @@ watch(isEditing, (editing) => {
                 v-if="canDelete"
                 type="button"
                 @click.stop="confirmDelete"
-                class="text-red-400 hover:text-red-300 text-xs"
+                class="text-red-400 hover:text-red-300 text-xs cursor-pointer"
               >
                 Delete
               </button>
@@ -624,14 +624,14 @@ watch(isEditing, (editing) => {
                   <button
                     type="button"
                     @click="startEditing"
-                    class="text-xs text-indigo-400 hover:text-indigo-300"
+                    class="text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer"
                   >
                     Edit answer
                   </button>
                   <button
                     type="button"
                     @click="confirmClearAnswer"
-                    class="text-xs text-gray-400 hover:text-gray-300"
+                    class="text-xs text-gray-400 hover:text-gray-300 cursor-pointer"
                   >
                     Clear answer
                   </button>

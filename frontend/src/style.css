@@ -31,6 +31,10 @@ body {
   font-family: "gg sans", "Noto Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
 }
 
+button {
+  cursor: pointer;
+}
+
 /* Light theme */
 [data-theme="light"] {
   color-scheme: light;
