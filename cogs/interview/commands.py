@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Annotated, Any, TypeVar
 import discord
 from discord import app_commands
 from discord.ext import commands
+from sqlalchemy import select
 
 from db.session import get_session
 
@@ -25,7 +26,8 @@ from .embeds import (
     QuestionData,
     generate_answer_embeds,
 )
-from .models import InterviewServer
+from .models import Interview as InterviewModel
+from .models import InterviewServer, Question
 from .service import QuestionFilter
 
 if TYPE_CHECKING:
@@ -1555,6 +1557,64 @@ class Interview(commands.Cog):
             await session.commit()
 
         await ctx.send("All interview data for this server has been deleted.")
+
+    @iv.command(name="backfill_names")
+    @commands.is_owner()
+    async def iv_backfill_names(self, ctx: commands.Context) -> None:
+        """[DEV] Backfill asker_name and interviewee_name with current usernames.
+
+        Resolves stored user IDs to their current Discord usernames (.name),
+        replacing old display/guild names. Falls back to fetch_user for users
+        not in the bot's cache. Reports how many records were updated.
+        """
+        await ctx.send("Backfilling names, this may take a moment...")
+
+        async with get_session() as session:
+            questions = (await session.execute(select(Question))).scalars().all()
+            interviews = (await session.execute(select(InterviewModel))).scalars().all()
+
+        # Collect all unique user IDs to resolve
+        user_ids: set[int] = set()
+        for q in questions:
+            user_ids.add(q.asker_id)
+        for iv in interviews:
+            user_ids.add(iv.interviewee_id)
+
+        # Resolve IDs to usernames: cache first, then REST
+        names: dict[int, str] = {}
+        failed: list[int] = []
+        for uid in user_ids:
+            user = self.bot.get_user(uid)
+            if user is None:
+                try:
+                    user = await self.bot.fetch_user(uid)
+                except discord.NotFound:
+                    failed.append(uid)
+                    continue
+            names[uid] = user.name
+
+        # Apply updates
+        q_updated = 0
+        iv_updated = 0
+        async with get_session() as session:
+            for q in await session.execute(select(Question)):
+                q = q[0]
+                new_name = names.get(q.asker_id)
+                if new_name and q.asker_name != new_name:
+                    q.asker_name = new_name
+                    q_updated += 1
+            for interview in await session.execute(select(InterviewModel)):
+                interview = interview[0]
+                new_name = names.get(interview.interviewee_id)
+                if new_name and interview.interviewee_name != new_name:
+                    interview.interviewee_name = new_name
+                    iv_updated += 1
+            await session.commit()
+
+        reply = f"Done. Updated {q_updated} question(s) and {iv_updated} interview(s)."
+        if failed:
+            reply += f"\nCould not resolve {len(failed)} user ID(s): {', '.join(str(i) for i in failed)}"
+        await ctx.send(reply)
 
 
 async def setup(bot: Bot) -> None:
