@@ -277,7 +277,7 @@ class Interview(commands.Cog):
                 session,
                 interview_id=interview.id,
                 asker_id=ctx.author.id,
-                asker_name=ctx.author.display_name,
+                asker_name=ctx.author.name,
                 question_text=question,
                 source_guild_id=ctx.guild.id,
                 source_channel_id=ctx.channel.id,
@@ -292,7 +292,7 @@ class Interview(commands.Cog):
                 {
                     "question_id": q.id,
                     "question_number": q.question_number,
-                    "asker_name": ctx.author.display_name,
+                    "asker_name": ctx.author.name,
                 },
             )
 
@@ -335,7 +335,7 @@ class Interview(commands.Cog):
                     session,
                     interview_id=interview.id,
                     asker_id=ctx.author.id,
-                    asker_name=ctx.author.display_name,
+                    asker_name=ctx.author.name,
                     question_text=q_text,
                     source_guild_id=ctx.guild.id,
                     source_channel_id=ctx.channel.id,
@@ -352,7 +352,7 @@ class Interview(commands.Cog):
                     {
                         "question_id": q_id,
                         "question_number": q_num,
-                        "asker_name": ctx.author.display_name,
+                        "asker_name": ctx.author.name,
                     },
                 )
 
@@ -391,57 +391,69 @@ class Interview(commands.Cog):
         all_candidates = [candidate1, candidate2, candidate3, candidate4, candidate5]
         candidates = [c for c in all_candidates if c is not None]
 
-        # Filter out bots
-        valid_candidates = [c for c in candidates if not c.bot]
-        if not valid_candidates:
-            await ctx.send("You can't vote for bots!", ephemeral=True)
-            return
+        # Filter each rejection reason separately, collect errors to report together
+        rejected_bots = [c for c in candidates if c.bot]
+        candidates = [c for c in candidates if not c.bot]
+
+        rejected_self = ctx.author in candidates
+        if rejected_self:
+            candidates.remove(ctx.author)
 
         async with get_session() as session:
             # Get current interview for historical tracking (optional)
             interview = await service.get_current_interview(session, ctx.guild.id)
 
-            # Check for opted-out candidates
-            opted_out = []
-            for candidate in valid_candidates:
+            # Filter opted-out candidates
+            rejected_opted_out = []
+            for candidate in candidates[:]:
                 if await service.is_opted_out(session, ctx.guild.id, candidate.id):
-                    opted_out.append(candidate.display_name)
+                    rejected_opted_out.append(candidate)
+            candidates = [c for c in candidates if c not in rejected_opted_out]
 
-            if opted_out:
-                await ctx.send(
-                    f"Cannot vote for opted-out users: {', '.join(opted_out)}",
-                    ephemeral=True,
-                )
-                return
-
-            # Check reinterview restrictions
+            # Filter reinterview-restricted candidates
             server = await service.get_server(session, ctx.guild.id)
+            rejected_reinterview = []
             if server is not None:
-                reinterview_blocked = []
-                for candidate in valid_candidates:
+                for candidate in candidates[:]:
                     if not server.reinterviews_allowed:
                         latest = await service.get_latest_interview_for_user(session, ctx.guild.id, candidate.id)
                         if latest is not None:
-                            reinterview_blocked.append(candidate.display_name)
+                            rejected_reinterview.append(candidate)
                     elif server.reinterview_days > 0:
                         latest = await service.get_latest_interview_for_user(session, ctx.guild.id, candidate.id)
                         if latest is not None and latest.ended_at is not None:
                             cooldown_end = latest.ended_at + timedelta(days=server.reinterview_days)
                             if datetime.now(UTC) < cooldown_end:
-                                reinterview_blocked.append(candidate.display_name)
+                                rejected_reinterview.append(candidate)
+                candidates = [c for c in candidates if c not in rejected_reinterview]
 
-                if reinterview_blocked:
-                    await ctx.send(
-                        f"Cannot vote for (reinterview restricted): {', '.join(reinterview_blocked)}",
-                        ephemeral=True,
-                    )
-                    return
+            # Build combined error message for ignored votes
+            error_lines = []
+            if rejected_bots:
+                names = ", ".join(f"`{c.name}`" for c in rejected_bots)
+                error_lines.append(
+                    f"• As much as I would love to usher in the **Rᴏʙᴏᴛ Rᴇᴠᴏʟᴜᴛɪᴏɴ**, you cannot vote for "
+                    f"bots such as {names}."
+                )
+            if rejected_self:
+                error_lines.append("• Your **anti-town** self vote.")
+            if rejected_opted_out:
+                names = ", ".join(f"`{c.name}`" for c in rejected_opted_out)
+                error_lines.append(f"• Opted out: {names}.")
+            if rejected_reinterview:
+                names = ", ".join(f"`{c.name}`" for c in rejected_reinterview)
+                error_lines.append(f"• Interviewed too recently: {names}.")
+
+            if not candidates:
+                reply = "The following votes were ignored:\n" + "\n".join(error_lines)
+                await ctx.send(reply, ephemeral=True)
+                return
 
             # Remove any existing votes first (allows override)
             await service.remove_vote(session, ctx.guild.id, ctx.author.id)
 
             # Cast vote for each candidate
-            for candidate in valid_candidates:
+            for candidate in candidates:
                 await service.cast_vote(
                     session,
                     server_id=ctx.guild.id,
@@ -452,6 +464,9 @@ class Interview(commands.Cog):
 
             await session.commit()
 
+        if error_lines:
+            reply = "The following votes were ignored:\n" + "\n".join(error_lines)
+            await ctx.send(reply, ephemeral=True)
         await self._success(ctx)
 
     @commands.hybrid_command(name="unvote")
@@ -511,11 +526,11 @@ class Interview(commands.Cog):
                 lines = []
                 for candidate_id, voter_ids in detailed:
                     member = ctx.guild.get_member(candidate_id)
-                    name = member.display_name if member else f"<@{candidate_id}>"
+                    name = member.name if member else f"<@{candidate_id}>"
                     voter_names = []
                     for vid in voter_ids:
                         voter = ctx.guild.get_member(vid)
-                        voter_names.append(voter.display_name if voter else f"<@{vid}>")
+                        voter_names.append(voter.name if voter else f"<@{vid}>")
                     count = len(voter_ids)
                     lines.append(f"**{name}**: {count} vote{'s' if count != 1 else ''} ({', '.join(voter_names)})")
             else:
@@ -528,7 +543,7 @@ class Interview(commands.Cog):
                 lines = []
                 for candidate_id, count in votals_data:
                     member = ctx.guild.get_member(candidate_id)
-                    name = member.display_name if member else f"<@{candidate_id}>"
+                    name = member.name if member else f"<@{candidate_id}>"
                     lines.append(f"**{name}**: {count} vote{'s' if count != 1 else ''}")
 
         embed = discord.Embed(
@@ -542,7 +557,7 @@ class Interview(commands.Cog):
             vote_mentions = []
             for v in user_votes:
                 m = ctx.guild.get_member(v.candidate_id)
-                vote_mentions.append(m.display_name if m else str(v.candidate_id))
+                vote_mentions.append(m.name if m else str(v.candidate_id))
             embed.set_footer(text=f"Your votes: {', '.join(vote_mentions)}")
         else:
             embed.set_footer(text="You haven't voted yet.")
@@ -770,7 +785,7 @@ class Interview(commands.Cog):
             # Check if opted out
             if await service.is_opted_out(session, ctx.guild.id, interviewee.id):
                 await ctx.send(
-                    f"{interviewee.display_name} has opted out of interviews.",
+                    f"{interviewee.name} has opted out of interviews.",
                     ephemeral=True,
                 )
                 return
@@ -783,7 +798,7 @@ class Interview(commands.Cog):
                 session,
                 server_id=ctx.guild.id,
                 interviewee_id=interviewee.id,
-                interviewee_name=interviewee.display_name,
+                interviewee_name=interviewee.name,
                 op_channel_id=ctx.channel.id,
                 op_message_id=ctx.message.id if ctx.message else None,
             )
@@ -794,7 +809,7 @@ class Interview(commands.Cog):
                     session,
                     interview_id=interview.id,
                     asker_id=self.bot.user.id,
-                    asker_name=self.bot.user.display_name,
+                    asker_name=self.bot.user.name,
                     question_text=server.default_question,
                     source_guild_id=ctx.guild.id,
                     source_channel_id=ctx.channel.id,
@@ -821,12 +836,12 @@ class Interview(commands.Cog):
                 "interview_id": interview.id,
                 "interview_number": interview.interview_number,
                 "interviewee_id": str(interviewee.id),
-                "interviewee_name": interviewee.display_name,
+                "interviewee_name": interviewee.name,
             },
         )
 
         embed = discord.Embed(
-            title=f"Interview #{interview.interview_number}: {interviewee.display_name}",
+            title=f"Interview #{interview.interview_number}: {interviewee.name}",
             description=f"Use `{ctx.prefix}ask <question>` to submit questions!",
             color=discord.Color.green(),
         )
@@ -1080,7 +1095,7 @@ class Interview(commands.Cog):
                 question_count = await service.get_member_question_count(session, ctx.guild.id, member.id)
 
                 embed = discord.Embed(
-                    title=f"Interview Stats: {member.display_name}",
+                    title=f"Interview Stats: {member.name}",
                     color=member.color if member.color.value else discord.Color.blue(),
                 )
                 embed.set_thumbnail(url=member.display_avatar.url)
@@ -1212,7 +1227,7 @@ class Interview(commands.Cog):
             await ctx.send(f"No members currently have {role.mention}.", ephemeral=True)
             return
 
-        lines = [m.display_name for m in role.members]
+        lines = [m.name for m in role.members]
         embed = discord.Embed(
             title=f"Stage Members ({len(lines)})",
             description="\n".join(lines),
@@ -1260,7 +1275,7 @@ class Interview(commands.Cog):
         for member in members:
             if role not in member.roles:
                 await member.add_roles(role, reason="Interview stage access granted")
-                granted.append(member.display_name)
+                granted.append(member.name)
 
         if granted:
             await ctx.send(f"Granted stage access to: {', '.join(granted)}")
@@ -1307,7 +1322,7 @@ class Interview(commands.Cog):
         for member in members:
             if role in member.roles:
                 await member.remove_roles(role, reason="Interview stage access revoked")
-                revoked.append(member.display_name)
+                revoked.append(member.name)
 
         if revoked:
             await ctx.send(f"Revoked stage access from: {', '.join(revoked)}")
@@ -1346,7 +1361,7 @@ class Interview(commands.Cog):
         for member in members:
             if role not in member.roles:
                 await member.add_roles(role, reason="Interview stage access granted")
-                granted.append(member.display_name)
+                granted.append(member.name)
 
         if granted:
             await ctx.send(
@@ -1387,7 +1402,7 @@ class Interview(commands.Cog):
         for member in members:
             if role in member.roles:
                 await member.remove_roles(role, reason="Interview stage access revoked")
-                revoked.append(member.display_name)
+                revoked.append(member.name)
 
         if revoked:
             await ctx.send(
@@ -1474,7 +1489,7 @@ class Interview(commands.Cog):
         lines = []
         for user_id in opt_outs:
             member = ctx.guild.get_member(user_id)
-            name = member.display_name if member else f"<@{user_id}>"
+            name = member.name if member else f"<@{user_id}>"
             lines.append(name)
 
         embed = discord.Embed(
