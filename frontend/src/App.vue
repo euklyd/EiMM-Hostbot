@@ -30,7 +30,7 @@ onMounted(async () => {
 <template>
   <div class="min-h-screen flex flex-col md:flex-row">
     <NavBar />
-    <main class="flex-1 container mx-auto px-4 py-6">
+    <main class="flex-1 container mx-auto px-4 py-6 md:ml-56">
       <!-- Wait for auth check before rendering routes -->
       <!-- Key on full path forces component recreation on navigation -->
       <router-view v-if="authReady" :key="routeKey" />

@@ -22,8 +22,8 @@ function onAvatarError() {
   <nav
     class="bg-gray-800 border-b border-gray-700
            flex items-center px-3 sm:px-4 h-12 sm:h-14
-           md:flex-col md:items-stretch md:h-auto md:min-h-screen md:w-56
-           md:border-b-0 md:border-r md:px-0 md:py-0"
+           md:fixed md:top-0 md:left-0 md:flex-col md:items-stretch md:h-screen md:w-56
+           md:border-b-0 md:border-r md:px-0 md:py-0 md:z-50"
   >
     <!-- Logo -->
     <router-link
