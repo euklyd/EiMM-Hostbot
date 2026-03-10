@@ -231,7 +231,7 @@ class Interview(commands.Cog):
             return None
         return server
 
-    async def _success(self, ctx: commands.Context) -> None:
+    async def _success(self, ctx: commands.Context, message: str | None = None) -> None:
         """Indicate success with a reaction (prefix) or ephemeral message (slash)."""
         if ctx.message:
             # Prefix command - react to the message
@@ -239,10 +239,10 @@ class Interview(commands.Cog):
                 await ctx.message.add_reaction(self.bot.greentick)
             except discord.HTTPException:
                 # Fallback if we can't react
-                await ctx.send("\N{WHITE HEAVY CHECK MARK}", ephemeral=True)
+                await ctx.send(message or "\N{WHITE HEAVY CHECK MARK}", ephemeral=True)
         else:
             # Slash command - can't react, send ephemeral confirmation
-            await ctx.send("\N{WHITE HEAVY CHECK MARK}", ephemeral=True)
+            await ctx.send(message or "\N{WHITE HEAVY CHECK MARK}", ephemeral=True)
 
     # =========================================================================
     # Audience Commands - Asking Questions
@@ -298,10 +298,7 @@ class Interview(commands.Cog):
                 },
             )
 
-            await ctx.send(
-                f"Question #{q.question_number} submitted for {interview.interviewee_name}!",
-                ephemeral=True,
-            )
+            await self._success(ctx, f"Question #{q.question_number} submitted for {interview.interviewee_name}!")
 
     @commands.hybrid_command(name="mask")
     @commands.guild_only()
@@ -358,10 +355,7 @@ class Interview(commands.Cog):
                     },
                 )
 
-            await ctx.send(
-                f"Submitted {len(added)} questions (#{added[0][1]}-#{added[-1][1]}) for {interview.interviewee_name}!",
-                ephemeral=True,
-            )
+            await self._success(ctx, f"Submitted {len(added)} question(s) for {interview.interviewee_name}!")
 
     # =========================================================================
     # Audience Commands - Voting
@@ -482,10 +476,7 @@ class Interview(commands.Cog):
             removed = await service.remove_vote(session, ctx.guild.id, ctx.author.id)
             await session.commit()
 
-        if removed:
-            await ctx.send("Vote removed.", ephemeral=True)
-        else:
-            await ctx.send("You haven't voted yet.", ephemeral=True)
+        await self._success(ctx)
 
     @commands.hybrid_command(name="votes")
     @commands.guild_only()
@@ -686,10 +677,7 @@ class Interview(commands.Cog):
 
             await session.commit()
 
-            await ctx.send(
-                f"Posted {len(questions)} answers to {answer_channel.mention}!",
-                ephemeral=True,
-            )
+            await self._success(ctx, f"Posted {len(questions)} answer(s) to {answer_channel.mention}!")
 
     # =========================================================================
     # Management Commands (iv group)
