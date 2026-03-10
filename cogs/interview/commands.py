@@ -491,10 +491,18 @@ class Interview(commands.Cog):
         if not user_votes:
             await ctx.send("You haven't voted yet.", ephemeral=True)
         elif len(user_votes) == 1:
-            await ctx.send(f"You voted for <@{user_votes[0].candidate_id}>.", ephemeral=True)
+            await ctx.send(
+                f"You voted for <@{user_votes[0].candidate_id}>.",
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
         else:
             mentions = ", ".join(f"<@{v.candidate_id}>" for v in user_votes)
-            await ctx.send(f"You voted for: {mentions}", ephemeral=True)
+            await ctx.send(
+                f"You voted for: {mentions}",
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
 
     @commands.hybrid_command(name="votals")
     @commands.guild_only()
