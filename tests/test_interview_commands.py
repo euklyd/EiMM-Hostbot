@@ -6,7 +6,7 @@ import discord
 import pytest
 from discord.ext import commands
 
-from cogs.interview.commands import TextChannelConverter
+from cogs.interview.commands import TextChannelConverter, _MemberOrStr
 
 
 @pytest.fixture
@@ -178,3 +178,26 @@ class TestTextChannelConverter:
             result = await converter.convert(mock_ctx_for_converter, snowflake_with_unicode)
 
             assert result == mock_text_channel
+
+
+class TestMemberOrStr:
+    """Tests for the _MemberOrStr prefix converter."""
+
+    async def test_valid_member_returns_member(self, mock_ctx_for_converter: MagicMock) -> None:
+        """Returns a Member when the argument resolves to a guild member."""
+        mock_member = MagicMock(spec=discord.Member)
+        mock_member.name = "alice"
+
+        with patch.object(commands.MemberConverter, "convert", new=AsyncMock(return_value=mock_member)):
+            result = await _MemberOrStr().convert(mock_ctx_for_converter, "alice")
+
+        assert result is mock_member
+
+    async def test_invalid_member_returns_string(self, mock_ctx_for_converter: MagicMock) -> None:
+        """Returns the raw string when the argument cannot be resolved to a member."""
+        with patch.object(
+            commands.MemberConverter, "convert", new=AsyncMock(side_effect=commands.MemberNotFound("notauser"))
+        ):
+            result = await _MemberOrStr().convert(mock_ctx_for_converter, "notauser")
+
+        assert result == "notauser"

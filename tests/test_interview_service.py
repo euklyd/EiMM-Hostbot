@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from cogs.interview import service
 from cogs.interview.models import Interview, InterviewServer, Question
 from cogs.interview.service import QuestionFilter
+from datetime import UTC, datetime, timedelta
 from db.base import Base
 
 
@@ -859,3 +860,167 @@ class TestStats:
         assert stats["total_answered"] == 0
         assert stats["avg_questions_per_interview"] == 0.0
         assert stats["avg_answer_time_seconds"] is None
+
+
+class TestVoteCleanup:
+    """Tests for vote cleanup service functions."""
+
+    async def test_clear_votes_for_candidate(self, async_session: AsyncSession) -> None:
+        """Removes all votes for a specific candidate, leaves others intact."""
+        server = InterviewServer(id=1, name="Test Server")
+        async_session.add(server)
+        await async_session.flush()
+
+        await service.cast_vote(async_session, 1, voter_id=10, candidate_id=200)
+        await service.cast_vote(async_session, 1, voter_id=20, candidate_id=200)
+        await service.cast_vote(async_session, 1, voter_id=30, candidate_id=300)
+        await async_session.commit()
+
+        removed = await service.clear_votes_for_candidate(async_session, 1, candidate_id=200)
+        await async_session.commit()
+
+        assert removed == 2
+        votals = await service.get_votals(async_session, 1)
+        assert votals == [(300, 1)]
+
+    async def test_clear_votes_for_candidate_none_present(self, async_session: AsyncSession) -> None:
+        """Returns 0 when no votes exist for that candidate."""
+        server = InterviewServer(id=1, name="Test Server")
+        async_session.add(server)
+        await async_session.flush()
+
+        removed = await service.clear_votes_for_candidate(async_session, 1, candidate_id=999)
+        assert removed == 0
+
+    async def test_clear_votes_for_candidate_different_server(self, async_session: AsyncSession) -> None:
+        """Does not touch votes for the same candidate in a different server."""
+        for i in (1, 2):
+            async_session.add(InterviewServer(id=i, name=f"Server {i}"))
+        await async_session.flush()
+
+        await service.cast_vote(async_session, 1, voter_id=10, candidate_id=200)
+        await service.cast_vote(async_session, 2, voter_id=20, candidate_id=200)
+        await async_session.commit()
+
+        removed = await service.clear_votes_for_candidate(async_session, 1, candidate_id=200)
+        await async_session.commit()
+
+        assert removed == 1
+        votals = await service.get_votals(async_session, 2)
+        assert votals == [(200, 1)]
+
+    async def test_get_all_server_ids(self, async_session: AsyncSession) -> None:
+        """Returns all server IDs."""
+        for i in range(1, 4):
+            async_session.add(InterviewServer(id=i, name=f"Server {i}"))
+        await async_session.commit()
+
+        server_ids = await service.get_all_server_ids(async_session)
+        assert set(server_ids) == {1, 2, 3}
+
+    async def test_get_all_server_ids_empty(self, async_session: AsyncSession) -> None:
+        """Returns empty list when no servers exist."""
+        server_ids = await service.get_all_server_ids(async_session)
+        assert server_ids == []
+
+    async def test_clear_ineligible_votes_opted_out(self, async_session: AsyncSession) -> None:
+        """Removes votes for opted-out candidates."""
+        server = InterviewServer(id=1, name="Test Server")
+        async_session.add(server)
+        await async_session.flush()
+
+        await service.cast_vote(async_session, 1, voter_id=10, candidate_id=200)
+        await service.cast_vote(async_session, 1, voter_id=20, candidate_id=300)
+        await service.opt_out(async_session, 1, user_id=200)
+        await async_session.commit()
+
+        removed = await service.clear_ineligible_votes(async_session, 1)
+        await async_session.commit()
+
+        assert removed == 1
+        votals = await service.get_votals(async_session, 1)
+        assert votals == [(300, 1)]
+
+    async def test_clear_ineligible_votes_reinterviews_disabled(self, async_session: AsyncSession) -> None:
+        """Removes votes for previously-interviewed candidates when reinterviews are off."""
+        server = InterviewServer(id=1, name="Test Server", reinterviews_allowed=False)
+        async_session.add(server)
+        await async_session.flush()
+
+        interview = await service.start_interview(async_session, 1, interviewee_id=200, interviewee_name="Alice")
+        await service.end_interview(async_session, interview.id)
+        await service.cast_vote(async_session, 1, voter_id=10, candidate_id=200)
+        await service.cast_vote(async_session, 1, voter_id=20, candidate_id=300)
+        await async_session.commit()
+
+        removed = await service.clear_ineligible_votes(async_session, 1)
+        await async_session.commit()
+
+        assert removed == 1
+        votals = await service.get_votals(async_session, 1)
+        assert votals == [(300, 1)]
+
+    async def test_clear_ineligible_votes_within_cooldown(self, async_session: AsyncSession) -> None:
+        """Removes votes for candidates whose reinterview cooldown has not expired."""
+        server = InterviewServer(id=1, name="Test Server", reinterviews_allowed=True, reinterview_days=30)
+        async_session.add(server)
+        await async_session.flush()
+
+        interview = await service.start_interview(async_session, 1, interviewee_id=200, interviewee_name="Alice")
+        await service.end_interview(async_session, interview.id)
+        # Backdate ended_at to 5 days ago (within 30-day cooldown)
+        interview_row = await service.get_interview(async_session, interview.id)
+        interview_row.ended_at = datetime.now(UTC) - timedelta(days=5)
+
+        await service.cast_vote(async_session, 1, voter_id=10, candidate_id=200)
+        await service.cast_vote(async_session, 1, voter_id=20, candidate_id=300)
+        await async_session.commit()
+
+        removed = await service.clear_ineligible_votes(async_session, 1)
+        await async_session.commit()
+
+        assert removed == 1
+        votals = await service.get_votals(async_session, 1)
+        assert votals == [(300, 1)]
+
+    async def test_clear_ineligible_votes_cooldown_expired(self, async_session: AsyncSession) -> None:
+        """Does not remove votes when the reinterview cooldown has expired."""
+        server = InterviewServer(id=1, name="Test Server", reinterviews_allowed=True, reinterview_days=30)
+        async_session.add(server)
+        await async_session.flush()
+
+        interview = await service.start_interview(async_session, 1, interviewee_id=200, interviewee_name="Alice")
+        await service.end_interview(async_session, interview.id)
+        # Backdate ended_at to 60 days ago (past 30-day cooldown)
+        interview_row = await service.get_interview(async_session, interview.id)
+        interview_row.ended_at = datetime.now(UTC) - timedelta(days=60)
+
+        await service.cast_vote(async_session, 1, voter_id=10, candidate_id=200)
+        await async_session.commit()
+
+        removed = await service.clear_ineligible_votes(async_session, 1)
+        await async_session.commit()
+
+        assert removed == 0
+
+    async def test_clear_ineligible_votes_eligible_untouched(self, async_session: AsyncSession) -> None:
+        """Does not remove votes for candidates with no restrictions."""
+        server = InterviewServer(id=1, name="Test Server")
+        async_session.add(server)
+        await async_session.flush()
+
+        await service.cast_vote(async_session, 1, voter_id=10, candidate_id=200)
+        await service.cast_vote(async_session, 1, voter_id=20, candidate_id=300)
+        await async_session.commit()
+
+        removed = await service.clear_ineligible_votes(async_session, 1)
+        assert removed == 0
+
+    async def test_clear_ineligible_votes_no_votes(self, async_session: AsyncSession) -> None:
+        """Returns 0 when there are no votes."""
+        server = InterviewServer(id=1, name="Test Server")
+        async_session.add(server)
+        await async_session.commit()
+
+        removed = await service.clear_ineligible_votes(async_session, 1)
+        assert removed == 0
