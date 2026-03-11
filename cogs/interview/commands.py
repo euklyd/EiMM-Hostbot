@@ -403,7 +403,7 @@ class Interview(commands.Cog):
     # Audience Commands - Voting
     # =========================================================================
 
-    @commands.hybrid_command(name="vote")
+    @commands.hybrid_command(name="vote", ignore_extra=False)
     @commands.guild_only()
     @app_commands.describe(
         candidate1="First choice for next interviewee",
@@ -508,6 +508,14 @@ class Interview(commands.Cog):
             await ctx.send(reply, ephemeral=True)
             await self._fail(ctx)
         await self._success(ctx)
+
+    @vote.error
+    async def vote_error(self, ctx: commands.Context, error: Exception) -> None:
+        """Handle errors from the vote command."""
+        if isinstance(error, commands.TooManyArguments):
+            await ctx.send("You can vote for at most 3 candidates.", ephemeral=True)
+            await self._fail(ctx)
+            error.handled = True  # type: ignore[attr-defined]
 
     @commands.hybrid_command(name="unvote")
     @commands.guild_only()
