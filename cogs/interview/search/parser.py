@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import re
+from collections.abc import Iterator
 from dataclasses import dataclass
 from enum import Enum, auto
-from typing import Iterator
 
 from .ast import AndNode, FilterNode, FilterType, MatchMode, NotNode, OrNode, QueryNode, TextNode
 

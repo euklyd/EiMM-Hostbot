@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Union
 
 
 class MatchMode(Enum):
@@ -81,4 +80,4 @@ class TextNode:
 
 
 # Union type for all query nodes
-QueryNode = Union[OrNode, AndNode, NotNode, FilterNode, TextNode]
+QueryNode = OrNode | AndNode | NotNode | FilterNode | TextNode

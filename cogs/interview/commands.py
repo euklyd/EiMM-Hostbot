@@ -484,7 +484,7 @@ class Interview(commands.Cog):
             return
 
         async with get_session() as session:
-            removed = await service.remove_vote(session, ctx.guild.id, ctx.author.id)
+            await service.remove_vote(session, ctx.guild.id, ctx.author.id)
             await session.commit()
 
         await self._success(ctx)

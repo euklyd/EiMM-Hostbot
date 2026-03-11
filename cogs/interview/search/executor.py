@@ -91,7 +91,7 @@ def _parse_date(value: str) -> datetime | None:
     return None
 
 
-def _exact_match(column: "InstrumentedAttribute[str | None]", value: str) -> ColumnElement[bool]:
+def _exact_match(column: InstrumentedAttribute[str | None], value: str) -> ColumnElement[bool]:
     """Create an exact match clause using ILIKE for case-insensitive substring match.
 
     Wildcards: * -> %, ? -> _
@@ -102,7 +102,7 @@ def _exact_match(column: "InstrumentedAttribute[str | None]", value: str) -> Col
     return column.ilike(f"%{pattern}%")
 
 
-def _fuzzy_match(column: "InstrumentedAttribute[str | None]", value: str) -> ColumnElement[bool]:
+def _fuzzy_match(column: InstrumentedAttribute[str | None], value: str) -> ColumnElement[bool]:
     """Create a fuzzy match clause using pg_trgm similarity."""
     return func.similarity(column, value) > FUZZY_THRESHOLD
 

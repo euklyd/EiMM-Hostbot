@@ -425,9 +425,7 @@ async def clear_votes_for_candidate(session: AsyncSession, server_id: int, candi
 
     Returns the number of votes removed.
     """
-    result = await session.execute(
-        select(Vote).where(Vote.server_id == server_id, Vote.candidate_id == candidate_id)
-    )
+    result = await session.execute(select(Vote).where(Vote.server_id == server_id, Vote.candidate_id == candidate_id))
     votes = result.scalars().all()
     for vote in votes:
         await session.delete(vote)
