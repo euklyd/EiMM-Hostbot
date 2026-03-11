@@ -42,6 +42,25 @@ T = TypeVar("T")
 QUESTION_LENGTH_HARD_LIMIT = 2000  # Reject excessively long questions
 
 
+class _MemberOrStr(commands.Converter[discord.Member | str]):
+    """Prefix-command converter: returns a Member if found, or the raw string if not.
+
+    Used so invalid candidate names surface as reportable errors rather than
+    silently becoming None via Optional[Member] fallback behavior.
+    """
+
+    async def convert(self, ctx: commands.Context, argument: str) -> discord.Member | str:
+        try:
+            return await commands.MemberConverter().convert(ctx, argument)
+        except commands.MemberNotFound:
+            return argument
+
+
+# Module-level singletons used as parameter defaults in the vote command.
+_VOTE_CANDIDATE_REQUIRED = commands.parameter(converter=_MemberOrStr())
+_VOTE_CANDIDATE_OPTIONAL = commands.parameter(converter=_MemberOrStr(), default=None)
+
+
 # =============================================================================
 # WebSocket Broadcasting
 # =============================================================================
@@ -259,6 +278,14 @@ class Interview(commands.Cog):
             # Slash command - can't react, send ephemeral confirmation
             await ctx.send(message or "\N{WHITE HEAVY CHECK MARK}", ephemeral=True)
 
+    async def _fail(self, ctx: commands.Context) -> None:
+        """Indicate failure with a redtick reaction (prefix only; slash uses the error message)."""
+        if ctx.message:
+            try:
+                await ctx.message.add_reaction(self.bot.redtick)
+            except discord.HTTPException:
+                pass
+
     # =========================================================================
     # Audience Commands - Asking Questions
     # =========================================================================
@@ -386,17 +413,18 @@ class Interview(commands.Cog):
     async def vote(
         self,
         ctx: commands.Context,
-        candidate1: discord.Member,
-        candidate2: discord.Member | None = None,
-        candidate3: discord.Member | None = None,
+        candidate1: discord.Member = _VOTE_CANDIDATE_REQUIRED,
+        candidate2: discord.Member | None = _VOTE_CANDIDATE_OPTIONAL,
+        candidate3: discord.Member | None = _VOTE_CANDIDATE_OPTIONAL,
     ) -> None:
         """Vote for the next interviewee. Replaces any previous vote."""
         if await self._require_setup(ctx) is None:
             return
 
-        # Collect all provided candidates
-        all_candidates = [candidate1, candidate2, candidate3]
-        candidates = [c for c in all_candidates if c is not None]
+        # Separate resolved members from unresolved names (prefix only; slash always gives Member)
+        all_provided = [candidate1, candidate2, candidate3]
+        unresolved_names = [c for c in all_provided if isinstance(c, str)]
+        candidates = [c for c in all_provided if isinstance(c, discord.Member)]
 
         # Filter each rejection reason separately, collect errors to report together
         rejected_bots = [c for c in candidates if c.bot]
@@ -436,6 +464,9 @@ class Interview(commands.Cog):
 
             # Build combined error message for ignored votes
             error_lines = []
+            if unresolved_names:
+                names = ", ".join(f"`{n}`" for n in unresolved_names)
+                error_lines.append(f"• Not found: {names}.")
             if rejected_bots:
                 names = ", ".join(f"`{c.name}`" for c in rejected_bots)
                 error_lines.append(
@@ -454,6 +485,7 @@ class Interview(commands.Cog):
             if not candidates:
                 reply = "The following votes were ignored:\n" + "\n".join(error_lines)
                 await ctx.send(reply, ephemeral=True)
+                await self._fail(ctx)
                 return
 
             # Remove any existing votes first (allows override)
@@ -474,6 +506,7 @@ class Interview(commands.Cog):
         if error_lines:
             reply = "The following votes were ignored:\n" + "\n".join(error_lines)
             await ctx.send(reply, ephemeral=True)
+            await self._fail(ctx)
         await self._success(ctx)
 
     @commands.hybrid_command(name="unvote")
