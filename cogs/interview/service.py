@@ -6,7 +6,7 @@ All methods are async and accept an AsyncSession from the caller.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import Enum, auto
 
 from sqlalchemy import func, select
@@ -418,6 +418,61 @@ async def clear_votes(
         await session.delete(vote)
 
     return len(votes)
+
+
+async def clear_votes_for_candidate(session: AsyncSession, server_id: int, candidate_id: int) -> int:
+    """Delete all votes for a specific candidate in a server.
+
+    Returns the number of votes removed.
+    """
+    result = await session.execute(
+        select(Vote).where(Vote.server_id == server_id, Vote.candidate_id == candidate_id)
+    )
+    votes = result.scalars().all()
+    for vote in votes:
+        await session.delete(vote)
+    return len(votes)
+
+
+async def clear_ineligible_votes(session: AsyncSession, server_id: int) -> int:
+    """Delete votes for candidates who are no longer eligible (opted out or reinterview restricted).
+
+    Returns total number of votes removed.
+    """
+    # Get all distinct candidate IDs in this server's vote table
+    result = await session.execute(select(Vote.candidate_id).where(Vote.server_id == server_id).distinct())
+    candidate_ids = [row[0] for row in result.all()]
+
+    server = await get_server(session, server_id)
+    total_removed = 0
+
+    for candidate_id in candidate_ids:
+        ineligible = False
+
+        if await is_opted_out(session, server_id, candidate_id):
+            ineligible = True
+        elif server is not None:
+            if not server.reinterviews_allowed:
+                latest = await get_latest_interview_for_user(session, server_id, candidate_id)
+                if latest is not None:
+                    ineligible = True
+            elif server.reinterview_days > 0:
+                latest = await get_latest_interview_for_user(session, server_id, candidate_id)
+                if latest is not None and latest.ended_at is not None:
+                    cooldown_end = latest.ended_at + timedelta(days=server.reinterview_days)
+                    if datetime.now(UTC) < cooldown_end:
+                        ineligible = True
+
+        if ineligible:
+            total_removed += await clear_votes_for_candidate(session, server_id, candidate_id)
+
+    return total_removed
+
+
+async def get_all_server_ids(session: AsyncSession) -> list[int]:
+    """Get all server IDs that have interview data."""
+    result = await session.execute(select(InterviewServer.id))
+    return [int(row[0]) for row in result.all()]
 
 
 # =============================================================================

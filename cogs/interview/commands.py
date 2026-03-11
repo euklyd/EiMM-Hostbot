@@ -208,6 +208,21 @@ class Interview(commands.Cog):
     def __init__(self, bot: Bot) -> None:
         self.bot = bot
 
+    async def cog_load(self) -> None:
+        """Clear stale votes for all servers on startup."""
+        async with get_session() as session:
+            server_ids = await service.get_all_server_ids(session)
+
+        for server_id in server_ids:
+            try:
+                async with get_session() as session:
+                    removed = await service.clear_ineligible_votes(session, server_id)
+                    await session.commit()
+                if removed:
+                    logger.info("Cleared %d stale vote(s) for server %d on startup", removed, server_id)
+            except Exception:
+                logger.exception("Failed to clear stale votes for server %d on startup", server_id)
+
     def _get_member_avatar(self, guild: discord.Guild, user_id: int) -> str:
         """Get avatar URL for a member, falling back to default if not found."""
         member = guild.get_member(user_id)
@@ -367,8 +382,6 @@ class Interview(commands.Cog):
         candidate1="First choice for next interviewee",
         candidate2="Second choice (optional)",
         candidate3="Third choice (optional)",
-        candidate4="Fourth choice (optional)",
-        candidate5="Fifth choice (optional)",
     )
     async def vote(
         self,
@@ -376,15 +389,13 @@ class Interview(commands.Cog):
         candidate1: discord.Member,
         candidate2: discord.Member | None = None,
         candidate3: discord.Member | None = None,
-        candidate4: discord.Member | None = None,
-        candidate5: discord.Member | None = None,
     ) -> None:
         """Vote for the next interviewee. Replaces any previous vote."""
         if await self._require_setup(ctx) is None:
             return
 
         # Collect all provided candidates
-        all_candidates = [candidate1, candidate2, candidate3, candidate4, candidate5]
+        all_candidates = [candidate1, candidate2, candidate3]
         candidates = [c for c in all_candidates if c is not None]
 
         # Filter each rejection reason separately, collect errors to report together
@@ -1058,6 +1069,7 @@ class Interview(commands.Cog):
         async with get_session() as session:
             await service.get_or_create_server(session, ctx.guild.id, ctx.guild.name)
             await service.update_server_config(session, ctx.guild.id, reinterviews_allowed=False)
+            await service.clear_ineligible_votes(session, ctx.guild.id)
             await session.commit()
 
         await ctx.send("Reinterviews disabled.")
@@ -1074,6 +1086,7 @@ class Interview(commands.Cog):
         async with get_session() as session:
             await service.get_or_create_server(session, ctx.guild.id, ctx.guild.name)
             await service.update_server_config(session, ctx.guild.id, reinterview_days=days)
+            await service.clear_ineligible_votes(session, ctx.guild.id)
             await session.commit()
 
         if days == 0:
@@ -1458,6 +1471,7 @@ class Interview(commands.Cog):
         async with get_session() as session:
             await service.get_or_create_server(session, ctx.guild.id, ctx.guild.name)
             await service.opt_out(session, ctx.guild.id, ctx.author.id)
+            await service.clear_votes_for_candidate(session, ctx.guild.id, ctx.author.id)
             await session.commit()
 
         await ctx.send("You have opted out of interviews.", ephemeral=True)
