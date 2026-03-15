@@ -250,16 +250,33 @@ class Interview(commands.Cog):
         # Fallback to default Discord avatar based on user ID
         return f"https://cdn.discordapp.com/embed/avatars/{(user_id >> 22) % 6}.png"
 
-    async def _require_setup(self, ctx: commands.Context) -> InterviewServer | None:
-        """Check server is set up and active.
+    async def _require_server(self, ctx: commands.Context) -> InterviewServer | None:
+        """Check the interview system has been configured (ignores enabled/disabled state).
 
-        Returns the server if setup, or sends an error and returns None.
+        Returns the server record if it exists, or sends an error and returns None.
+        Use this for read-only commands that should work even when the system is disabled.
         """
         async with get_session() as session:
             server = await service.get_server(session, ctx.guild.id)
-        if server is None or not server.active:
+        if server is None:
             await ctx.send(
-                f"Interview system not set up or disabled. Use `{ctx.prefix}iv setup #answer #backstage` first.",
+                f"Interview system not configured. Use `{ctx.prefix}iv setup #answer #backstage` first.",
+                ephemeral=True,
+            )
+            return None
+        return server
+
+    async def _require_setup(self, ctx: commands.Context) -> InterviewServer | None:
+        """Check the interview system is configured and currently enabled.
+
+        Returns the server if active, or sends a specific error and returns None.
+        """
+        server = await self._require_server(ctx)
+        if server is None:
+            return None
+        if not server.active:
+            await ctx.send(
+                f"Interview system is currently disabled. Use `{ctx.prefix}iv enable` to re-enable it.",
                 ephemeral=True,
             )
             return None
@@ -561,9 +578,8 @@ class Interview(commands.Cog):
     @app_commands.describe(flag="Use -f for full details (shows who voted for whom)")
     async def votals(self, ctx: commands.Context, flag: str | None = None) -> None:
         """See the current vote standings."""
-        if await self._require_setup(ctx) is None:
+        if await self._require_server(ctx) is None:
             return
-
         full_mode = flag is not None and "-f" in flag
 
         async with get_session() as session:
