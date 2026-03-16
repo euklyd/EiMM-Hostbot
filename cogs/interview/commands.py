@@ -266,7 +266,7 @@ class Interview(commands.Cog):
             return None
         return server
 
-    async def _require_setup(self, ctx: commands.Context) -> InterviewServer | None:
+    async def _require_active(self, ctx: commands.Context) -> InterviewServer | None:
         """Check the interview system is configured and currently enabled.
 
         Returns the server if active, or sends a specific error and returns None.
@@ -433,7 +433,7 @@ class Interview(commands.Cog):
         candidate3: discord.Member | None = _VOTE_CANDIDATE_OPTIONAL,
     ) -> None:
         """Vote for the next interviewee. Replaces any previous vote."""
-        if await self._require_setup(ctx) is None:
+        if await self._require_active(ctx) is None:
             return
 
         # Separate resolved members from unresolved names (prefix only; slash always gives Member)
@@ -536,7 +536,7 @@ class Interview(commands.Cog):
     @commands.guild_only()
     async def unvote(self, ctx: commands.Context) -> None:
         """Remove your vote."""
-        if await self._require_setup(ctx) is None:
+        if await self._require_active(ctx) is None:
             return
 
         async with get_session() as session:
@@ -1521,7 +1521,7 @@ class Interview(commands.Cog):
     @opt.command(name="out")
     async def opt_out(self, ctx: commands.Context) -> None:
         """Opt out of being interviewed."""
-        if await self._require_setup(ctx) is None:
+        if await self._require_active(ctx) is None:
             return
 
         async with get_session() as session:
@@ -1534,7 +1534,7 @@ class Interview(commands.Cog):
     @opt.command(name="in")
     async def opt_in(self, ctx: commands.Context) -> None:
         """Opt back in to interviews."""
-        if await self._require_setup(ctx) is None:
+        if await self._require_active(ctx) is None:
             return
 
         async with get_session() as session:
