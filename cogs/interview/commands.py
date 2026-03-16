@@ -309,7 +309,6 @@ class Interview(commands.Cog):
 
     @commands.hybrid_command(name="ask")
     @commands.guild_only()
-    @interviews_enabled()
     @app_commands.describe(question="Your question for the interviewee")
     async def ask(self, ctx: commands.Context, *, question: str) -> None:
         """Submit a question for the current interview."""
@@ -361,7 +360,6 @@ class Interview(commands.Cog):
 
     @commands.hybrid_command(name="mask")
     @commands.guild_only()
-    @interviews_enabled()
     @app_commands.describe(questions="Multiple questions, one per line")
     async def mask(self, ctx: commands.Context, *, questions: str) -> None:
         """Submit multiple questions at once (one per line)."""
@@ -551,7 +549,7 @@ class Interview(commands.Cog):
     @commands.guild_only()
     async def votes(self, ctx: commands.Context) -> None:
         """See who you voted for."""
-        if await self._require_setup(ctx) is None:
+        if await self._require_server(ctx) is None:
             return
 
         async with get_session() as session:
@@ -841,12 +839,9 @@ class Interview(commands.Cog):
                 )
                 return
 
+            # Auto-enable if currently disabled — starting an interview implies enabling
             if not server.active:
-                await ctx.send(
-                    f"Interviews are disabled. Use `{ctx.prefix}iv enable` first.",
-                    ephemeral=True,
-                )
-                return
+                await service.update_server_config(session, ctx.guild.id, active=True)
 
             # Check if opted out
             if await service.is_opted_out(session, ctx.guild.id, interviewee.id):
@@ -1152,10 +1147,11 @@ class Interview(commands.Cog):
             await ctx.send(f"Reinterview cooldown set to {days} day{'s' if days != 1 else ''}.")
 
     @iv.command(name="stats")
-    @interviews_enabled()
     @app_commands.describe(member="View stats for a specific member (optional)")
     async def iv_stats(self, ctx: commands.Context, member: discord.Member | None = None) -> None:
         """View interview statistics."""
+        if await self._require_server(ctx) is None:
+            return
         async with get_session() as session:
             if member is not None:
                 # Member-specific stats
@@ -1275,7 +1271,7 @@ class Interview(commands.Cog):
     @is_interviewee_or_manager()
     async def iv_stage(self, ctx: commands.Context) -> None:
         """List members with the audience/stage role."""
-        server = await self._require_setup(ctx)
+        server = await self._require_server(ctx)
         if server is None:
             return
 
@@ -1322,7 +1318,7 @@ class Interview(commands.Cog):
         member5: discord.Member | None = None,
     ) -> None:
         """Grant audience/stage role to members."""
-        server = await self._require_setup(ctx)
+        server = await self._require_server(ctx)
         if server is None:
             return
 
@@ -1369,7 +1365,7 @@ class Interview(commands.Cog):
         member5: discord.Member | None = None,
     ) -> None:
         """Revoke audience/stage role from members."""
-        server = await self._require_setup(ctx)
+        server = await self._require_server(ctx)
         if server is None:
             return
 
@@ -1409,7 +1405,7 @@ class Interview(commands.Cog):
             await ctx.send("Mention one or more members to grant stage access to.", ephemeral=True)
             return
 
-        server = await self._require_setup(ctx)
+        server = await self._require_server(ctx)
         if server is None:
             return
 
@@ -1450,7 +1446,7 @@ class Interview(commands.Cog):
             await ctx.send("Mention one or more members to revoke stage access from.", ephemeral=True)
             return
 
-        server = await self._require_setup(ctx)
+        server = await self._require_server(ctx)
         if server is None:
             return
 
@@ -1483,7 +1479,7 @@ class Interview(commands.Cog):
     @is_interviewee_or_manager()
     async def iv_stage_clear(self, ctx: commands.Context) -> None:
         """Remove audience/stage role from all members."""
-        server = await self._require_setup(ctx)
+        server = await self._require_server(ctx)
         if server is None:
             return
 
@@ -1525,8 +1521,10 @@ class Interview(commands.Cog):
     @opt.command(name="out")
     async def opt_out(self, ctx: commands.Context) -> None:
         """Opt out of being interviewed."""
+        if await self._require_setup(ctx) is None:
+            return
+
         async with get_session() as session:
-            await service.get_or_create_server(session, ctx.guild.id, ctx.guild.name)
             await service.opt_out(session, ctx.guild.id, ctx.author.id)
             await service.clear_votes_for_candidate(session, ctx.guild.id, ctx.author.id)
             await session.commit()
@@ -1536,6 +1534,9 @@ class Interview(commands.Cog):
     @opt.command(name="in")
     async def opt_in(self, ctx: commands.Context) -> None:
         """Opt back in to interviews."""
+        if await self._require_setup(ctx) is None:
+            return
+
         async with get_session() as session:
             removed = await service.opt_in(session, ctx.guild.id, ctx.author.id)
             await session.commit()
@@ -1548,6 +1549,9 @@ class Interview(commands.Cog):
     @opt.command(name="list")
     async def opt_list(self, ctx: commands.Context) -> None:
         """List users who have opted out."""
+        if await self._require_server(ctx) is None:
+            return
+
         async with get_session() as session:
             opt_outs = await service.get_opt_outs(session, ctx.guild.id)
 
