@@ -312,6 +312,8 @@ class Interview(commands.Cog):
     @app_commands.describe(question="Your question for the interviewee")
     async def ask(self, ctx: commands.Context, *, question: str) -> None:
         """Submit a question for the current interview."""
+        if await self._require_active(ctx) is None:
+            return
         question = question.strip()
 
         # Validate question
@@ -363,6 +365,8 @@ class Interview(commands.Cog):
     @app_commands.describe(questions="Multiple questions, one per line")
     async def mask(self, ctx: commands.Context, *, questions: str) -> None:
         """Submit multiple questions at once (one per line)."""
+        if await self._require_active(ctx) is None:
+            return
         question_list = [q.strip() for q in questions.split("\n") if q.strip()]
 
         if not question_list:
