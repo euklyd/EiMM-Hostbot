@@ -137,6 +137,18 @@ export async function clearAnswer(questionId: number): Promise<QuestionResponse>
   });
 }
 
+export async function unpostQuestion(questionId: number): Promise<QuestionResponse> {
+  return request<QuestionResponse>(`/api/questions/${questionId}/unpost`, {
+    method: "POST",
+  });
+}
+
+export async function unpostQuestion(questionId: number): Promise<QuestionResponse> {
+  return request<QuestionResponse>(`/api/questions/${questionId}/post`, {
+    method: "DELETE",
+  });
+}
+
 export async function postAnswers(interviewId: number): Promise<PostAnswersResponse> {
   return request<PostAnswersResponse>(`/api/interviews/${interviewId}/post`, {
     method: "POST",

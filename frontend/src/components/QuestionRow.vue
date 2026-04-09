@@ -20,6 +20,7 @@ const emit = defineEmits<{
   delete: [questionId: number];
   stash: [questionId: number];
   clearAnswer: [questionId: number];
+  unpost: [questionId: number];
 }>();
 
 const isExpanded = ref(false);
@@ -174,6 +175,12 @@ function confirmClearAnswer() {
   if (confirm("Clear this answer? The question will return to unanswered.")) {
     isEditing.value = false;
     emit("clearAnswer", props.question.id);
+  }
+}
+
+function confirmUnpost() {
+  if (confirm("Un-post this question? The answer will be kept but the question will re-enter the posting queue.")) {
+    emit("unpost", props.question.id);
   }
 }
 
@@ -399,6 +406,14 @@ watch(isEditing, (editing) => {
             {{ question.is_stashed ? 'Unstash' : 'Stash' }}
           </button>
           <button
+            v-if="canDelete && question.is_posted"
+            type="button"
+            @click.stop="confirmUnpost"
+            class="text-yellow-400 text-sm cursor-pointer"
+          >
+            Un-post
+          </button>
+          <button
             v-if="canDelete"
             type="button"
             @click.stop="confirmDelete"
@@ -488,9 +503,21 @@ watch(isEditing, (editing) => {
         </a>
       </td>
 
-      <!-- Actions (delete) -->
+      <!-- Actions (un-post / delete) -->
       <td v-if="canDelete" class="px-2 py-1.5 text-center w-10">
         <button
+          v-if="question.is_posted"
+          type="button"
+          @click.stop="confirmUnpost"
+          class="text-yellow-400 hover:text-yellow-300 cursor-pointer"
+          title="Un-post question"
+        >
+          <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+          </svg>
+        </button>
+        <button
+          v-else
           type="button"
           @click.stop="confirmDelete"
           class="text-red-400 hover:text-red-300 cursor-pointer"
@@ -539,6 +566,14 @@ watch(isEditing, (editing) => {
                 :class="question.is_stashed ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-400 hover:text-gray-300'"
               >
                 {{ question.is_stashed ? 'Unstash' : 'Stash' }}
+              </button>
+              <button
+                v-if="canDelete && question.is_posted"
+                type="button"
+                @click.stop="confirmUnpost"
+                class="text-yellow-400 hover:text-yellow-300 text-xs cursor-pointer"
+              >
+                Un-post
               </button>
               <button
                 v-if="canDelete"

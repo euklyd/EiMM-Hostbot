@@ -367,6 +367,35 @@ class TestQuestions:
         assert q1.posted_message_id == 12345
         assert q2.is_posted is True
 
+    async def test_unpost_question(
+        self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
+    ) -> None:
+        """Un-posting a question resets is_posted and clears posted_message_id."""
+        _, interview = server_with_interview
+
+        q = await service.add_question(async_session, interview.id, 100, "A", "Q?", 1, 10, 1)
+        await service.answer_question(async_session, q.id, "My answer")
+        await service.mark_posted(async_session, [q.id], posted_message_id=99999)
+        await async_session.commit()
+
+        await async_session.refresh(q)
+        assert q.is_posted is True
+        assert q.posted_message_id == 99999
+        assert q.answer_text == "My answer"
+
+        result = await service.unpost_question(async_session, q.id)
+        await async_session.commit()
+
+        assert result is not None
+        assert result.is_posted is False
+        assert result.posted_message_id is None
+        assert result.answer_text == "My answer"  # answer text preserved
+
+    async def test_unpost_question_not_found(self, async_session: AsyncSession) -> None:
+        """Un-posting a non-existent question returns None."""
+        result = await service.unpost_question(async_session, 99999)
+        assert result is None
+
 
 class TestVoting:
     """Tests for voting operations."""

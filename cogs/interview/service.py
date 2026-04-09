@@ -289,6 +289,19 @@ async def mark_posted(
     return count
 
 
+async def unpost_question(session: AsyncSession, question_id: int) -> Question | None:
+    """Reset a question's posted status, keeping the answer text intact.
+
+    Returns the question if found, None otherwise.
+    """
+    question = await get_question(session, question_id)
+    if question is None:
+        return None
+    question.is_posted = False
+    question.posted_message_id = None
+    return question
+
+
 # =============================================================================
 # Voting
 # =============================================================================

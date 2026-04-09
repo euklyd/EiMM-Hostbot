@@ -361,6 +361,37 @@ async def clear_answer(
     return QuestionResponse.model_validate(updated)
 
 
+@router.post("/questions/{question_id}/unpost", response_model=QuestionResponse)
+async def unpost_question(
+    question_id: int,
+    user: CurrentUser,
+    db: DbSession,
+    bot: BotInstance,
+) -> QuestionResponse:
+    """Reset a question's posted status, keeping the answer text intact.
+
+    Only managers can un-post questions. The question re-enters the posting
+    queue so it can be re-posted via ##answer after editing.
+    """
+    question = await service.get_question(db, question_id)
+    if question is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Question not found")
+
+    interview = await service.get_interview(db, question.interview_id)
+    if interview is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Interview not found")
+
+    is_manager = await check_manager_role(interview.server_id, user, bot, db)
+    if not is_manager:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Only managers can un-post questions")
+
+    updated = await service.unpost_question(db, question_id)
+    await db.commit()
+
+    logger.info(f"Question {question_id} un-posted by {user.username}")
+    return QuestionResponse.model_validate(updated)
+
+
 @router.delete("/questions/{question_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_question(
     question_id: int,

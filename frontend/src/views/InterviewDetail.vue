@@ -93,6 +93,10 @@ async function handleClearAnswer(questionId: number) {
   await store.clearAnswer(questionId);
 }
 
+async function handleUnpost(questionId: number) {
+  await store.unpostQuestion(questionId);
+}
+
 async function handlePost() {
   posting.value = true;
   postMessage.value = null;
@@ -291,6 +295,7 @@ async function retryLoad() {
           @delete="handleDelete"
           @stash="handleStash"
           @clear-answer="handleClearAnswer"
+          @unpost="handleUnpost"
         />
 
         <!-- Empty state -->
