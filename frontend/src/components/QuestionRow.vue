@@ -36,6 +36,7 @@ const ANSWER_PREVIEW_LIMIT = 60;
 const MAX_IMAGES = 10;
 const DISCORD_FIELD_VALUE_LIMIT = 1024;
 const MAX_ANSWER_LENGTH = 10000;
+const DISCORD_EMBED_WARN_LENGTH = 5000;
 
 // Count images in edit text for validation
 const editImageCount = computed(() => {
@@ -55,6 +56,9 @@ const totalLength = computed(() => editText.value.length);
 const willBeChunked = computed(() => editCharCount.value > DISCORD_FIELD_VALUE_LIMIT);
 const tooManyImages = computed(() => editImageCount.value > MAX_IMAGES);
 const tooLong = computed(() => totalLength.value > MAX_ANSWER_LENGTH);
+const approachingEmbedLimit = computed(
+  () => !tooLong.value && totalLength.value > DISCORD_EMBED_WARN_LENGTH,
+);
 const hasValidationError = computed(() => tooManyImages.value || tooLong.value);
 
 const statusColor = computed(() => {
@@ -340,6 +344,9 @@ watch(isEditing, (editing) => {
               </div>
               <p v-if="tooManyImages" class="text-red-400 text-xs font-medium">
                 Too many images — reduce to {{ MAX_IMAGES }} or fewer to save
+              </p>
+              <p v-if="approachingEmbedLimit" class="text-yellow-400 text-xs font-medium">
+                Answer may be too long to embed in Discord ({{ totalLength.toLocaleString() }} chars)
               </p>
               <p v-if="tooLong" class="text-red-400 text-xs font-medium">
                 Answer too long ({{ totalLength.toLocaleString() }}/{{ MAX_ANSWER_LENGTH.toLocaleString() }} chars)
