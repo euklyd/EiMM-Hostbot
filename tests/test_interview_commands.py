@@ -676,3 +676,95 @@ class TestMemberOrStr:
             result = await _MemberOrStr().convert(mock_ctx_for_converter, "notauser")
 
         assert result == "notauser"
+
+
+# =============================================================================
+# Phase 6: answer command skip handling
+# =============================================================================
+
+
+class TestAnswerCommandSkips:
+    """Regression tests: skipped (too-long) questions must not be marked as posted."""
+
+    async def test_skipped_questions_not_marked_posted(
+        self, interview_cog: Interview, mock_ctx: MagicMock
+    ) -> None:
+        """When generate_answer_embeds skips a question, mark_posted must not include it."""
+        import discord as _discord
+
+        from cogs.interview.embeds import EmbedGenerationResult, QuestionData
+        from cogs.interview.service import QuestionFilter
+
+        # Mock interview and server
+        interview = MagicMock()
+        interview.id = 1
+        interview.interviewee_id = 100
+        interview.interviewee_name = "Testee"
+
+        server = MagicMock(spec=InterviewServer)
+        server.answer_channel_id = 999
+
+        # Mock answer channel
+        sent_msg = MagicMock()
+        sent_msg.id = 5555
+        answer_channel = MagicMock(spec=_discord.TextChannel)
+        answer_channel.send = AsyncMock(return_value=sent_msg)
+
+        mock_ctx.guild.get_channel = MagicMock(side_effect=lambda cid: answer_channel if cid == 999 else None)
+        mock_ctx.guild.get_member = MagicMock(return_value=None)
+        mock_ctx.message.add_reaction = AsyncMock()
+
+        # q1 will be embedded, q2 will be skipped (too long)
+        q1 = MagicMock()
+        q1.id = 1
+        q1.question_number = 1
+        q1.asker_name = "Asker"
+        q1.asker_id = 200
+        q1.question_text = "What is your favorite color?"
+        q1.answer_text = "Blue"
+        q1.jump_url = "https://discord.com/channels/1/2/3"
+
+        q2 = MagicMock()
+        q2.id = 2
+        q2.question_number = 2
+        q2.asker_name = "Asker"
+        q2.asker_id = 200
+        q2.question_text = "Tell me your entire life story in detail."
+        q2.answer_text = "x" * 5000
+        q2.jump_url = "https://discord.com/channels/1/2/4"
+
+        mock_embed = MagicMock(spec=_discord.Embed)
+        skipped_q2_data = QuestionData(
+            question_number=2,
+            asker_name="Asker",
+            asker_avatar_url="",
+            question_text="Tell me your entire life story in detail.",
+            answer_text="x" * 5000,
+            jump_url="https://discord.com/channels/1/2/4",
+        )
+        embed_result = EmbedGenerationResult(
+            embed_groups=[[mock_embed]],
+            skipped_questions=[skipped_q2_data],
+        )
+
+        mark_posted_mock = AsyncMock(return_value=1)
+
+        with (
+            patch("cogs.interview.commands.get_session", make_get_session()),
+            patch("cogs.interview.commands.service.get_current_interview", new=AsyncMock(return_value=interview)),
+            patch("cogs.interview.commands.service.get_server", new=AsyncMock(return_value=server)),
+            patch(
+                "cogs.interview.commands.service.get_questions",
+                new=AsyncMock(return_value=[q1, q2]),
+            ),
+            patch("cogs.interview.commands.service.count_questions", new=AsyncMock(return_value=2)),
+            patch("cogs.interview.commands.generate_answer_embeds", return_value=embed_result),
+            patch("cogs.interview.commands.service.mark_posted", new=mark_posted_mock),
+        ):
+            await _call(interview_cog, "answer", mock_ctx)
+
+        # mark_posted must be called exactly once and must NOT include q2 (the skipped one)
+        mark_posted_mock.assert_called_once()
+        posted_ids = mark_posted_mock.call_args.args[1]
+        assert 1 in posted_ids, "q1 should be marked posted"
+        assert 2 not in posted_ids, "q2 was skipped and must not be marked posted"

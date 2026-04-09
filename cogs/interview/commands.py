@@ -746,16 +746,29 @@ class Interview(commands.Cog):
                 total_asked=await service.count_questions(session, interview.id),
             )
 
+            # Exclude skipped questions from being marked as posted
+            skipped_nums = {q.question_number for q in result.skipped_questions}
+            posted_ids = [q.id for q in questions if q.question_number not in skipped_nums]
+
             # Post embed groups (each group sent as single message for gallery support)
-            question_ids = [q.id for q in questions]
+            last_msg = None
             for embed_group in result.embed_groups:
-                msg = await answer_channel.send(embeds=embed_group)
-                # Mark all questions in this batch as posted with the last message ID
-                await service.mark_posted(session, question_ids, msg.id)
+                last_msg = await answer_channel.send(embeds=embed_group)
+
+            # Mark posted once after all groups are sent
+            if last_msg is not None and posted_ids:
+                await service.mark_posted(session, posted_ids, last_msg.id)
 
             await session.commit()
 
-            await self._success(ctx, f"Posted {len(questions)} answer(s) to {answer_channel.mention}!")
+            success_msg = f"Posted {len(posted_ids)} answer(s) to {answer_channel.mention}!"
+            if result.skipped_questions:
+                skipped_list = ", ".join(f"#{q.question_number}" for q in result.skipped_questions)
+                success_msg += (
+                    f"\n\u26a0\ufe0f {len(result.skipped_questions)} question(s) too long to post and were skipped: "
+                    f"{skipped_list}. Please post them manually."
+                )
+            await self._success(ctx, success_msg)
 
     # =========================================================================
     # Management Commands (iv group)
