@@ -351,6 +351,7 @@ async function retryLoad() {
               @delete="handleDelete"
               @stash="handleStash"
               @clear-answer="handleClearAnswer"
+              @unpost="handleUnpost"
             />
           </tbody>
         </table>
