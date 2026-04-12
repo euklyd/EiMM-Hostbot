@@ -768,3 +768,106 @@ class TestAnswerCommandSkips:
         posted_ids = mark_posted_mock.call_args.args[1]
         assert 1 in posted_ids, "q1 should be marked posted"
         assert 2 not in posted_ids, "q2 was skipped and must not be marked posted"
+
+
+# =============================================================================
+# iv unend command tests
+# =============================================================================
+
+
+def _interview(interview_id: int = 1, server_id: int = 444555666) -> MagicMock:
+    """Build a minimal ended Interview stub."""
+    iv = MagicMock()
+    iv.id = interview_id
+    iv.server_id = server_id
+    iv.interview_number = interview_id
+    iv.interviewee_id = 12345
+    iv.interviewee_name = "Test User"
+    iv.ended_at = None
+    iv.is_current = True
+    return iv
+
+
+class TestIvUnend:
+    """Tests for ##iv unend guard and happy-path behaviour."""
+
+    async def test_unend_happy_path(self, interview_cog: Interview, mock_ctx: MagicMock) -> None:
+        """No active interview + ended interview found → reopen it."""
+        ended = _interview()
+        with (
+            patch("cogs.interview.commands.get_session", make_get_session()),
+            patch("cogs.interview.commands.service.get_current_interview", new=AsyncMock(return_value=None)),
+            patch(
+                "cogs.interview.commands.service.get_most_recent_ended_interview",
+                new=AsyncMock(return_value=ended),
+            ),
+            patch("cogs.interview.commands.service.unend_interview", new=AsyncMock(return_value=ended)),
+            patch("cogs.interview.commands.broadcast_event"),
+        ):
+            await _call(interview_cog, "iv_unend", mock_ctx)
+
+        mock_ctx.send.assert_called_once()
+        assert "reopened" in mock_ctx.send.call_args.args[0].lower()
+
+    async def test_unend_active_interview_exists(self, interview_cog: Interview, mock_ctx: MagicMock) -> None:
+        """Active interview exists → error, nothing unended."""
+        active = _interview()
+        with (
+            patch("cogs.interview.commands.get_session", make_get_session()),
+            patch("cogs.interview.commands.service.get_current_interview", new=AsyncMock(return_value=active)),
+            patch(
+                "cogs.interview.commands.service.unend_interview", new=AsyncMock()
+            ) as mock_unend,
+        ):
+            await _call(interview_cog, "iv_unend", mock_ctx)
+
+        mock_unend.assert_not_called()
+        mock_ctx.send.assert_called_once()
+        assert mock_ctx.send.call_args.kwargs.get("ephemeral") is True
+
+    async def test_unend_no_ended_interview(self, interview_cog: Interview, mock_ctx: MagicMock) -> None:
+        """No ended interview found → error."""
+        with (
+            patch("cogs.interview.commands.get_session", make_get_session()),
+            patch("cogs.interview.commands.service.get_current_interview", new=AsyncMock(return_value=None)),
+            patch(
+                "cogs.interview.commands.service.get_most_recent_ended_interview",
+                new=AsyncMock(return_value=None),
+            ),
+        ):
+            await _call(interview_cog, "iv_unend", mock_ctx)
+
+        mock_ctx.send.assert_called_once()
+        assert mock_ctx.send.call_args.kwargs.get("ephemeral") is True
+
+    async def test_unend_by_id_success(self, interview_cog: Interview, mock_ctx: MagicMock) -> None:
+        """Specify interview_id for a valid interview → reopen it."""
+        ended = _interview(interview_id=7)
+        with (
+            patch("cogs.interview.commands.get_session", make_get_session()),
+            patch("cogs.interview.commands.service.get_current_interview", new=AsyncMock(return_value=None)),
+            patch("cogs.interview.commands.service.get_interview", new=AsyncMock(return_value=ended)),
+            patch("cogs.interview.commands.service.unend_interview", new=AsyncMock(return_value=ended)),
+            patch("cogs.interview.commands.broadcast_event"),
+        ):
+            await _call(interview_cog, "iv_unend", mock_ctx, interview_id=7)
+
+        mock_ctx.send.assert_called_once()
+        assert "reopened" in mock_ctx.send.call_args.args[0].lower()
+
+    async def test_unend_by_id_wrong_server(self, interview_cog: Interview, mock_ctx: MagicMock) -> None:
+        """interview_id belongs to a different server → error."""
+        foreign = _interview(interview_id=5, server_id=999999)
+        with (
+            patch("cogs.interview.commands.get_session", make_get_session()),
+            patch("cogs.interview.commands.service.get_current_interview", new=AsyncMock(return_value=None)),
+            patch("cogs.interview.commands.service.get_interview", new=AsyncMock(return_value=foreign)),
+            patch(
+                "cogs.interview.commands.service.unend_interview", new=AsyncMock()
+            ) as mock_unend,
+        ):
+            await _call(interview_cog, "iv_unend", mock_ctx, interview_id=5)
+
+        mock_unend.assert_not_called()
+        mock_ctx.send.assert_called_once()
+        assert mock_ctx.send.call_args.kwargs.get("ephemeral") is True

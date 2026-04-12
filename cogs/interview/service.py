@@ -80,6 +80,34 @@ async def end_interview(session: AsyncSession, interview_id: int) -> Interview |
     return interview
 
 
+async def unend_interview(session: AsyncSession, interview_id: int) -> Interview | None:
+    """Reopen an ended interview by clearing ended_at.
+
+    Returns the interview if found, None otherwise.
+    """
+    result = await session.execute(select(Interview).where(Interview.id == interview_id))
+    interview = result.scalar_one_or_none()
+    if interview is None:
+        return None
+
+    interview.ended_at = None
+    return interview
+
+
+async def get_most_recent_ended_interview(session: AsyncSession, server_id: int) -> Interview | None:
+    """Get the most recently ended interview for a server."""
+    result = await session.execute(
+        select(Interview)
+        .where(
+            Interview.server_id == server_id,
+            Interview.ended_at.is_not(None),
+        )
+        .order_by(Interview.ended_at.desc())
+        .limit(1)
+    )
+    return result.scalar_one_or_none()
+
+
 async def get_current_interview(session: AsyncSession, server_id: int) -> Interview | None:
     """Get the current (non-ended) interview for a server."""
     result = await session.execute(

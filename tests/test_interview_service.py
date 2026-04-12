@@ -150,6 +150,49 @@ class TestInterviewLifecycle:
         result = await service.end_interview(async_session, 9999)
         assert result is None
 
+    async def test_unend_interview(
+        self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
+    ) -> None:
+        """Unend an ended interview."""
+        _, interview = server_with_interview
+
+        await service.end_interview(async_session, interview.id)
+        await async_session.commit()
+
+        result = await service.unend_interview(async_session, interview.id)
+        await async_session.commit()
+
+        assert result is not None
+        assert result.ended_at is None
+        assert result.is_current is True
+
+    async def test_unend_interview_not_found(self, async_session: AsyncSession) -> None:
+        """Unend interview returns None for non-existent ID."""
+        result = await service.unend_interview(async_session, 9999)
+        assert result is None
+
+    async def test_get_most_recent_ended_interview(self, async_session: AsyncSession) -> None:
+        """Returns the most recently ended interview for a server."""
+        server = InterviewServer(id=1, name="Test Server")
+        async_session.add(server)
+        await async_session.flush()
+
+        iv1 = await service.start_interview(async_session, 1, 1, "User1")
+        iv2 = await service.start_interview(async_session, 1, 2, "User2")  # auto-ends iv1
+        await service.end_interview(async_session, iv2.id)
+        await async_session.commit()
+
+        result = await service.get_most_recent_ended_interview(async_session, server_id=1)
+        assert result is not None
+        assert result.id == iv2.id
+
+    async def test_get_most_recent_ended_interview_none(
+        self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
+    ) -> None:
+        """Returns None when no ended interview exists."""
+        result = await service.get_most_recent_ended_interview(async_session, server_id=1)
+        assert result is None
+
     async def test_get_current_interview(
         self, async_session: AsyncSession, server_with_interview: tuple[InterviewServer, Interview]
     ) -> None:

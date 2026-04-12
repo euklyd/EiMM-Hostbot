@@ -950,6 +950,48 @@ class Interview(commands.Cog):
 
             await ctx.send(f"Interview with {interview.interviewee_name} has ended.")
 
+    @iv.command(name="unend")
+    @is_manager()
+    async def iv_unend(self, ctx: commands.Context, interview_id: int | None = None) -> None:
+        """Reopen the most recently ended interview (or a specific one by ID)."""
+        async with get_session() as session:
+            current = await service.get_current_interview(session, ctx.guild.id)
+            if current is not None:
+                await ctx.send(
+                    f"An interview with {current.interviewee_name} is already active. End it first.",
+                    ephemeral=True,
+                )
+                return
+
+            if interview_id is not None:
+                interview = await service.get_interview(session, interview_id)
+                if interview is None or interview.server_id != ctx.guild.id:
+                    await ctx.send(f"Interview #{interview_id} not found for this server.", ephemeral=True)
+                    return
+            else:
+                interview = await service.get_most_recent_ended_interview(session, ctx.guild.id)
+                if interview is None:
+                    await ctx.send("No ended interview found to reopen.", ephemeral=True)
+                    return
+
+            await service.unend_interview(session, interview.id)
+            await session.commit()
+
+            broadcast_event(
+                ctx.guild.id,
+                "interview_started",
+                {
+                    "interview_id": interview.id,
+                    "interview_number": interview.interview_number,
+                    "interviewee_id": str(interview.interviewee_id),
+                    "interviewee_name": interview.interviewee_name,
+                },
+            )
+
+            await ctx.send(
+                f"Interview #{interview.interview_number} with {interview.interviewee_name} has been reopened."
+            )
+
     @iv.command(name="settings")
     @is_manager()
     async def iv_settings(self, ctx: commands.Context) -> None:
