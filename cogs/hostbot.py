@@ -431,7 +431,7 @@ class HostBot(commands.Cog):
                         if player_roles[0] not in player.roles:
                             await player.edit(roles=player.roles + [player_roles[0]])
                     # manage needed for pins
-                    overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True)
+                    overwrites[player] = discord.PermissionOverwrite(read_messages=True, manage_messages=True, pin_messages=True)
                 topic = f"{player}'s Role PM"
                 await category.create_text_channel(
                     HostBot._player_channel_name(player),
