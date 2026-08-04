@@ -61,6 +61,9 @@ const isManager = computed(() => store.currentServer?.is_manager ?? false);
 const canAnswer = computed(() => isInterviewee.value);
 const canDelete = computed(() => isManager.value);
 const canPost = computed(() => isInterviewee.value && store.answeredQuestions.length > 0);
+const showPostSection = computed(
+  () => isInterviewee.value && (store.answeredQuestions.length > 0 || store.stashedQuestions.length > 0),
+);
 
 onMounted(async () => {
   await Promise.all([
@@ -264,14 +267,18 @@ async function retryLoad() {
       </div>
 
       <!-- Post button -->
-      <div v-if="canPost" class="mb-6 flex items-center space-x-4">
+      <div v-if="showPostSection" class="mb-6 flex items-center space-x-4">
         <button
+          v-if="canPost"
           @click="handlePost"
           :disabled="posting"
           class="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg transition-colors post-btn"
         >
           {{ posting ? "Posting..." : `Post ${store.answeredQuestions.length} Answers to Discord` }}
         </button>
+        <span v-if="store.stashedQuestions.length > 0" class="text-yellow-400 text-sm">
+          ({{ store.stashedQuestions.length }} stashed answer{{ store.stashedQuestions.length === 1 ? '' : 's' }} not included)
+        </span>
         <span v-if="postMessage" class="text-green-400">{{ postMessage }}</span>
       </div>
 

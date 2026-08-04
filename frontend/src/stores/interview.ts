@@ -31,11 +31,15 @@ export const useInterviewStore = defineStore("interview", () => {
   );
 
   const answeredQuestions = computed(() =>
-    questions.value.filter((q) => q.answer_text && !q.is_posted),
+    questions.value.filter((q) => q.answer_text && !q.is_posted && !q.is_stashed),
   );
 
   const postedQuestions = computed(() =>
     questions.value.filter((q) => q.is_posted),
+  );
+
+  const stashedQuestions = computed(() =>
+    questions.value.filter((q) => q.is_stashed && !q.is_posted),
   );
 
   // Actions
@@ -334,6 +338,7 @@ export const useInterviewStore = defineStore("interview", () => {
     unansweredQuestions,
     answeredQuestions,
     postedQuestions,
+    stashedQuestions,
 
     // Actions
     fetchServers,
