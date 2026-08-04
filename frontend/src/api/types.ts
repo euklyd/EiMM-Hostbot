@@ -89,6 +89,7 @@ export interface TopAskerResponse {
 export interface PostAnswersResponse {
   success: boolean;
   posted_count: number;
+  skipped_count: number;
   message: string | null;
 }
 

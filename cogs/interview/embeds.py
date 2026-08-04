@@ -43,6 +43,11 @@ SAFE_FIELD_VALUE = 900
 SAFE_ANSWER_CHUNK = 950
 # Maximum fields before we need a new embed (leave 2 as buffer for edge cases)
 SAFE_FIELDS_PER_EMBED = 23
+# Safety valve: max embeds (messages) a single Q&A may be split across before
+# we give up and treat it as unpostable. Discord's 6000-char embed limit is a
+# per-message total across all embeds, so a too-long Q&A must span multiple
+# *messages*, not multiple embeds in the same message.
+MAX_SPLIT_EMBEDS = 10
 
 
 class AddQuestionResult(Enum):
@@ -366,6 +371,69 @@ def _add_chunked_qa(
     return (AddQuestionResult.SUCCESS, added_length)
 
 
+def split_qa_into_embeds(
+    interviewee: IntervieweeData,
+    question: QuestionData,
+    answer_text: str,
+) -> list[discord.Embed] | None:
+    """Split a Q&A too long for one embed across multiple embeds.
+
+    Each returned embed must be sent as its own message: Discord's 6000-char
+    embed limit is a total across all embeds *in a message*, so packing
+    more embeds into the same message doesn't add capacity.
+
+    Returns None if the Q&A would need more than MAX_SPLIT_EMBEDS embeds
+    (a safety valve against pathological input).
+    """
+    question_chunks = split_text_into_chunks(question.question_text, SAFE_FIELD_VALUE - 100)
+    answer_chunks = split_text_into_chunks(answer_text, SAFE_ANSWER_CHUNK)
+
+    fields: list[tuple[str, str]] = []
+    for i, chunk in enumerate(question_chunks):
+        lines = [line.strip() for line in chunk.split("\n")]
+        quote_block = "\n> ".join(lines)
+        formatted_chunk = f"> [{quote_block}]({question.jump_url})"
+        name = (
+            f"Question #{question.question_number} [{i + 1}/{len(question_chunks)}]"
+            if len(question_chunks) > 1
+            else f"Question #{question.question_number}"
+        )
+        fields.append((name, formatted_chunk))
+    for i, chunk in enumerate(answer_chunks):
+        name = (
+            f"Answer #{question.question_number} [{i + 1}/{len(answer_chunks)}]"
+            if len(answer_chunks) > 1
+            else f"Answer #{question.question_number}"
+        )
+        fields.append((name, chunk))
+
+    def new_embed() -> discord.Embed:
+        embed = create_blank_embed(interviewee, question.asker_name, question.asker_avatar_url)
+        embed.url = "https://discord.com"
+        return embed
+
+    embeds: list[discord.Embed] = []
+    embed = new_embed()
+    length = calculate_base_embed_length(interviewee, question.asker_name)
+    field_count = 0
+
+    for name, value in fields:
+        field_len = len(name) + len(value)
+        if field_count > 0 and (field_count >= SAFE_FIELDS_PER_EMBED or length + field_len > SAFE_EMBED_TOTAL):
+            embeds.append(embed)
+            if len(embeds) >= MAX_SPLIT_EMBEDS:
+                return None
+            embed = new_embed()
+            length = calculate_base_embed_length(interviewee, question.asker_name)
+            field_count = 0
+        embed.add_field(name=name, value=value, inline=False)
+        length += field_len
+        field_count += 1
+
+    embeds.append(embed)
+    return embeds
+
+
 def set_embed_footer(
     embed: discord.Embed,
     answered_count: int,
@@ -529,7 +597,29 @@ def generate_answer_embeds(
             output = add_question_to_embed(current_embed, question, current_length)
 
         if output.result == AddQuestionResult.QUESTION_TOO_LONG:
-            skipped.append(question)
+            # Doesn't fit in a single embed even fresh. Split it across
+            # multiple embeds/messages instead of dropping it silently.
+            if current_embed is not None and len(current_embed.fields) > 0:
+                finalize_embed(current_embed, pending_images)
+                pending_images = []
+            current_embed = None
+
+            cleaned_answer, images = extract_images_from_text(question.answer_text)
+            split_embeds = split_qa_into_embeds(interviewee, question, cleaned_answer or "(image)")
+
+            if split_embeds is None:
+                skipped.append(question)
+            else:
+                if images:
+                    split_embeds[0].set_image(url=images[0].url)
+                for i, split_embed in enumerate(split_embeds):
+                    set_embed_footer(split_embed, prior_answered + answered_in_batch + 1, total_asked)
+                    group = [split_embed]
+                    if i == 0 and len(images) > 1:
+                        for img in images[1:10]:
+                            group.append(create_gallery_embed(split_embed, img))
+                    embed_groups.append(group)
+                answered_in_batch += 1
         else:
             current_length += output.chars_added
             answered_in_batch += 1

@@ -6,6 +6,7 @@ of text processing and embed generation.
 
 from cogs.interview.embeds import (
     EMBED_FIELD_VALUE_LIMIT,
+    EMBED_TOTAL_LIMIT,
     SAFE_ANSWER_CHUNK,
     SAFE_EMBED_TOTAL,
     SAFE_FIELD_VALUE,
@@ -368,8 +369,8 @@ class TestGenerateAnswerEmbeds:
         assert len(result.embed_groups) == 1
         assert len(result.embed_groups[0][0].fields) >= 2
 
-    def test_too_long_question_is_skipped(self) -> None:
-        """Questions too long to embed are added to skipped list."""
+    def test_too_long_question_is_split_not_skipped(self) -> None:
+        """Q&A too long for one embed is split across multiple messages instead of dropped."""
         interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
         questions = [
             QuestionData(
@@ -377,7 +378,47 @@ class TestGenerateAnswerEmbeds:
                 asker_name="Asker",
                 asker_avatar_url="http://asker.url",
                 question_text="Q" * 3000,
-                answer_text="A" * 3000,  # Way too long
+                answer_text="A" * 3000,  # Too long for one embed, but not "impossibly" long
+                jump_url="http://discord.com/channels/1/2/3",
+            ),
+        ]
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=1)
+        assert len(result.skipped_questions) == 0
+        # Discord's 6000-char embed limit is a *per-message* total across all
+        # embeds in that message, so extra content must go in extra messages.
+        assert len(result.embed_groups) >= 2
+        for group in result.embed_groups:
+            assert sum(len(embed) for embed in group) <= EMBED_TOTAL_LIMIT
+
+    def test_realistic_long_answer_is_split_not_skipped(self) -> None:
+        """A real-world long-form answer (~5.2k chars) is split, not silently dropped."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        # Mimics a long-form paragraph answer a user might realistically write.
+        answer_text = ("This is a sentence about my music journey and instrument playing. " * 75).strip()
+        questions = [
+            QuestionData(
+                question_number=1,
+                asker_name="Asker",
+                asker_avatar_url="http://asker.url",
+                question_text="Talk about your instrument playing / music journey in general",
+                answer_text=answer_text,
+                jump_url="http://discord.com/channels/1/2/3",
+            ),
+        ]
+        result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=1)
+        assert len(result.skipped_questions) == 0
+        assert len(result.embed_groups) >= 1
+
+    def test_extremely_long_answer_is_still_skipped(self) -> None:
+        """An answer so long it would need an unreasonable number of messages is skipped as a safety valve."""
+        interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
+        questions = [
+            QuestionData(
+                question_number=1,
+                asker_name="Asker",
+                asker_avatar_url="http://asker.url",
+                question_text="Q?",
+                answer_text="word " * 60000,  # ~300k chars - not realistically postable
                 jump_url="http://discord.com/channels/1/2/3",
             ),
         ]
@@ -951,8 +992,8 @@ class TestMixedScenarios:
         # Second group should have 1 embed (main with image)
         assert len(result.embed_groups[1]) == 1
 
-    def test_skipped_question_mixed_with_valid(self) -> None:
-        """Oversized question is skipped while others succeed."""
+    def test_oversized_question_mixed_with_valid_is_split_not_skipped(self) -> None:
+        """An oversized question mixed with normal ones is split, not dropped."""
         interviewee = IntervieweeData(name="Test", color=0, avatar_url="http://avatar.url")
 
         questions = [
@@ -968,7 +1009,7 @@ class TestMixedScenarios:
                 question_number=2,
                 asker_name="Asker",
                 asker_avatar_url="http://asker.url",
-                question_text="X" * 3000,  # Way too long
+                question_text="X" * 3000,  # Too long for one embed, but splittable
                 answer_text="Y" * 3000,
                 jump_url="http://discord.com/channels/1/2/2",
             ),
@@ -984,8 +1025,6 @@ class TestMixedScenarios:
 
         result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=3)
 
-        # Q1 and Q3 should succeed, Q2 skipped
-        assert len(result.skipped_questions) == 1
-        assert result.skipped_questions[0].question_number == 2
-        # Should have embed(s) for Q1 and Q3
-        assert len(result.embed_groups) >= 1
+        # Nothing should be dropped - Q2 is split across extra messages instead.
+        assert len(result.skipped_questions) == 0
+        assert len(result.embed_groups) >= 3

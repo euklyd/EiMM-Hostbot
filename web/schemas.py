@@ -230,6 +230,7 @@ class PostAnswersResponse(BaseModel):
 
     success: bool
     posted_count: int
+    skipped_count: int = 0
     message: str | None = None
 
 

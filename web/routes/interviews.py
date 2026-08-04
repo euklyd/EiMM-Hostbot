@@ -492,8 +492,13 @@ async def post_answers(
     # Generate embeds
     result = generate_answer_embeds(interviewee_data, question_data, prior_answered, total_asked)
 
+    # Questions that couldn't be embedded (too long, even split) must not be
+    # marked posted - they were never sent to Discord.
+    skipped_numbers = {qd.question_number for qd in result.skipped_questions}
+    postable_questions = [q for q in questions if q.question_number not in skipped_numbers]
+
     # Post embeds to Discord
-    question_ids = [q.id for q in questions]
+    question_ids = [q.id for q in postable_questions]
     posted_count = 0
     last_msg = None
 
@@ -506,16 +511,33 @@ async def post_answers(
             logger.error(f"Failed to post embed: {e}")
             raise HTTPException(status.HTTP_502_BAD_GATEWAY, "Failed to post to Discord") from e
 
-    # Mark questions as posted
-    await service.mark_posted(db, question_ids, last_msg.id if last_msg else 0)
-    await db.commit()
+    # Mark only the questions that were actually posted
+    if question_ids:
+        await service.mark_posted(db, question_ids, last_msg.id if last_msg else 0)
+        await db.commit()
 
-    logger.info(f"Posted {posted_count} embeds with {len(questions)} answers for interview {interview_id}")
+    logger.info(
+        f"Posted {posted_count} embeds with {len(question_ids)} answers "
+        f"({len(result.skipped_questions)} skipped) for interview {interview_id}"
+    )
+
+    if not question_ids:
+        # Nothing could be posted - this is a failure, not a silent no-op.
+        raise HTTPException(
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
+            f"{len(result.skipped_questions)} answer(s) were too long to post to Discord "
+            "and could not be sent. Please shorten them and try again.",
+        )
+
+    message = f"Posted {len(question_ids)} answers in {posted_count} embeds"
+    if result.skipped_questions:
+        message += f" ({len(result.skipped_questions)} answer(s) too long to post were skipped)"
 
     return PostAnswersResponse(
         success=True,
-        posted_count=len(questions),
-        message=f"Posted {len(questions)} answers in {posted_count} embeds",
+        posted_count=len(question_ids),
+        skipped_count=len(result.skipped_questions),
+        message=message,
     )
 
 

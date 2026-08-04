@@ -14,6 +14,7 @@ const store = useInterviewStore();
 
 const posting = ref(false);
 const postMessage = ref<string | null>(null);
+const postMessageType = ref<"success" | "warning" | "error">("success");
 const hidePosted = ref(false);
 const searchQuery = ref("");
 
@@ -108,12 +109,19 @@ async function handlePost() {
     const result = await store.postAnswers(interviewIdNum.value);
     postMessage.value = result.message || `Posted ${result.posted_count} answers!`;
 
-    // Clear message after a few seconds
-    setTimeout(() => {
-      postMessage.value = null;
-    }, 5000);
+    if (result.skipped_count > 0) {
+      // Something didn't make it to Discord - keep this visible, don't auto-dismiss.
+      postMessageType.value = "warning";
+    } else {
+      postMessageType.value = "success";
+      // Clear message after a few seconds
+      setTimeout(() => {
+        postMessage.value = null;
+      }, 5000);
+    }
   } catch (e) {
     postMessage.value = e instanceof Error ? e.message : "Failed to post answers";
+    postMessageType.value = "error";
   } finally {
     posting.value = false;
   }
@@ -279,7 +287,16 @@ async function retryLoad() {
         <span v-if="store.stashedQuestions.length > 0" class="text-yellow-400 text-sm">
           ({{ store.stashedQuestions.length }} stashed answer{{ store.stashedQuestions.length === 1 ? '' : 's' }} not included)
         </span>
-        <span v-if="postMessage" class="text-green-400">{{ postMessage }}</span>
+        <span
+          v-if="postMessage"
+          :class="{
+            'text-green-400': postMessageType === 'success',
+            'text-yellow-400': postMessageType === 'warning',
+            'text-red-400': postMessageType === 'error',
+          }"
+        >
+          {{ postMessage }}
+        </span>
       </div>
 
       <!-- Mobile: Card list -->
