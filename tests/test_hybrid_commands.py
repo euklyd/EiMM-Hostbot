@@ -72,6 +72,7 @@ class TestMacroCog:
     @pytest.fixture
     def cog(self, mock_bot):
         from cogs.macro import Macro
+
         return Macro(mock_bot)
 
     def test_cog_loads(self, cog):
@@ -95,6 +96,7 @@ class TestUtilityCog:
     @pytest.fixture
     def cog(self, mock_bot):
         from cogs.utility import Utility
+
         return Utility(mock_bot)
 
     def test_cog_loads(self, cog):
@@ -123,9 +125,9 @@ class TestScryfallCog:
     @pytest.fixture
     def cog(self, mock_bot):
         # Cards cog requires db session, so we mock it
-        with patch("cogs.scryfall.async_sessionmaker"), \
-             patch("cogs.scryfall.create_async_engine"):
+        with patch("cogs.scryfall.async_sessionmaker"), patch("cogs.scryfall.create_async_engine"):
             from cogs.scryfall import Cards
+
             return Cards(mock_bot, MagicMock(), "test.db")
 
     def test_cog_loads(self, cog):
@@ -146,6 +148,7 @@ class TestEmojiCountCog:
     @pytest.fixture
     def cog(self, mock_bot):
         from cogs.emoji_count import Emoji
+
         return Emoji(mock_bot)
 
     def test_cog_loads(self, cog):
@@ -185,10 +188,13 @@ class TestHostbotCog:
     @pytest.fixture
     def cog(self, mock_bot):
         # Need to patch the database setup
-        with patch("cogs.hostbot.create_engine"), \
-             patch("cogs.hostbot.sessionmaker"), \
-             patch("cogs.hostbot.spreadsheet.SheetConnection"):
+        with (
+            patch("cogs.hostbot.create_engine"),
+            patch("cogs.hostbot.sessionmaker"),
+            patch("cogs.hostbot.spreadsheet.SheetConnection"),
+        ):
             from cogs.hostbot import HostBot
+
             return HostBot(mock_bot)
 
     def test_cog_loads(self, cog):
@@ -278,6 +284,7 @@ class TestResolveMembersHelper:
     @pytest.mark.asyncio
     async def test_resolve_mentions(self, mock_guild):
         from utils.members import resolve_members
+
         guild, members = mock_guild
 
         result = await resolve_members(guild, "<@111111111111111111> <@222222222222222222>")
@@ -288,6 +295,7 @@ class TestResolveMembersHelper:
     @pytest.mark.asyncio
     async def test_resolve_mentions_with_nickname(self, mock_guild):
         from utils.members import resolve_members
+
         guild, members = mock_guild
 
         # Nickname mention format <@!id>
@@ -298,6 +306,7 @@ class TestResolveMembersHelper:
     @pytest.mark.asyncio
     async def test_resolve_raw_ids(self, mock_guild):
         from utils.members import resolve_members
+
         guild, members = mock_guild
 
         result = await resolve_members(guild, "111111111111111111 222222222222222222")
@@ -306,6 +315,7 @@ class TestResolveMembersHelper:
     @pytest.mark.asyncio
     async def test_resolve_mixed(self, mock_guild):
         from utils.members import resolve_members
+
         guild, members = mock_guild
 
         result = await resolve_members(guild, "<@111111111111111111> 222222222222222222 <@!333333333333333333>")
@@ -314,6 +324,7 @@ class TestResolveMembersHelper:
     @pytest.mark.asyncio
     async def test_resolve_skips_unknown(self, mock_guild):
         from utils.members import resolve_members
+
         guild, members = mock_guild
 
         result = await resolve_members(guild, "<@111111111111111111> <@999999999999999999>")
@@ -323,6 +334,7 @@ class TestResolveMembersHelper:
     @pytest.mark.asyncio
     async def test_resolve_deduplicates(self, mock_guild):
         from utils.members import resolve_members
+
         guild, members = mock_guild
 
         result = await resolve_members(guild, "<@111111111111111111> <@111111111111111111> 111111111111111111")
@@ -331,6 +343,7 @@ class TestResolveMembersHelper:
     @pytest.mark.asyncio
     async def test_resolve_empty_string(self, mock_guild):
         from utils.members import resolve_members
+
         guild, _ = mock_guild
 
         result = await resolve_members(guild, "")
@@ -339,6 +352,7 @@ class TestResolveMembersHelper:
     @pytest.mark.asyncio
     async def test_resolve_no_matches(self, mock_guild):
         from utils.members import resolve_members
+
         guild, _ = mock_guild
 
         result = await resolve_members(guild, "hello world no ids here")

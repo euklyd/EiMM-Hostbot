@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -10,7 +12,6 @@ from sqlalchemy.orm import Session, sessionmaker
 from cogs.interview import service
 from cogs.interview.models import Interview, InterviewServer, Question
 from cogs.interview.service import QuestionFilter
-from datetime import UTC, datetime, timedelta
 from db.base import Base
 
 
@@ -177,8 +178,8 @@ class TestInterviewLifecycle:
         async_session.add(server)
         await async_session.flush()
 
-        iv1 = await service.start_interview(async_session, 1, 1, "User1")
-        iv2 = await service.start_interview(async_session, 1, 2, "User2")  # auto-ends iv1
+        await service.start_interview(async_session, 1, 1, "User1")
+        iv2 = await service.start_interview(async_session, 1, 2, "User2")  # auto-ends first interview
         await service.end_interview(async_session, iv2.id)
         await async_session.commit()
 

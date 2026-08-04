@@ -1,6 +1,5 @@
 """Tests for interview command utilities and guard behaviour."""
 
-import contextlib
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -686,14 +685,11 @@ class TestMemberOrStr:
 class TestAnswerCommandSkips:
     """Regression tests: skipped (too-long) questions must not be marked as posted."""
 
-    async def test_skipped_questions_not_marked_posted(
-        self, interview_cog: Interview, mock_ctx: MagicMock
-    ) -> None:
+    async def test_skipped_questions_not_marked_posted(self, interview_cog: Interview, mock_ctx: MagicMock) -> None:
         """When generate_answer_embeds skips a question, mark_posted must not include it."""
         import discord as _discord
 
         from cogs.interview.embeds import EmbedGenerationResult, QuestionData
-        from cogs.interview.service import QuestionFilter
 
         # Mock interview and server
         interview = MagicMock()
@@ -815,9 +811,7 @@ class TestIvUnend:
         with (
             patch("cogs.interview.commands.get_session", make_get_session()),
             patch("cogs.interview.commands.service.get_current_interview", new=AsyncMock(return_value=active)),
-            patch(
-                "cogs.interview.commands.service.unend_interview", new=AsyncMock()
-            ) as mock_unend,
+            patch("cogs.interview.commands.service.unend_interview", new=AsyncMock()) as mock_unend,
         ):
             await _call(interview_cog, "iv_unend", mock_ctx)
 
@@ -862,9 +856,7 @@ class TestIvUnend:
             patch("cogs.interview.commands.get_session", make_get_session()),
             patch("cogs.interview.commands.service.get_current_interview", new=AsyncMock(return_value=None)),
             patch("cogs.interview.commands.service.get_interview", new=AsyncMock(return_value=foreign)),
-            patch(
-                "cogs.interview.commands.service.unend_interview", new=AsyncMock()
-            ) as mock_unend,
+            patch("cogs.interview.commands.service.unend_interview", new=AsyncMock()) as mock_unend,
         ):
             await _call(interview_cog, "iv_unend", mock_ctx, interview_id=5)
 
