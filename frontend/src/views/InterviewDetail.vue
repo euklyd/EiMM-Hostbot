@@ -19,27 +19,23 @@ const postMessageType = ref<"success" | "warning" | "error">("success");
 const hidePosted = ref(false);
 const searchQuery = ref("");
 
-// Filter questions based on hide toggle and search
-const visibleQuestions = computed(() => {
+// Questions matching the search query (or all questions, if no query)
+const searchMatchedQuestions = computed(() => {
   const query = searchQuery.value.trim();
+  return query ? store.questions.filter((q) => matchesQuestionFilter(q, query)) : store.questions;
+});
 
-  // If searching, filter by match and ignore hidePosted toggle
-  if (query) {
-    return store.questions.filter((q) => matchesQuestionFilter(q, query));
-  }
-
-  // No search - apply hidePosted toggle
+// Search and the hide-posted toggle compose: both apply together
+const visibleQuestions = computed(() => {
   if (hidePosted.value) {
-    return store.questions.filter((q) => !q.is_posted);
+    return searchMatchedQuestions.value.filter((q) => !q.is_posted);
   }
-
-  return store.questions;
+  return searchMatchedQuestions.value;
 });
 
 const hiddenCount = computed(() => {
-  // When searching, no "hidden" count (search overrides toggle)
-  if (searchQuery.value.trim()) return 0;
-  return hidePosted.value ? store.postedQuestions.length : 0;
+  if (!hidePosted.value) return 0;
+  return searchMatchedQuestions.value.filter((q) => q.is_posted).length;
 });
 
 // Use strings for Discord IDs to avoid precision loss
