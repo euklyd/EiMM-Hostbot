@@ -125,7 +125,7 @@ function truncate(text: string, maxLength: number): string {
               <ul class="mt-1 space-y-1">
                 <li><code class="bg-gray-700 px-1 rounded">asker:alice</code> - exact match</li>
                 <li><code class="bg-gray-700 px-1 rounded">asker~alice</code> - fuzzy match (typo-tolerant)</li>
-                <li><code class="bg-gray-700 px-1 rounded">"star wars"</code> - exact phrase</li>
+                <li><code class="bg-gray-700 px-1 rounded">"power player"</code> - exact phrase</li>
               </ul>
               <h4 class="font-medium text-white mt-3">Operators</h4>
               <ul class="mt-1 space-y-1">
