@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, computed, ref } from "vue";
 import { useAuthStore } from "../stores/auth";
 import { useInterviewStore } from "../stores/interview";
+import { matchesQuestionFilter } from "../utils/questionFilter";
 import QuestionRow from "../components/QuestionRow.vue";
 
 const props = defineProps<{
@@ -20,15 +21,11 @@ const searchQuery = ref("");
 
 // Filter questions based on hide toggle and search
 const visibleQuestions = computed(() => {
-  const query = searchQuery.value.trim().toLowerCase();
+  const query = searchQuery.value.trim();
 
   // If searching, filter by match and ignore hidePosted toggle
   if (query) {
-    return store.questions.filter((q) => {
-      const questionMatch = q.question_text.toLowerCase().includes(query);
-      const answerMatch = q.answer_text?.toLowerCase().includes(query) ?? false;
-      return questionMatch || answerMatch;
-    });
+    return store.questions.filter((q) => matchesQuestionFilter(q, query));
   }
 
   // No search - apply hidePosted toggle
@@ -242,8 +239,8 @@ async function retryLoad() {
         </div>
 
         <!-- Search -->
-        <div class="mt-3 sm:mt-4">
-          <div class="relative max-w-xs">
+        <div class="mt-3 sm:mt-4 flex items-center gap-1.5">
+          <div class="relative max-w-xs flex-1">
             <input
               v-model="searchQuery"
               type="text"
@@ -268,10 +265,27 @@ async function retryLoad() {
               </svg>
             </button>
           </div>
-          <p v-if="searchQuery && visibleQuestions.length === 0" class="text-gray-500 text-sm mt-2">
-            No matches found
-          </p>
+          <span
+            class="shrink-0 text-gray-500 hover:text-gray-300 cursor-help"
+            title='Filter syntax:
+asker:name - only questions from a matching asker
+content:text - only if question/answer contains text
+"exact phrase" - literal phrase match
+plain words - same as content: (all terms must match)'
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093M12 17h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </span>
         </div>
+        <p v-if="searchQuery && visibleQuestions.length === 0" class="text-gray-500 text-sm mt-2">
+          No matches found
+        </p>
       </div>
 
       <!-- Post button -->
