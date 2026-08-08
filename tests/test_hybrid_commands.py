@@ -1,9 +1,9 @@
 """Smoke tests for hybrid command registration."""
 
-import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import discord
+import pytest
 from discord.ext import commands
 
 
@@ -116,7 +116,7 @@ class TestUtilityCog:
         params = cmd.clean_params
         assert "emoji" in params
         # The annotation should be str, not a union
-        assert params["emoji"].annotation == str
+        assert params["emoji"].annotation is str
 
 
 class TestScryfallCog:
@@ -175,7 +175,7 @@ class TestEmojiCountCog:
         emoji_cmd = next(c for c in cog.get_commands() if c.name == "emoji")
 
         count_cmd = next(c for c in emoji_cmd.commands if c.name == "count")
-        assert count_cmd.clean_params["em"].annotation == str
+        assert count_cmd.clean_params["em"].annotation is str
 
         stats_cmd = next(c for c in emoji_cmd.commands if c.name == "stats")
         # str | None is fine
@@ -237,14 +237,14 @@ class TestHostbotCog:
         enrole_cmd = next(c for c in cog.get_commands() if c.name == "enrole")
         params = enrole_cmd.clean_params
         assert "members" in params
-        assert params["members"].annotation == str
+        assert params["members"].annotation is str
 
     def test_addspec_uses_string_members(self, cog):
         """Verify addspec uses str instead of Greedy[Member]."""
         addspec_cmd = next(c for c in cog.get_commands() if c.name == "addspec")
         params = addspec_cmd.clean_params
         assert "members" in params
-        assert params["members"].annotation == str
+        assert params["members"].annotation is str
 
     def test_setchan_uses_guild_channel(self, cog):
         """Verify setchan uses GuildChannel for union type compatibility."""

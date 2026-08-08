@@ -1,7 +1,5 @@
 """Tests for web API schemas."""
 
-import pytest
-
 from web.schemas import DiscordGuild, DiscordUser
 
 

@@ -5,9 +5,7 @@ of text processing and embed generation.
 """
 
 from cogs.interview.embeds import (
-    EMBED_FIELD_VALUE_LIMIT,
     EMBED_TOTAL_LIMIT,
-    SAFE_ANSWER_CHUNK,
     SAFE_EMBED_TOTAL,
     SAFE_FIELD_VALUE,
     SAFE_FIELDS_PER_EMBED,

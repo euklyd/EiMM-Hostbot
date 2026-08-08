@@ -78,6 +78,8 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # interview.py will be overhauled in Phase 8 - defer annotations until then
 "cogs/interview.py" = ["ANN"]
+# Type annotations on test functions/fixtures add noise without value
+"tests/*" = ["ANN"]
 
 [tool.ruff.format]
 quote-style = "double"

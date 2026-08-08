@@ -39,7 +39,7 @@ async def search_interviews(
         raise HTTPException(
             status.HTTP_400_BAD_REQUEST,
             f"Invalid query syntax: {e}",
-        )
+        ) from e
 
     if ast is None:
         raise HTTPException(
