@@ -30,6 +30,7 @@ async def async_session() -> AsyncGenerator[AsyncSession]:
     session_factory = async_sessionmaker(engine, expire_on_commit=False)
     async with session_factory() as session:
         yield session
+    await engine.dispose()
 
 
 @pytest.fixture
