@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator, Generator
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -16,7 +17,7 @@ from db.base import Base
 
 
 @pytest.fixture
-def sync_session() -> Session:
+def sync_session() -> Generator[Session]:
     """Create a sync session for setup (models require sync initially)."""
     engine = create_engine("sqlite:///:memory:")
     Base.metadata.create_all(engine)
@@ -27,7 +28,7 @@ def sync_session() -> Session:
 
 
 @pytest.fixture
-async def async_session() -> AsyncSession:
+async def async_session() -> AsyncGenerator[AsyncSession]:
     """Create an async session for service tests."""
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:

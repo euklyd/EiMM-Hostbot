@@ -120,7 +120,7 @@ class Emoji(commands.Cog):
             return int(match.group(1))
         return None
 
-    @commands.hybrid_group(invoke_without_command=True, fallback="info")
+    @commands.hybrid_group(fallback="info")
     @commands.has_permissions(manage_emojis=True)
     async def emoji(self, ctx: commands.Context) -> None:
         """Emoji management commands."""
@@ -442,7 +442,7 @@ class Emoji(commands.Cog):
 
         await ctx.send("Alright, _nerd_.", file=discord.File(filename))
 
-    @commands.hybrid_group(invoke_without_command=True, fallback="info")
+    @commands.hybrid_group(fallback="info")
     @commands.has_permissions(manage_emojis=True)
     async def evemoji(self, ctx: commands.Context) -> None:
         """Event Emoji command group."""

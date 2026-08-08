@@ -6,6 +6,7 @@ even though no Discord message was ever sent.
 
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from unittest.mock import AsyncMock, MagicMock
 
 import discord
@@ -21,7 +22,7 @@ from web.schemas import DiscordUser
 
 
 @pytest.fixture
-async def async_session() -> AsyncSession:
+async def async_session() -> AsyncGenerator[AsyncSession]:
     engine = create_async_engine("sqlite+aiosqlite:///:memory:")
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

@@ -91,7 +91,7 @@ class HostBot(commands.Cog):
 
         hbs.Base.metadata.create_all(engine)
 
-    @commands.hybrid_group(invoke_without_command=True, fallback="help")
+    @commands.hybrid_group(fallback="help")
     @commands.has_permissions(administrator=True)
     async def init(self, ctx: commands.Context) -> None:
         """HostBot server initialization commands."""
@@ -848,7 +848,7 @@ class HostBot(commands.Cog):
             return True
         return ctx.channel.category.id in [c.id for c in server.channels if c.type == "rolepms"]
 
-    @commands.hybrid_group(invoke_without_command=True, fallback="add")
+    @commands.hybrid_group(fallback="add")
     @app_commands.describe(members="Spectators to add (@mentions or user IDs)")
     async def addspec(self, ctx: commands.Context, *, members: str) -> None:
         """Add a spectator to your Role PM."""

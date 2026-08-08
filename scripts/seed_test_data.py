@@ -283,6 +283,7 @@ async def seed_votes(interview: Interview) -> None:
         # Voter1 votes for Candidate1
         await service.cast_vote(
             session,
+            server_id=TEST_SERVER_ID,
             interview_id=interview.id,
             voter_id=USERS["voter1"]["id"],
             candidate_id=USERS["candidate1"]["id"],
@@ -294,6 +295,7 @@ async def seed_votes(interview: Interview) -> None:
         # Voter2 votes for Candidate1
         await service.cast_vote(
             session,
+            server_id=TEST_SERVER_ID,
             interview_id=interview.id,
             voter_id=USERS["voter2"]["id"],
             candidate_id=USERS["candidate1"]["id"],
@@ -305,6 +307,7 @@ async def seed_votes(interview: Interview) -> None:
         # Asker1 votes for Candidate2
         await service.cast_vote(
             session,
+            server_id=TEST_SERVER_ID,
             interview_id=interview.id,
             voter_id=USERS["asker1"]["id"],
             candidate_id=USERS["candidate2"]["id"],

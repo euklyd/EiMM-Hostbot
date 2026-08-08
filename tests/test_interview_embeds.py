@@ -118,6 +118,7 @@ class TestCreateBlankEmbed:
         """Embed has correct title."""
         interviewee = IntervieweeData(name="TestUser", color=0xFF0000, avatar_url="http://avatar.url")
         embed = create_blank_embed(interviewee, "AskerName", "http://asker.url")
+        assert embed.title is not None
         assert "TestUser" in embed.title
         assert "interview" in embed.title.lower()
 
@@ -126,6 +127,7 @@ class TestCreateBlankEmbed:
         interviewee = IntervieweeData(name="TestUser", color=0xFF0000, avatar_url="http://avatar.url")
         embed = create_blank_embed(interviewee, "AskerName", "http://asker.url")
         assert embed.author is not None
+        assert embed.author.name is not None
         assert "AskerName" in embed.author.name
 
     def test_embed_has_color(self) -> None:
@@ -282,6 +284,7 @@ class TestSetEmbedFooter:
         embed = create_blank_embed(interviewee, "Asker", "http://asker.url")
         set_embed_footer(embed, answered_count=5, total_count=10)
         assert embed.footer is not None
+        assert embed.footer.text is not None
         assert "5" in embed.footer.text
         assert "10" in embed.footer.text
 
@@ -338,8 +341,12 @@ class TestGenerateAnswerEmbeds:
         result = generate_answer_embeds(interviewee, questions, prior_answered=0, total_asked=2)
         assert len(result.embed_groups) == 2
         # First embed should be from Asker1, second from Asker2
-        assert "Asker1" in result.embed_groups[0][0].author.name
-        assert "Asker2" in result.embed_groups[1][0].author.name
+        first_author = result.embed_groups[0][0].author
+        second_author = result.embed_groups[1][0].author
+        assert first_author is not None and first_author.name is not None
+        assert second_author is not None and second_author.name is not None
+        assert "Asker1" in first_author.name
+        assert "Asker2" in second_author.name
 
     def test_same_asker_same_embed(self) -> None:
         """Same asker's questions go in same embed group."""
@@ -439,8 +446,10 @@ class TestGenerateAnswerEmbeds:
         ]
         result = generate_answer_embeds(interviewee, questions, prior_answered=5, total_asked=10)
         # Should show 6 answered (5 prior + 1 in batch) of 10
-        assert "6" in result.embed_groups[0][0].footer.text
-        assert "10" in result.embed_groups[0][0].footer.text
+        footer = result.embed_groups[0][0].footer
+        assert footer is not None and footer.text is not None
+        assert "6" in footer.text
+        assert "10" in footer.text
 
     def test_many_fields_triggers_new_embed(self) -> None:
         """Exceeding field limit starts new embed group."""
@@ -692,7 +701,7 @@ class TestImageGalleryEmbeds:
         assert output.result == AddQuestionResult.SUCCESS
         # The field should contain "(image)" as placeholder
         field_values = [f.value for f in embed.fields]
-        assert any("(image)" in v for v in field_values)
+        assert any(v is not None and "(image)" in v for v in field_values)
 
 
 # =============================================================================
@@ -720,6 +729,7 @@ class TestEmbedFooterWithImages:
 
         set_embed_footer(embed, answered_count=1, total_count=5, extra_images=3)
 
+        assert embed.footer is not None and embed.footer.text is not None
         assert "+3 more" in embed.footer.text
         assert "click images to view all" in embed.footer.text
 
@@ -730,6 +740,7 @@ class TestEmbedFooterWithImages:
 
         set_embed_footer(embed, answered_count=1, total_count=5, extra_images=6, dropped_images=2)
 
+        assert embed.footer is not None and embed.footer.text is not None
         assert "2 images not shown" in embed.footer.text
         assert "limit 10" in embed.footer.text
 
@@ -740,6 +751,7 @@ class TestEmbedFooterWithImages:
 
         set_embed_footer(embed, answered_count=1, total_count=5, extra_images=6, dropped_images=1)
 
+        assert embed.footer is not None and embed.footer.text is not None
         assert "1 image not shown" in embed.footer.text
         assert "1 images" not in embed.footer.text  # Should be singular
 
@@ -818,7 +830,7 @@ class TestFieldLimitEdgeCases:
         assert output.result == AddQuestionResult.SUCCESS
         # Check for chunked field names like "Question #1 [1/2]"
         field_names = [f.name for f in embed.fields]
-        assert any("[1/" in name for name in field_names)
+        assert any(name is not None and "[1/" in name for name in field_names)
 
     def test_both_question_and_answer_long(self) -> None:
         """Both long question and answer are properly chunked."""
@@ -839,8 +851,8 @@ class TestFieldLimitEdgeCases:
         assert output.result == AddQuestionResult.SUCCESS
         # Should have question and answer fields
         field_names = [f.name for f in embed.fields]
-        assert any("Question" in name for name in field_names)
-        assert any("Answer" in name for name in field_names)
+        assert any(name is not None and "Question" in name for name in field_names)
+        assert any(name is not None and "Answer" in name for name in field_names)
 
 
 class TestTotalEmbedLimitEdgeCases:
