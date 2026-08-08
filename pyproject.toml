@@ -81,6 +81,12 @@ ignore = [
 # Type annotations on test functions/fixtures add noise without value
 "tests/*" = ["ANN"]
 
+[tool.ruff.lint.isort]
+# conf/settings.py is gitignored, so ruff can't always probe it on disk to
+# infer conf.settings is first-party (e.g. in CI). Declare explicitly so
+# import sorting doesn't depend on which local files happen to exist.
+known-first-party = ["cogs", "conf", "core", "db", "schemas", "utils", "web"]
+
 [tool.ruff.format]
 quote-style = "double"
 
